@@ -8,7 +8,7 @@
 ## Структура
 
 - `main.py` — FastAPI приложение
-- `api/` — роуты (`/api/logs`, `/api/settings`, `/api/advice`)
+- `api/` — роуты (`/api/logs`, `/api/settings`, `/api/rp`)
 - `models/` — Pydantic модели
 - `static/` — HTML страницы админки
 - `frontend/` — JS для админки
@@ -23,7 +23,13 @@
 ### Тесты
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_ui_smoke.py
+```
+
+`tests/test_ui_smoke.py` требует Selenium и установленного браузера, поэтому по умолчанию исключён.
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_ui_smoke.py -q
 ```
 
 ### Для мода
@@ -44,14 +50,16 @@
 1) Создать и активировать виртуальное окружение:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 ```
 
 2) Поставить зависимости:
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements.txt   # ядро сервера
+# pip install -r requirements-dev.txt      # + pytest, selenium
+# pip install -r requirements-vision.txt   # + подсистема legacy/vision-assistant (vision, голос) — ставится долго
 ```
 
 3) **Настроить Groq API (опционально)**
@@ -132,7 +140,7 @@ cd mod\minecraft-mod
 Мод (клиентский) будет:
 
 - отправлять `POST /api/logs/` на сервер
-- периодически получать советы с `GET /api/advice/`
+- периодически получать советы с `GET /api/rp/`
 - показывать советы в игре (actionbar)
 
 ## Настройки
@@ -144,7 +152,7 @@ cd mod\minecraft-mod
 Важно:
 
 - `analysis_interval` (мс) — влияет на частоту отправки `state` логов из мода (например `5000` = раз в 5 секунд)
-- `threat_threshold` — влияет на правило в `/api/advice/`
+- `threat_threshold` — влияет на правило в `/api/rp/`
 
 ### Настройки мода
 
@@ -258,7 +266,7 @@ MVP события (7 шт):
 
 ## Нюансы для команды
 
-- **Не коммитить** `venv/`, `mod/minecraft-mod/run/`, `build/`, `.env` — они в `.gitignore`.
+- **Не коммитить** `.venv/`, `venv/`, `mod/minecraft-mod/run/`, `build/`, `.env` — они в `.gitignore`.
 - Если кто-то запускает сервер не на своей машине, то в конфиге мода нужно указать `serverUrl` на реальный IP/домен сервера (не `127.0.0.1`).
 - Убедитесь, что у вас **Java 17** (иначе Fabric/Gradle сборка сломается).
 
@@ -268,7 +276,7 @@ MVP события (7 шт):
 
 ### Как это работает
 
-1. Когда клиент запрашивает `GET /api/advice/`, система собирает последние 5 логов из игры
+1. Когда клиент запрашивает `GET /api/rp/`, система собирает последние 5 логов из игры
 2. Эти логи отправляются в Groq API вместе с специально подготовленным промптом
 3. LLM анализирует ситуацию (здоровье, враги, голод, время суток) и генерирует короткий совет
 4. Совет отправляется обратно клиенту с источником `"groq"`
@@ -293,7 +301,7 @@ MVP события (7 шт):
 
 Проверить, что работает:
 ```bash
-curl http://127.0.0.1:8000/api/advice/
+curl http://127.0.0.1:8000/api/rp/
 ```
 
 В ответе должно быть `"source": "groq"` вместо `"source": "fallback"`.
@@ -350,7 +358,7 @@ curl http://127.0.0.1:8000/api/advice/
 ```
 
 4. **Сервер получает** и добавляет в логи
-5. **Запрос /api/advice/** обнаруживает смерть
+5. **Запрос `GET /api/rp/`** обнаруживает смерть
 6. **Возвращает CRITICAL** совет с confidence=1.0:
 ```json
 {
@@ -407,7 +415,7 @@ Double-click start_minecraft_client.bat
 # Должно быть событие event_type: "death"
 
 # 5. Проверьте API
-# http://localhost:8000/api/advice/
+# http://localhost:8000/api/rp/
 # Должно быть "level": "CRITICAL"
 
 # 6. В консоли мода должно быть:

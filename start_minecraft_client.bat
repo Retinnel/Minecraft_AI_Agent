@@ -1,11 +1,8 @@
 @echo off
-REM Start Minecraft client with the mod
+REM Start Minecraft client with the mod (requires JDK 17)
 
 if not exist logs mkdir logs
 set LOGFILE=%~dp0logs\minecraft_client.log
-
-echo Activating virtual environment...
-call venv\Scripts\activate.bat
 
 echo Starting Minecraft client...
 echo This may take a moment...

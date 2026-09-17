@@ -68,3 +68,6 @@ explanation.txt
 config.yaml
 
 .report/
+
+# Runtime state (пишется приложением во время работы)
+data/challenge_state.json

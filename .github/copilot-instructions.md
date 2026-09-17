@@ -5,8 +5,8 @@
 ### Python backend
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -36,7 +36,7 @@ Windows helper:
 Python unit tests are checked in:
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m pytest tests -q --ignore=tests/test_ui_smoke.py
 ```
 
 There is still no lint configuration and no Java/Fabric test suite checked in. Runtime validation is also manual by running the backend and mod together, then checking:
@@ -66,7 +66,7 @@ Runtime logs are written to `logs\server.log` and `logs\minecraft_client.log` by
 ## Key conventions
 
 - Preserve the shared-state pattern when changing backend behavior. If you create a second `GroqClient`, a second log store, or a second settings object, other routers will not see the same state.
-- Keep player-facing assistant text in Russian and short. Prompt edits belong in `llm_config.json`, and the placeholders `{context}` and `{player_message}` must stay intact.
+- Keep player-facing assistant text in Russian and short. Prompt edits belong in `llm_prompts.json`, and the placeholders `{context}` and `{player_message}` must stay intact.
 - LLM context is intentionally capped:
   - RP tips and chat replies use only the last 5 logs
   - Analytics uses aggregated counters plus a reduced timeline

@@ -1,0 +1,19 @@
+# Зависимости архивной подсистемы legacy/vision-assistant (захват экрана, vision, голос, TTS, оверлей).
+# Это отдельный от игрового ассистента модуль, в курсовой работе не используется.
+# Ставится долго (torch ~2.5 ГБ), PyAudio на Windows часто требует сборочных инструментов.
+-r requirements.txt
+dxcam
+opencv-python
+Pillow
+numpy
+faster-whisper
+PyAudio
+sounddevice
+torch
+torchaudio
+PyQt6
+pynput
+chromadb
+sentence-transformers
+google-generativeai
+pyyaml
