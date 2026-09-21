@@ -32,6 +32,8 @@
 - [PLAN.md](PLAN.md) — поэтапный план работ с привязкой к опроцентовкам;
 - [docs/context-design.md](docs/context-design.md) — управление контекстом и памятью;
 - [eval/README.md](eval/README.md) — оценочный контур, метрики, принятая политика поведения.
+- [docs/delta-from-previous.md](docs/delta-from-previous.md) — отличие от 6-го семестра,
+  материал для обоснования темы и введения записки.
 
 ### Принятая политика поведения
 
