@@ -11,3 +11,4 @@ markdown>=3.6
 # LLM-провайдеры: Groq, а также OpenAI-совместимые (Ollama, OpenRouter)
 groq>=0.5.0
 openai>=1.0.0
+rdflib>=7.0

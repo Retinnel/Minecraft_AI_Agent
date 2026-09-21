@@ -111,7 +111,7 @@ FastAPI-сервер (api/)
 | `models/` | Pydantic-модели |
 | `static/`, `frontend/js/` | Админка: 7 страниц (dashboard, settings, responses, player-state, challenges, analytics, wiki) |
 | `mod/minecraft-mod/` | Fabric client-only мод, Java 17, MC 1.20.1 |
-| `kb/` | Построение базы знаний: загрузка локали, извлечение данных игры |
+| `kb/` | База знаний: загрузка локали, извлечение данных игры, сборка онтологии, доступ через `kb.graph.KnowledgeBase` |
 | `eval/` | Оценочный контур: золотой набор реплик, раннер метрик, отчёты |
 | `legacy/vision-assistant/` | Архив, к проекту не относится (см. ниже) |
 
@@ -136,6 +136,8 @@ FastAPI-сервер (api/)
 | `data/minecraft_crafting_recipes.json` | Рецепты, ключи и ячейки сетки — русские названия, **не связаны с ID каталога** |
 | `data/challenge_state.json` | Состояние челленджей (изменяется в рантайме) |
 | `data/game/*.json` | Извлечённые данные игры: 1514 сущностей, 1144 рецепта, 282 тега, дроп, требования к инструменту. В `.gitignore`, воспроизводятся `kb.extract` |
+| `data/kb/game.ttl` | Онтология, 23971 триплет. В `.gitignore`, воспроизводится `kb.build` |
+| `kb/restrictions.json` | Рукописный слой: запреты на боссов и служебные блоки с причинами |
 | `llm_config.json` | Выбор модели и параметры |
 | `llm_prompts.json` | Шаблоны промптов |
 | `settings.json` | Настройки сервера |
@@ -155,7 +157,7 @@ python -m venv .venv
 ./.venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Тесты (108 штук, все проходят):
+Тесты (130 штук, все проходят):
 
 ```bash
 ./.venv/Scripts/python.exe -m pytest tests -q --ignore=tests/test_ui_smoke.py
@@ -166,6 +168,7 @@ python -m venv .venv
 ```bash
 ./.venv/Scripts/python.exe -m kb.fetch_locale   # русская локаль из ассетов Mojang
 ./.venv/Scripts/python.exe -m kb.extract        # рецепты, теги, дроп, инструменты
+./.venv/Scripts/python.exe -m kb.build          # онтология в data/kb/game.ttl
 ```
 
 Прогон золотого набора (см. [eval/README.md](eval/README.md)):
