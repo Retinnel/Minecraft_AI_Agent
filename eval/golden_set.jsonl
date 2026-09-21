@@ -1,0 +1,79 @@
+// Золотой набор реплик игрока. Одна строка — один размеченный пример.
+// Поля описаны в eval/schema.py. Строки с "policy": true требуют подтверждения политики
+// поведения — см. раздел «Что нужно подтвердить» в eval/README.md.
+
+// --- Типичные запросы на выдачу предмета ---
+{"id": "give-t-001", "utterance": "дай алмаз", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond", "count": 1}
+{"id": "give-t-002", "utterance": "дай мне 5 алмазов", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond", "count": 5, "note": "известный промах: резолвится в diamond_block"}
+{"id": "give-t-003", "utterance": "выдай 32 факела", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:torch", "count": 32}
+{"id": "give-t-004", "utterance": "нужен хлеб", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:bread", "count": 1}
+{"id": "give-t-005", "utterance": "дай сундук", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:chest", "count": 1}
+{"id": "give-t-006", "utterance": "мне нужен верстак", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:crafting_table", "count": 1}
+{"id": "give-t-007", "utterance": "дай 64 булыжника", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:cobblestone", "count": 64}
+{"id": "give-t-008", "utterance": "хочу железный слиток", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:iron_ingot", "count": 1}
+{"id": "give-t-009", "utterance": "дай печку", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:furnace", "count": 1}
+{"id": "give-t-010", "utterance": "выдай лук", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:bow", "count": 1, "note": "омонимия с растением; в каталоге только оружие"}
+{"id": "give-t-011", "utterance": "дай мне 10 стрел", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:arrow", "count": 10}
+{"id": "give-t-012", "utterance": "нужна наковальня", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:anvil", "count": 1}
+{"id": "give-t-013", "utterance": "дай обсидиан", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:obsidian", "count": 1}
+{"id": "give-t-014", "utterance": "выдай щит", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:shield", "count": 1}
+{"id": "give-t-015", "utterance": "дай 16 палок", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:stick", "count": 16}
+
+// --- Разговорные и жаргонные формулировки ---
+{"id": "give-s-001", "utterance": "дай гэпл", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:golden_apple", "count": 1}
+{"id": "give-s-002", "utterance": "закинь тотем", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:totem_of_undying", "count": 1}
+{"id": "give-s-003", "utterance": "нужна реда", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:redstone", "count": 1}
+{"id": "give-s-004", "utterance": "дай слаймбол", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:slime_ball", "count": 1}
+{"id": "give-s-005", "utterance": "хочу стейк", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:cooked_beef", "count": 1}
+{"id": "give-s-006", "utterance": "дай незерит", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:netherite_ingot", "count": 1}
+{"id": "give-s-007", "utterance": "мне бы дебрис", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:ancient_debris", "count": 1}
+{"id": "give-s-008", "utterance": "дай крылья", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:elytra", "count": 1}
+{"id": "give-s-009", "utterance": "я бы не отказался от пузырька", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:glass_bottle", "count": 1}
+{"id": "give-s-010", "utterance": "мне бы 10 наковален", "group": "typical", "outcome": "act", "intent": "give_item", "item_id": "minecraft:anvil", "count": 10}
+
+// --- Граничные случаи: неоднозначность ---
+{"id": "give-b-001", "utterance": "дай доски", "group": "boundary", "outcome": "clarify", "intent": "give_item", "note": "несколько пород дерева"}
+{"id": "give-b-002", "utterance": "дай меч", "group": "boundary", "outcome": "clarify", "intent": "give_item", "policy": true, "note": "шесть видов мечей; сейчас захардкожен diamond_sword"}
+{"id": "give-b-003", "utterance": "нужна кирка", "group": "boundary", "outcome": "clarify", "intent": "give_item", "policy": true, "note": "алмазная и железная; алиас 'кирка' висит на обеих"}
+{"id": "give-b-004", "utterance": "дай бревно", "group": "boundary", "outcome": "clarify", "intent": "give_item", "note": "несколько пород дерева"}
+{"id": "give-b-005", "utterance": "дай лодку", "group": "boundary", "outcome": "clarify", "intent": "give_item", "note": "несколько пород дерева"}
+
+// --- Граничные случаи: количество ---
+{"id": "give-b-006", "utterance": "дай 1000 алмазов", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond", "count": 64, "note": "обрезание по лимиту MAX_ITEM_COUNT"}
+{"id": "give-b-007", "utterance": "дай 0 алмазов", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond", "count": 1, "policy": true, "note": "нулевое количество нормализуется в 1; возможно, правильнее отказывать"}
+{"id": "give-b-008", "utterance": "дай -5 алмазов", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond", "count": 1, "policy": true, "note": "минус игнорируется регуляркой, число читается как положительное"}
+
+// --- Граничные случаи: словоформы ---
+{"id": "give-b-009", "utterance": "дай пузырьков", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:glass_bottle", "count": 1}
+{"id": "give-b-010", "utterance": "дай бутылёк", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:glass_bottle", "count": 1, "policy": true, "note": "разговорная форма, обрабатывается захардкоженным стеммингом по префиксу"}
+{"id": "give-b-011", "utterance": "выдай косточку", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:bone", "count": 1}
+
+// --- Дефекты данных, найденные при разметке ---
+{"id": "give-b-012", "utterance": "дай зелье лечения", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:potion{Potion:\"minecraft:healing\"}", "count": 1, "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"}
+{"id": "give-b-013", "utterance": "дай пузырёк воды", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:potion{Potion:\"minecraft:water\"}", "count": 1, "note": "тот же дефект"}
+
+// --- Отрицательные случаи ---
+{"id": "give-n-001", "utterance": "дай мне звёздный меч", "group": "negative", "outcome": "reject", "intent": "give_item", "note": "предмета не существует"}
+{"id": "give-n-002", "utterance": "выдай сто алмазных драконов", "group": "negative", "outcome": "reject", "intent": "give_item", "note": "предмета не существует"}
+{"id": "give-n-003", "utterance": "дай командный блок", "group": "negative", "outcome": "reject", "intent": "give_item", "policy": true, "note": "предмет существует в игре, но не в каталоге; политика по служебным блокам не определена"}
+{"id": "give-n-004", "utterance": "дай", "group": "negative", "outcome": "clarify", "intent": "give_item", "policy": true, "note": "запрос без предмета: переспросить или отказать"}
+
+// --- Призыв существ ---
+{"id": "summon-t-001", "utterance": "призови зомби", "group": "typical", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:zombie", "count": 1}
+{"id": "summon-t-002", "utterance": "заспавни крипера", "group": "typical", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:creeper", "count": 1}
+{"id": "summon-t-003", "utterance": "призови 5 скелетов", "group": "typical", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:skeleton", "count": 5}
+{"id": "summon-t-004", "utterance": "спавни корову", "group": "typical", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:cow", "count": 1}
+{"id": "summon-t-005", "utterance": "призови слайма", "group": "typical", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:slime", "count": 1}
+{"id": "summon-b-001", "utterance": "призови 100 зомби", "group": "boundary", "outcome": "act", "intent": "summon_entity", "entity_id": "minecraft:zombie", "count": 16, "note": "обрезание по лимиту MAX_SUMMON_COUNT"}
+{"id": "summon-n-001", "utterance": "призови дракона края", "group": "negative", "outcome": "reject", "intent": "summon_entity", "policy": true, "note": "существо есть в игре, но не в каталоге; призыв босса стоит запрещать осознанно"}
+{"id": "summon-n-002", "utterance": "призови кракена", "group": "negative", "outcome": "reject", "intent": "summon_entity", "note": "существа не существует"}
+
+// --- Удаление предметов ---
+{"id": "remove-t-001", "utterance": "забери гнилую плоть", "group": "typical", "outcome": "act", "intent": "remove_item", "item_id": "minecraft:rotten_flesh", "count": 1}
+{"id": "remove-t-002", "utterance": "убери 10 булыжника", "group": "typical", "outcome": "act", "intent": "remove_item", "item_id": "minecraft:cobblestone", "count": 10}
+
+// --- Не запросы действий ---
+{"id": "chat-t-001", "utterance": "привет", "group": "typical", "outcome": "none"}
+{"id": "chat-t-002", "utterance": "что делать ночью?", "group": "typical", "outcome": "none"}
+{"id": "chat-t-003", "utterance": "как скрафтить факел?", "group": "boundary", "outcome": "none", "policy": true, "note": "вопрос о рецепте, не запрос выдачи; после появления решателя ожидание изменится на план"}
+{"id": "chat-t-004", "utterance": "спасибо", "group": "typical", "outcome": "none"}
