@@ -229,9 +229,10 @@ def format_report(rows: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
             lines.append(
                 f"| {row['id']}{marker} | {row['utterance']} | {expected} | {actual} | {row['verdict']} |"
             )
-        lines.append("")
-        lines.append("⚙ — разметка зависит от принятой политики поведения, а не от объективно "
-                     "правильного ответа.")
+        if any(row["policy"] for row in failures):
+            lines.append("")
+            lines.append("⚙ — разметка зависит от неподтверждённой политики поведения, а не от "
+                         "объективно правильного ответа.")
     lines.append("")
     return "\n".join(lines)
 
