@@ -34,6 +34,8 @@
 - [eval/README.md](eval/README.md) — оценочный контур, метрики, принятая политика поведения.
 - [docs/delta-from-previous.md](docs/delta-from-previous.md) — отличие от 6-го семестра,
   материал для обоснования темы и введения записки.
+- [docs/demo.md](docs/demo.md) — сценарий защиты: пять минут демонстрации по
+  хронометражу и заготовки к вопросам.
 
 ### Принятая политика поведения
 
@@ -158,7 +160,7 @@ python -m venv .venv
 ./.venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Тесты (176 штук, все проходят):
+Тесты (185 штук, все проходят):
 
 ```bash
 ./.venv/Scripts/python.exe -m pytest tests -q --ignore=tests/test_ui_smoke.py

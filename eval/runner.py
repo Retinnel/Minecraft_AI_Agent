@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 GOLDEN_SET_PATH = ROOT / "golden_set.jsonl"
 REPORTS_DIR = ROOT / "reports"
 
-AVAILABLE_CONFIGS = ("symbolic",)
+AVAILABLE_CONFIGS = ("symbolic", "llm_only")
 
 
 def load_config(key: str) -> Config:
