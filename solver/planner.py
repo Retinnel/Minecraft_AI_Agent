@@ -97,6 +97,11 @@ class Plan:
         return [step for step in self.root.walk() if step.kind in
                 (CRAFT, SMELT, STONECUT, SMITH, MINE, HUNT)]
 
+    @property
+    def effort(self) -> int:
+        """Суммарная трудоёмкость плана по тем же весам, по которым выбирался вариант."""
+        return sum(step.weight for step in self.root.walk())
+
 
 class Planner:
     def __init__(self, kb: KnowledgeBase, max_depth: int = MAX_DEPTH) -> None:
