@@ -38,6 +38,22 @@ MAX_DEPTH = 20
 # оценке стоимости, поэтому лучшие идут первыми, а ограничение держит перебор конечным.
 MAX_BRANCHES = 4
 
+# Предел числа раскрытий за один запрос. Ограничения глубины и ветвления недостаточно:
+# в предметной области есть узлы с очень плотным графом рецептов — красители получаются
+# смешиванием друг друга, и перебор там растёт экспоненциально. Бюджет даёт жёсткую
+# верхнюю границу времени ответа, что важнее полноты: ассистент обязан отвечать быстро,
+# а на исчерпании бюджета возвращается лучший найденный план.
+MAX_EXPANSIONS = 4000
+
+# Заглушка для оценки стоимости: возвращается, когда сработала защита от цикла или
+# исчерпана глубина. Значение заведомо больше любой реальной оценки.
+COST_GUARD = 50
+
+# Сколько проходов делает приближение стоимостей. Цепочки изготовления в предметной
+# области короткие, значения сходятся за единицы проходов; предел страхует от
+# патологических случаев.
+COST_ITERATIONS = 16
+
 # Веса, по которым сравниваются планы. Это проектное решение, а не физика игры: они задают,
 # что считать удобным для игрока. Подобраны так, чтобы план шёл привычным путём развития.
 WEIGHT_STEP = 1          # любое действие само по себе
@@ -104,18 +120,27 @@ class Plan:
 
 
 class Planner:
-    def __init__(self, kb: KnowledgeBase, max_depth: int = MAX_DEPTH) -> None:
+    def __init__(self, kb: KnowledgeBase, max_depth: int = MAX_DEPTH,
+                 max_expansions: int = MAX_EXPANSIONS) -> None:
         self.kb = kb
         self.max_depth = max_depth
+        self.max_expansions = max_expansions
         self._cost_cache: Dict[str, int] = {}
+        self._budget = 0
 
     # --- публичный интерфейс ---
 
     def plan(self, goal: str, count: int = 1,
              inventory: Optional[Dict[str, int]] = None) -> Plan:
         stock = Counter(inventory or {})
+        self._budget = self.max_expansions
         root = self._resolve(goal, count, stock, frozenset(), 0)
         return Plan(goal=goal, count=count, root=root)
+
+    @property
+    def budget_exhausted(self) -> bool:
+        """Последний запрос упёрся в предел перебора, и план может быть неполным."""
+        return self._budget <= 0
 
     # --- вывод ---
 
@@ -135,6 +160,10 @@ class Planner:
 
         if depth >= self.max_depth:
             return self._missing(item, remaining, "превышена глубина вывода", taken)
+
+        self._budget -= 1
+        if self._budget <= 0:
+            return self._missing(item, remaining, "исчерпан бюджет поиска", taken)
 
         # Предмет уже раскрывается выше по стеку: дальше идти нельзя, иначе цикл.
         # Такое бывает у обратимых рецептов вроде «блок алмазов -> 9 алмазов».
@@ -289,9 +318,15 @@ class Planner:
             if stock.get(tool.id, 0) > 0:
                 return Step(kind=HAVE, item=tool.id, count=1, satisfied=True)
 
-        # Из подходящих берём самый дешёвый в изготовлении, а не самый низкий по уровню:
-        # золотой инструмент по уровню слабее каменного, но золото добыть куда сложнее.
-        simplest = min(suitable, key=lambda tool: (self._item_cost(tool.id, stack), tool.id))
+        # Берём минимальный достаточный уровень, а при равном уровне — самый дешёвый.
+        #
+        # Порядок важен именно такой. Если сортировать только по стоимости, для добычи алмаза
+        # может быть выбрана алмазная кирка: её оценка совпадает с железной, а чтобы её
+        # сделать, нужны алмазы — вывод замыкается в цикл и план разваливается. Если же
+        # сортировать только по уровню, для добычи чернита выбирается золотая кирка: по
+        # уровню она слабее каменной, хотя золото добыть куда сложнее.
+        simplest = min(suitable,
+                       key=lambda tool: (tool.tier_rank, self._item_cost(tool.id, stack), tool.id))
         return self._resolve(simplest.id, 1, stock, stack, depth + 1)
 
     # --- выбор вариантов ---
@@ -326,37 +361,57 @@ class Planner:
                 self._item_cost(item, stack) for item in ingredient.alternatives)
         return (total / max(recipe.produces_count, 1), len(recipe.inputs), recipe.id)
 
-    def _item_cost(self, item: str, stack: frozenset, depth: int = 0) -> int:
-        """Грубая оценка трудоёмкости предмета: сколько шагов до него от подручных ресурсов.
+    def _item_cost(self, item: str, stack: frozenset = frozenset()) -> int:
+        """Оценка трудоёмкости предмета: во что он обойдётся от подручных ресурсов."""
+        if not self._cost_cache:
+            self._compute_costs()
+        return self._cost_cache.get(item, COST_GUARD)
 
-        Нужна только для упорядочивания вариантов, поэтому количества игнорируются, а
-        результат кэшируется. Точность здесь не важна — важно, чтобы выбор был устойчивым.
+    def _compute_costs(self) -> None:
+        """Считает оценки для всех предметов сразу, итеративным приближением.
+
+        Рекурсивный расчёт здесь не работает. Предметная область содержит взаимно зависимые
+        узлы — красители получаются смешиванием друг друга, — поэтому рекурсия либо
+        пересчитывает одно и то же экспоненциально, либо кэширует заглушки защиты от цикла
+        и навсегда завышает стоимость.
+
+        Итеративное приближение свободно от обеих бед: начинаем с того, что добывается в
+        мире, и на каждом проходе уточняем стоимость всего, что из этого изготавливается,
+        пока значения не перестанут меняться. Это обычная релаксация, и на цикл ей всё равно.
         """
-        if item in self._cost_cache:
-            return self._cost_cache[item]
-        if depth > 8 or item in stack:
-            return 50
+        recipes_by_item = self.kb.index_recipes()
+        sources_by_item = self.kb.index_sources()
 
-        sources = self.kb.sources_of(item)
-        best = 50
-        for source in sources:
-            # Та же шкала, что и у веса шага: оценка и сравнение планов должны быть согласованы.
-            best = min(best, self._source_weight(source))
+        # Начальное приближение: то, что просто лежит в мире.
+        cost: Dict[str, int] = {}
+        for item, sources in sources_by_item.items():
+            # Источник может быть не опознан, если у него нет записи в базе знаний:
+            # часть лут-таблиц описывает сущности, которых нет среди именованных.
+            if sources:
+                cost[item] = min(self._source_weight(source) for source in sources)
 
-        for recipe in self.kb.recipes_for(item):
-            cost = 1
-            for ingredient in recipe.inputs:
-                if not ingredient.alternatives:
-                    cost += 50
-                    continue
-                cost += ingredient.quantity * min(
-                    self._item_cost(alternative, stack | {item}, depth + 1)
-                    for alternative in ingredient.alternatives)
-            best = min(best, int(cost / max(recipe.produces_count, 1)) or 1)
+        for _ in range(COST_ITERATIONS):
+            changed = False
+            for item, recipes in recipes_by_item.items():
+                for recipe in recipes:
+                    total = WEIGHT_STEP
+                    for ingredient in recipe.inputs:
+                        if not ingredient.alternatives:
+                            total += COST_GUARD
+                            continue
+                        cheapest = min(
+                            (cost.get(alternative, COST_GUARD)
+                             for alternative in ingredient.alternatives),
+                            default=COST_GUARD)
+                        total += ingredient.quantity * cheapest
+                    value = max(int(total / max(recipe.produces_count, 1)), 1)
+                    if value < cost.get(item, COST_GUARD):
+                        cost[item] = value
+                        changed = True
+            if not changed:
+                break
 
-        if depth == 0:
-            self._cost_cache[item] = best
-        return best
+        self._cost_cache = cost
 
     # --- вспомогательное ---
 

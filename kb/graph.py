@@ -92,6 +92,10 @@ class KnowledgeBase:
             subject: str(game_id)
             for subject, game_id in graph.subject_objects(ont.GAME_ID)
         }
+        # Заполняются по требованию: разбор всего графа разом дорог, но окупается там,
+        # где нужен обзор всей предметной области.
+        self._recipe_index: Optional[Dict[str, List[Recipe]]] = None
+        self._source_index: Optional[Dict[str, List[Source]]] = None
 
     # --- загрузка ---
 
@@ -151,48 +155,85 @@ class KnowledgeBase:
 
     # --- рецепты ---
 
-    def recipes_for(self, item_id: str) -> List[Recipe]:
-        """Все способы изготовить предмет, включая плавку, резку и ковку."""
-        target = ont.thing_uri(item_id)
-        recipes: List[Recipe] = []
+    def _read_recipe(self, recipe_uri: URIRef, item_id: str) -> Recipe:
+        inputs: List[Ingredient] = []
+        for node in self.graph.objects(recipe_uri, ont.REQUIRES):
+            quantity = int(next(self.graph.objects(node, ont.QUANTITY)))
+            alternatives: List[str] = []
+            tag: Optional[str] = None
+            for alternative in self.graph.objects(node, ont.ALTERNATIVE):
+                if (alternative, RDF.type, ont.TAG) in self.graph:
+                    tag = str(alternative).rsplit("/", 1)[-1]
+                    alternatives.extend(
+                        self._by_uri[member]
+                        for member in self.graph.objects(alternative, ont.HAS_MEMBER)
+                        if member in self._by_uri
+                    )
+                elif alternative in self._by_uri:
+                    alternatives.append(self._by_uri[alternative])
+            inputs.append(Ingredient(quantity=quantity,
+                                     alternatives=tuple(sorted(set(alternatives))),
+                                     tag=tag))
 
-        for recipe_uri in self.graph.subjects(ont.PRODUCES, target):
-            inputs: List[Ingredient] = []
-            for node in self.graph.objects(recipe_uri, ont.REQUIRES):
-                quantity = int(next(self.graph.objects(node, ont.QUANTITY)))
-                alternatives: List[str] = []
-                tag: Optional[str] = None
-                for alternative in self.graph.objects(node, ont.ALTERNATIVE):
-                    if (alternative, RDF.type, ont.TAG) in self.graph:
-                        tag = str(alternative).rsplit("/", 1)[-1]
-                        alternatives.extend(
-                            self._by_uri[member]
-                            for member in self.graph.objects(alternative, ont.HAS_MEMBER)
-                            if member in self._by_uri
-                        )
-                    elif alternative in self._by_uri:
-                        alternatives.append(self._by_uri[alternative])
-                inputs.append(Ingredient(quantity=quantity,
-                                         alternatives=tuple(sorted(set(alternatives))),
-                                         tag=tag))
+        return Recipe(
+            id=str(recipe_uri).rsplit("/", 1)[-1],
+            method=str(next(self.graph.objects(recipe_uri, ont.METHOD))),
+            station=str(next(self.graph.objects(recipe_uri, ont.AT_STATION))).rsplit("/", 1)[-1],
+            produces=item_id,
+            produces_count=int(next(self.graph.objects(recipe_uri, ont.PRODUCES_COUNT))),
+            inputs=tuple(inputs),
+        )
 
-            recipes.append(Recipe(
-                id=str(recipe_uri).rsplit("/", 1)[-1],
-                method=str(next(self.graph.objects(recipe_uri, ont.METHOD))),
-                station=str(next(self.graph.objects(recipe_uri, ont.AT_STATION))).rsplit("/", 1)[-1],
-                produces=item_id,
-                produces_count=int(next(self.graph.objects(recipe_uri, ont.PRODUCES_COUNT))),
-                inputs=tuple(inputs),
-            ))
-
+    @staticmethod
+    def _recipe_order(recipe: Recipe):
         # Устойчивый порядок: сначала крафт, потом остальное — так план читается привычнее.
         method_order = {"craft": 0, "smelt": 1, "stonecut": 2, "smith": 3}
-        return sorted(recipes, key=lambda r: (method_order.get(r.method, 9), r.id))
+        return (method_order.get(recipe.method, 9), recipe.id)
+
+    def recipes_for(self, item_id: str) -> List[Recipe]:
+        """Все способы изготовить предмет, включая плавку, резку и ковку."""
+        if self._recipe_index is not None:
+            return self._recipe_index.get(item_id, [])
+        target = ont.thing_uri(item_id)
+        recipes = [self._read_recipe(uri, item_id)
+                   for uri in self.graph.subjects(ont.PRODUCES, target)]
+        return sorted(recipes, key=self._recipe_order)
+
+    def index_recipes(self) -> Dict[str, List[Recipe]]:
+        """Разбирает все рецепты разом и запоминает их по результату.
+
+        Поштучные запросы к графу дороги, а планировщику нужен обзор всей предметной области
+        для предварительного расчёта стоимостей. Один проход вместо полутора тысяч.
+        """
+        if self._recipe_index is None:
+            index: Dict[str, List[Recipe]] = {}
+            for recipe_uri, target in self.graph.subject_objects(ont.PRODUCES):
+                item_id = self._by_uri.get(target)
+                if item_id is None:
+                    continue
+                index.setdefault(item_id, []).append(self._read_recipe(recipe_uri, item_id))
+            for recipes in index.values():
+                recipes.sort(key=self._recipe_order)
+            self._recipe_index = index
+        return self._recipe_index
 
     # --- добыча ---
 
+    def index_sources(self) -> Dict[str, List[Source]]:
+        """Источники добычи для всех предметов разом."""
+        if self._source_index is None:
+            index: Dict[str, List[Source]] = {}
+            for _, target in self.graph.subject_objects(ont.YIELDS):
+                item_id = self._by_uri.get(target)
+                if item_id is not None and item_id not in index:
+                    index[item_id] = self.sources_of(item_id)
+            self._source_index = index
+        return self._source_index
+
     def sources_of(self, item_id: str) -> List[Source]:
         """Блоки и существа, из которых предмет может быть получен в мире."""
+        if self._source_index is not None:
+            return self._source_index.get(item_id, [])
         target = ont.thing_uri(item_id)
         sources: List[Source] = []
 
