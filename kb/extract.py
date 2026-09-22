@@ -247,47 +247,90 @@ def extract_recipes(jar: GameJar) -> List[Dict[str, Any]]:
 # --- лут-таблицы --------------------------------------------------------------------------
 
 
-def _collect_items(node: Any, found: Set[str]) -> None:
-    """Обходит дерево лут-таблицы и собирает все достижимые предметы.
+# Условия, означающие, что выпадение случайное и редкое. Такие дропы существуют, но строить
+# на них план нельзя: железный слиток действительно падает с зомби, только с шансом в доли
+# процента, и «выбей три слитка из зомби» — вредный совет вместо «выплавь из руды».
+CHANCE_CONDITIONS = {
+    "minecraft:random_chance",
+    "minecraft:random_chance_with_looting",
+    "minecraft:table_bonus",
+}
+
+
+def _drops_nothing_sometimes(entry: Dict[str, Any]) -> bool:
+    """Задаёт ли запись количество диапазоном, включающим ноль."""
+    for function in entry.get("functions") or []:
+        if not isinstance(function, dict) or function.get("function") != "minecraft:set_count":
+            continue
+        count = function.get("count")
+        if isinstance(count, dict) and float(count.get("min", 1)) <= 0:
+            return True
+    return False
+
+
+def _collect_items(node: Any, found: Dict[str, bool], rare: bool = False) -> None:
+    """Обходит дерево лут-таблицы и собирает достижимые предметы с пометкой редкости.
 
     Структура вложенная: pools -> entries, а entry бывает alternatives/group/sequence
-    со своими children. Условия выпадения (шёлковое касание, удача, убит игроком) здесь
-    не учитываются: для планирования важен сам факт «из этого может получиться то».
+    со своими children. Условия шёлкового касания и удачи на состав не влияют, а вот
+    случайный шанс помечает выпадение как редкое и распространяется вглубь.
     """
     if isinstance(node, list):
         for item in node:
-            _collect_items(item, found)
+            _collect_items(item, found, rare)
         return
     if not isinstance(node, dict):
         return
 
+    conditions = node.get("conditions") or []
+    if any(isinstance(c, dict) and c.get("condition") in CHANCE_CONDITIONS for c in conditions):
+        rare = True
+
     if node.get("type") == "minecraft:item":
         name = node.get("name")
         if isinstance(name, str):
-            found.add(name)
+            # Диапазон количества, начинающийся с нуля, означает, что попытка может не дать
+            # ничего: мёртвый куст роняет от нуля до двух палок. Строить на таком план нельзя.
+            unreliable = rare or _drops_nothing_sometimes(node)
+            # Если предмет достижим хотя бы одним надёжным путём, он не считается ненадёжным.
+            found[name] = found.get(name, True) and unreliable
 
     for key in ("pools", "entries", "children"):
         if key in node:
-            _collect_items(node[key], found)
+            _collect_items(node[key], found, rare)
 
 
-def extract_drops(jar: GameJar, kind: str) -> Dict[str, List[str]]:
+def extract_drops(jar: GameJar, kind: str) -> Dict[str, Dict[str, bool]]:
     prefix = f"{DATA_PREFIX}/loot_tables/{kind}/"
-    drops: Dict[str, List[str]] = {}
+    drops: Dict[str, Dict[str, bool]] = {}
     for name in jar.list_json(prefix):
-        found: Set[str] = set()
+        found: Dict[str, bool] = {}
         _collect_items(jar.read_json(name), found)
         if found:
-            drops[GameJar.resource_id(name, prefix)] = sorted(found)
+            drops[GameJar.resource_id(name, prefix)] = dict(sorted(found.items()))
     return drops
 
 
 # --- требования к инструменту -------------------------------------------------------------
 
 
-def extract_tool_requirements(block_tags: Dict[str, List[str]]) -> Dict[str, Dict[str, str]]:
-    """Сводит теги needs_*_tool и mineable/* в требования по каждому блоку."""
-    requirements: Dict[str, Dict[str, str]] = {}
+def extract_tool_requirements(block_tags: Dict[str, List[str]]) -> Dict[str, Dict[str, Any]]:
+    """Сводит теги needs_*_tool и mineable/* в требования по каждому блоку.
+
+    Уровень инструмента (`tier`) берётся из данных напрямую и точен.
+
+    С обязательностью самого инструмента сложнее. Свойство `requiresCorrectToolForDrops`
+    задано в коде игры, а не в данных: в лут-таблице его нет, там условие `match_tool`
+    относится к шёлковому касанию. Поэтому используется приближение — инструмент считается
+    обязательным для блоков из `mineable/pickaxe`. В ванильной игре это верно: каменные блоки
+    и руды без кирки не выпадают, тогда как дерево и земля добываются руками, а топор и лопата
+    лишь ускоряют работу.
+
+    Приближение выбрано так, чтобы ошибка была безопасной: для кирки, где от неё зависит
+    правильность плана добычи, оно точно, а для остальных инструментов в худшем случае
+    появился бы лишний шаг.
+    """
+    requirements: Dict[str, Dict[str, Any]] = {}
 
     for tag, tier in TOOL_TIER_TAGS.items():
         for block in block_tags.get(tag, []):
@@ -295,7 +338,9 @@ def extract_tool_requirements(block_tags: Dict[str, List[str]]) -> Dict[str, Dic
 
     for kind in TOOL_KIND_TAGS:
         for block in block_tags.get(f"minecraft:mineable/{kind}", []):
-            requirements.setdefault(block, {})["tool"] = kind
+            entry = requirements.setdefault(block, {})
+            entry["tool"] = kind
+            entry["tool_required"] = kind == "pickaxe"
 
     return requirements
 
@@ -422,7 +467,7 @@ def extract_all(version: str, output_dir: Path) -> Dict[str, int]:
     for members in item_tags.values():
         referenced.update(members)
     for items_dropped in list(block_drops.values()) + list(entity_drops.values()):
-        referenced.update(items_dropped)
+        referenced.update(items_dropped)   # ключи словаря — идентификаторы предметов
 
     items = extract_items(jar, locale_ru, referenced)
 
@@ -450,6 +495,9 @@ def extract_all(version: str, output_dir: Path) -> Dict[str, int]:
         "блоков с требованием к инструменту": len(tools),
         "блоков с известным выпадением": len(block_drops),
         "существ с известным выпадением": len(entity_drops),
+        "  из них редких выпадений": sum(
+            1 for table in list(block_drops.values()) + list(entity_drops.values())
+            for is_rare in table.values() if is_rare),
     }
 
 

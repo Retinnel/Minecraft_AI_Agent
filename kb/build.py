@@ -132,18 +132,36 @@ def _add_tags(graph: Graph, item_tags: Dict[str, List[str]]) -> None:
             graph.add((uri, ont.HAS_MEMBER, ont.thing_uri(member)))
 
 
-def _add_drops(graph: Graph, drops: Dict[str, Dict[str, List[str]]]) -> None:
+def _add_drops(graph: Graph, drops: Dict[str, Any], craftable: set) -> int:
+    """Связи «источник -> что из него получается».
+
+    Два правила при записи.
+
+    Связь блока с самим собой сохраняется, но только если блок нельзя изготовить. Петли здесь
+    нет: блок в мире и предмет в инвентаре — разные вещи, и добыча блока не требует иметь
+    такой предмет. Для дерева, земли, песка и руд это единственный способ их получить.
+    А вот для алмазного блока такая связь означала бы «найди алмазный блок в мире»: он
+    выпадает сам собой просто потому, что его можно поднять обратно, естественным ресурсом
+    он не является. Отсюда правило: что можно изготовить — то не добывают.
+
+    Редкие выпадения помечаются флагом. Железный слиток действительно падает с зомби, но
+    с шансом в доли процента, и строить на этом план нельзя.
+    """
+    rare_count = 0
     for source_id, produced in list(drops["blocks"].items()) + list(drops["entities"].items()):
         source = ont.thing_uri(source_id)
-        for item_id in produced:
-            # Блок, выпадающий сам собой при шёлковом касании, полезного отношения не даёт
-            # и создаёт петлю в графе добычи, поэтому такие связи не записываем.
-            if item_id == source_id:
+        for item_id, is_rare in produced.items():
+            if item_id == source_id and item_id in craftable:
                 continue
-            graph.add((source, ont.YIELDS, ont.thing_uri(item_id)))
+            target = ont.thing_uri(item_id)
+            graph.add((source, ont.YIELDS, target))
+            if is_rare:
+                graph.add((source, ont.RARE_YIELD, target))
+                rare_count += 1
+    return rare_count
 
 
-def _add_tool_requirements(graph: Graph, tools: Dict[str, Dict[str, str]]) -> None:
+def _add_tool_requirements(graph: Graph, tools: Dict[str, Dict[str, Any]]) -> None:
     kinds = set()
     for block_id, requirement in tools.items():
         uri = ont.thing_uri(block_id)
@@ -152,11 +170,32 @@ def _add_tool_requirements(graph: Graph, tools: Dict[str, Dict[str, str]]) -> No
         if "tool" in requirement:
             kinds.add(requirement["tool"])
             graph.add((uri, ont.REQUIRES_TOOL_KIND, ont.tool_kind_uri(requirement["tool"])))
+            graph.add((uri, ont.TOOL_REQUIRED, Literal(bool(requirement.get("tool_required")))))
 
     for kind in sorted(kinds):
         uri = ont.tool_kind_uri(kind)
         graph.add((uri, RDF.type, ont.TOOL_KIND))
         graph.add((uri, RDFS.label, Literal(kind, lang="en")))
+
+
+def _add_tool_items(graph: Graph, item_tags: Dict[str, List[str]]) -> int:
+    """Отмечает сами инструменты: какого они вида и какого уровня.
+
+    Вид берётся из тега (`minecraft:pickaxes` и подобных), уровень — из приставки в
+    идентификаторе: `wooden_pickaxe` даёт уровень `wood`. Приставка — единственный источник,
+    отдельного тега на уровень в данных игры нет.
+    """
+    marked = 0
+    for tag_id, kind in ont.TOOL_TAGS.items():
+        for item_id in item_tags.get(tag_id, []):
+            uri = ont.thing_uri(item_id)
+            graph.add((uri, ont.IS_TOOL_KIND, ont.tool_kind_uri(kind)))
+            prefix = item_id.split(":", 1)[-1].split("_", 1)[0]
+            tier = ont.TOOL_MATERIAL_PREFIXES.get(prefix)
+            if tier:
+                graph.add((uri, ont.HAS_TOOL_TIER, ont.tier_uri(tier)))
+            marked += 1
+    return marked
 
 
 def _add_restrictions(graph: Graph, restrictions: Dict[str, Any]) -> int:
@@ -236,8 +275,10 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     _add_things(graph, items)
     _add_recipes(graph, recipes)
     _add_tags(graph, tags["items"])
-    _add_drops(graph, drops)
+    craftable = {recipe["result"]["item"] for recipe in recipes}
+    rare_yields = _add_drops(graph, drops, craftable)
     _add_tool_requirements(graph, tools)
+    tool_items = _add_tool_items(graph, tags["items"])
     restriction_count = _add_restrictions(graph, restrictions)
     legacy = _add_legacy_aliases(graph, set(items))
 
@@ -253,6 +294,8 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
         "рецептов": len(set(graph.subjects(RDF.type, ont.RECIPE))),
         "групп (тегов)": len(set(graph.subjects(RDF.type, ont.TAG))),
         "связей добычи": len(list(graph.triples((None, ont.YIELDS, None)))),
+        "  из них редких": rare_yields,
+        "инструментов размечено": tool_items,
         "запретов": restriction_count,
         "разговорных алиасов": legacy["aliases"],
         "  вариантов с NBT заведено": legacy["variants"],

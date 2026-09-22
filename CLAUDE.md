@@ -112,6 +112,7 @@ FastAPI-сервер (api/)
 | `static/`, `frontend/js/` | Админка: 7 страниц (dashboard, settings, responses, player-state, challenges, analytics, wiki) |
 | `mod/minecraft-mod/` | Fabric client-only мод, Java 17, MC 1.20.1 |
 | `kb/` | База знаний: загрузка локали, извлечение данных игры, сборка онтологии, доступ через `kb.graph.KnowledgeBase` |
+| `solver/` | Решатель: планировщик достижения цели (`solver.planner`), вывод плана (`solver.render`) |
 | `eval/` | Оценочный контур: золотой набор реплик, раннер метрик, отчёты |
 | `legacy/vision-assistant/` | Архив, к проекту не относится (см. ниже) |
 
@@ -157,7 +158,7 @@ python -m venv .venv
 ./.venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Тесты (130 штук, все проходят):
+Тесты (151 штука, все проходят):
 
 ```bash
 ./.venv/Scripts/python.exe -m pytest tests -q --ignore=tests/test_ui_smoke.py

@@ -57,8 +57,15 @@ HAS_MEMBER = GA.hasMember             # Tag -> Item
 
 # Добыча
 YIELDS = GA.yields                    # Block | Creature -> Item
+# Выпадение случайное и редкое: связь есть, но строить на ней план нельзя.
+RARE_YIELD = GA.rareYield             # Block | Creature -> Item
 REQUIRES_TOOL_TIER = GA.requiresToolTier  # Block -> ToolTier
 REQUIRES_TOOL_KIND = GA.requiresToolKind  # Block -> ToolKind
+TOOL_REQUIRED = GA.toolRequired       # Block -> boolean, обязателен ли инструмент для выпадения
+
+# Свойства самого инструмента как предмета
+IS_TOOL_KIND = GA.isToolKind         # Item -> ToolKind
+HAS_TOOL_TIER = GA.hasToolTier       # Item -> ToolTier
 TIER_RANK = GA.tierRank               # ToolTier -> integer, для сравнения уровней
 
 # Запреты
@@ -73,13 +80,22 @@ CATEGORY = GA.category                # Restriction -> literal: boss | service |
 GAME_ID = GA.gameId                   # Thing -> literal
 
 OBJECT_PROPERTIES = (PRODUCES, REQUIRES, AT_STATION, ALTERNATIVE, HAS_MEMBER, YIELDS,
-                     REQUIRES_TOOL_TIER, REQUIRES_TOOL_KIND, FORBIDS)
+                     RARE_YIELD, REQUIRES_TOOL_TIER, REQUIRES_TOOL_KIND, IS_TOOL_KIND,
+                     HAS_TOOL_TIER, FORBIDS)
 DATA_PROPERTIES = (PRODUCES_COUNT, METHOD, QUANTITY, TIER_RANK, FORBIDDEN_ACTION,
-                   REASON, CATEGORY, GAME_ID)
+                   REASON, CATEGORY, GAME_ID, TOOL_REQUIRED)
 
 # Порядок уровней инструмента. Нужен решателю, чтобы отвечать на вопрос «этого хватит?»:
 # требование `iron` удовлетворяется железом, алмазом и незеритом, но не камнем.
 TOOL_TIERS = {"wood": 0, "gold": 0, "stone": 1, "iron": 2, "diamond": 3, "netherite": 4}
+
+# Приставка в идентификаторе инструмента задаёт его уровень: wooden_pickaxe -> wood.
+TOOL_MATERIAL_PREFIXES = {"wooden": "wood", "golden": "gold", "stone": "stone",
+                          "iron": "iron", "diamond": "diamond", "netherite": "netherite"}
+
+# Теги, перечисляющие инструменты каждого вида.
+TOOL_TAGS = {"minecraft:pickaxes": "pickaxe", "minecraft:axes": "axe",
+             "minecraft:shovels": "shovel", "minecraft:hoes": "hoe"}
 
 # Действия, на которые может накладываться запрет.
 ACTIONS = ("give", "summon")

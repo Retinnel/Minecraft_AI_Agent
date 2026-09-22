@@ -122,11 +122,35 @@ class KnowledgeBaseTests(unittest.TestCase):
         ranks = [source.tool_tier_rank for source in self.kb.sources_of("minecraft:diamond")]
         self.assertEqual(ranks, sorted(ranks))
 
-    def test_blocks_do_not_yield_themselves(self):
-        # Иначе в графе добычи появляется петля: чтобы добыть X, добудь X.
-        for item in ("minecraft:diamond_ore", "minecraft:stone", "minecraft:oak_log"):
+    def test_natural_blocks_are_a_source_of_themselves(self):
+        # Дерево, земля и песок берутся только так: блок в мире и предмет в инвентаре —
+        # разные вещи, петли здесь нет. Без этой связи планировщик не дойдёт до подручных
+        # ресурсов и не сможет построить ни одного плана с нуля.
+        for item in ("minecraft:oak_log", "minecraft:dirt", "minecraft:sand"):
+            with self.subTest(item=item):
+                self.assertIn(item, [source.id for source in self.kb.sources_of(item)])
+
+    def test_craftable_blocks_are_not_a_source_of_themselves(self):
+        # Алмазный блок выпадает сам собой лишь потому, что его можно поднять обратно.
+        # Естественным ресурсом он не является, и «найди алмазный блок» — не план.
+        for item in ("minecraft:diamond_block", "minecraft:iron_block", "minecraft:crafting_table"):
             with self.subTest(item=item):
                 self.assertNotIn(item, [source.id for source in self.kb.sources_of(item)])
+
+    def test_unreliable_drops_are_marked(self):
+        # Палки выпадают из мёртвого куста в количестве от нуля до двух.
+        bush = {source.id: source for source in self.kb.sources_of("minecraft:stick")}
+        self.assertIn("minecraft:dead_bush", bush)
+        self.assertTrue(bush["minecraft:dead_bush"].rare)
+        # А руда даёт алмаз всегда.
+        ore = {source.id: source for source in self.kb.sources_of("minecraft:diamond")}
+        self.assertFalse(ore["minecraft:diamond_ore"].rare)
+
+    def test_tool_profiles(self):
+        pickaxe = self.kb.tool_profile("minecraft:iron_pickaxe")
+        self.assertEqual((pickaxe.kind, pickaxe.tier), ("pickaxe", "iron"))
+        self.assertIsNone(self.kb.tool_profile("minecraft:diamond"))
+        self.assertEqual(len(self.kb.tools_of_kind("pickaxe")), 6)
 
     # --- уровни инструмента ---
 

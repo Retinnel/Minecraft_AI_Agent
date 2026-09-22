@@ -60,6 +60,21 @@ class Source:
     tool_kind: Optional[str] = None   # pickaxe | axe | shovel | hoe
     tool_tier: Optional[str] = None   # stone | iron | diamond
     tool_tier_rank: int = 0
+    # Обязателен ли инструмент для выпадения. Для дерева и земли нет — они добываются руками,
+    # инструмент лишь ускоряет. Для камня и руд обязателен.
+    tool_required: bool = False
+    # Выпадение случайное и редкое: связь есть, но план на ней строить нельзя.
+    rare: bool = False
+
+
+@dataclass(frozen=True)
+class Tool:
+    """Инструмент как предмет: чем он является и какого уровня."""
+
+    id: str
+    kind: str              # pickaxe | axe | shovel | hoe
+    tier: Optional[str]    # wood | gold | stone | iron | diamond | netherite
+    tier_rank: int = 0
 
 
 @dataclass(frozen=True)
@@ -197,14 +212,45 @@ class KnowledgeBase:
                 rank_value = next(iter(self.graph.objects(tier_uri, ont.TIER_RANK)), None)
                 rank = int(rank_value) if rank_value is not None else 0
 
+            required = next(iter(self.graph.objects(source_uri, ont.TOOL_REQUIRED)), None)
+
+            rare = (source_uri, ont.RARE_YIELD, target) in self.graph
+
             sources.append(Source(id=source_id, kind=kind, tool_kind=tool_kind,
-                                  tool_tier=tool_tier, tool_tier_rank=rank))
+                                  tool_tier=tool_tier, tool_tier_rank=rank,
+                                  tool_required=bool(required) if required is not None else False,
+                                  rare=rare))
 
-        # Сначала то, что добыть проще: меньший требуемый уровень инструмента.
-        return sorted(sources, key=lambda s: (s.tool_tier_rank, s.id))
+        # Сначала надёжные источники, затем то, что добыть проще.
+        return sorted(sources, key=lambda s: (s.rare, s.tool_tier_rank, s.id))
 
-    def tool_tier_rank(self, tier: str) -> int:
-        return ont.TOOL_TIERS.get(tier, 0)
+    def tool_profile(self, item_id: str) -> Optional[Tool]:
+        """Если предмет — инструмент, возвращает его вид и уровень."""
+        uri = ont.thing_uri(item_id)
+        kind_uri = next(iter(self.graph.objects(uri, ont.IS_TOOL_KIND)), None)
+        if kind_uri is None:
+            return None
+        tier_uri = next(iter(self.graph.objects(uri, ont.HAS_TOOL_TIER)), None)
+        tier = str(tier_uri).rsplit("/", 1)[-1] if tier_uri is not None else None
+        return Tool(id=item_id,
+                    kind=str(kind_uri).rsplit("/", 1)[-1],
+                    tier=tier,
+                    tier_rank=self.tool_tier_rank(tier) if tier else 0)
+
+    def tools_of_kind(self, kind: str) -> List[Tool]:
+        """Все инструменты заданного вида, от простого к сложному."""
+        found: List[Tool] = []
+        for uri in self.graph.subjects(ont.IS_TOOL_KIND, ont.tool_kind_uri(kind)):
+            item_id = self._by_uri.get(uri)
+            if item_id is None:
+                continue
+            profile = self.tool_profile(item_id)
+            if profile is not None:
+                found.append(profile)
+        return sorted(found, key=lambda tool: (tool.tier_rank, tool.id))
+
+    def tool_tier_rank(self, tier: Optional[str]) -> int:
+        return ont.TOOL_TIERS.get(tier or "", 0)
 
     def tier_satisfies(self, available: Optional[str], required: Optional[str]) -> bool:
         """Хватит ли инструмента уровня `available` для требования `required`."""

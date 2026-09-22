@@ -1,0 +1,375 @@
+"""Планировщик достижения цели.
+
+Отвечает на вопрос «как получить N штук предмета X, если у игрока сейчас вот это».
+Работает обратным выводом от цели: сначала пытается взять из инвентаря, затем изготовить,
+затем добыть. Если для добычи нужен инструмент, которого нет, план рекурсивно достраивает
+и его.
+
+Планировщик обращается только к словарю ядра онтологии и не знает, что предметная область —
+именно Minecraft.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from dataclasses import dataclass, field
+from math import ceil
+from typing import Dict, List, Optional, Sequence, Tuple
+
+from kb.graph import KnowledgeBase, Recipe, Source
+
+# Как получен предмет на данном шаге.
+HAVE = "have"          # уже в инвентаре
+CRAFT = "craft"        # изготовить по рецепту
+SMELT = "smelt"        # переплавить
+STONECUT = "stonecut"  # вырезать камнерезом
+SMITH = "smith"        # выковать
+MINE = "mine"          # добыть из блока
+HUNT = "hunt"          # выбить из существа
+MISSING = "missing"    # получить не удалось
+
+METHOD_STEPS = {"craft": CRAFT, "smelt": SMELT, "stonecut": STONECUT, "smith": SMITH}
+
+# Ограничение глубины вывода. Самая длинная осмысленная цепочка в игре — от голых рук до
+# незеритового снаряжения — укладывается примерно в десяток уровней; запас взят вдвое.
+MAX_DEPTH = 20
+
+# Сколько вариантов рецепта или источника рассматривать. Варианты упорядочены по
+# оценке стоимости, поэтому лучшие идут первыми, а ограничение держит перебор конечным.
+MAX_BRANCHES = 4
+
+# Веса, по которым сравниваются планы. Это проектное решение, а не физика игры: они задают,
+# что считать удобным для игрока. Подобраны так, чтобы план шёл привычным путём развития.
+WEIGHT_STEP = 1          # любое действие само по себе
+WEIGHT_TOOL_TIER = 2     # за каждый уровень инструмента, нужного для добычи
+WEIGHT_HUNT = 20         # охота: существо нужно найти и одолеть, это не то же, что копать
+WEIGHT_UNRELIABLE = 30   # выпадение может не случиться, планировать на нём нельзя
+
+
+@dataclass(frozen=True)
+class Step:
+    """Узел плана."""
+
+    kind: str
+    item: str
+    count: int
+    satisfied: bool
+    # Чем именно закрывается шаг: станция для изготовления, источник для добычи.
+    station: Optional[str] = None
+    source: Optional[str] = None
+    tool_kind: Optional[str] = None
+    tool_tier: Optional[str] = None
+    reason: Optional[str] = None
+    # Ненадёжный источник: попытка может не дать ничего.
+    rare: bool = False
+    # Во что обходится сам этот шаг, без учёта вложенных. Складывается при сравнении планов.
+    weight: int = 0
+    children: Tuple["Step", ...] = ()
+
+    def walk(self):
+        yield self
+        for child in self.children:
+            yield from child.walk()
+
+
+@dataclass
+class Plan:
+    goal: str
+    count: int
+    root: Step
+
+    @property
+    def feasible(self) -> bool:
+        return self.root.satisfied
+
+    @property
+    def missing(self) -> List[str]:
+        """Предметы, на которых вывод упёрся."""
+        return sorted({step.item for step in self.root.walk() if step.kind == MISSING})
+
+    @property
+    def steps(self) -> List[Step]:
+        """Все шаги, кроме уже имеющегося в инвентаре, в порядке обхода."""
+        return [step for step in self.root.walk() if step.kind != HAVE]
+
+    def actions(self) -> List[Step]:
+        """Только то, что игроку предстоит сделать: изготовить, добыть, выбить."""
+        return [step for step in self.root.walk() if step.kind in
+                (CRAFT, SMELT, STONECUT, SMITH, MINE, HUNT)]
+
+
+class Planner:
+    def __init__(self, kb: KnowledgeBase, max_depth: int = MAX_DEPTH) -> None:
+        self.kb = kb
+        self.max_depth = max_depth
+        self._cost_cache: Dict[str, int] = {}
+
+    # --- публичный интерфейс ---
+
+    def plan(self, goal: str, count: int = 1,
+             inventory: Optional[Dict[str, int]] = None) -> Plan:
+        stock = Counter(inventory or {})
+        root = self._resolve(goal, count, stock, frozenset(), 0)
+        return Plan(goal=goal, count=count, root=root)
+
+    # --- вывод ---
+
+    def _resolve(self, item: str, count: int, stock: Counter,
+                 stack: frozenset, depth: int) -> Step:
+        if count <= 0:
+            return Step(kind=HAVE, item=item, count=0, satisfied=True)
+
+        # Что-то из нужного уже лежит в инвентаре — берём и уменьшаем остаток.
+        taken = min(stock.get(item, 0), count)
+        if taken:
+            stock[item] -= taken
+        remaining = count - taken
+
+        if remaining == 0:
+            return Step(kind=HAVE, item=item, count=taken, satisfied=True)
+
+        if depth >= self.max_depth:
+            return self._missing(item, remaining, "превышена глубина вывода", taken)
+
+        # Предмет уже раскрывается выше по стеку: дальше идти нельзя, иначе цикл.
+        # Такое бывает у обратимых рецептов вроде «блок алмазов -> 9 алмазов».
+        if item in stack:
+            return self._missing(item, remaining, "циклическая зависимость", taken)
+
+        deeper = stack | {item}
+
+        # Изготовление и добыча рассматриваются как равноправные пути, каждый на своей копии
+        # запасов. Иначе неудачная попытка изготовить закрыла бы дорогу к добыче: у алмаза
+        # есть рецепт из алмазного блока, который упирается в цикл, но сам алмаз прекрасно
+        # добывается из руды.
+        candidates: List[Tuple[Step, Counter]] = []
+        for attempt in (self._try_recipes, self._try_sources):
+            trial = stock.copy()
+            step = attempt(item, remaining, trial, deeper, depth)
+            if step is not None:
+                candidates.append((step, trial))
+
+        if candidates:
+            # Оба пути рассматриваются до конца, и берётся лучший, а не первый сработавший.
+            # Иначе алмаз «выплавлялся бы из алмазной руды» — формально это рецепт, но он
+            # требует сначала добыть саму руду, тогда как прямая добыча даёт алмаз сразу.
+            step, trial = max(candidates, key=lambda pair: self._score(pair[0]))
+            stock.clear()
+            stock.update(trial)
+        else:
+            step = self._missing(item, remaining, "нет ни рецепта, ни источника добычи", 0)
+
+        return self._merge_taken(item, count, step, taken)
+
+    @staticmethod
+    def _merge_taken(item: str, count: int, step: Step, taken: int) -> Step:
+        """Часть закрыта инвентарём, часть выводом — показываем оба шага."""
+        if not taken:
+            return step
+        return Step(kind=step.kind, item=item, count=count, satisfied=step.satisfied,
+                    station=step.station, source=step.source, tool_kind=step.tool_kind,
+                    tool_tier=step.tool_tier, reason=step.reason,
+                    children=(Step(kind=HAVE, item=item, count=taken, satisfied=True),
+                              *step.children))
+
+    def _try_recipes(self, item: str, count: int, stock: Counter,
+                     stack: frozenset, depth: int) -> Optional[Step]:
+        recipes = self.kb.recipes_for(item)
+        if not recipes:
+            return None
+
+        best: Optional[Tuple[Step, Counter]] = None
+        for recipe in sorted(recipes, key=lambda r: self._recipe_cost(r, stack))[:MAX_BRANCHES]:
+            # Каждый вариант считается на своей копии запасов: неудачная попытка не должна
+            # съедать инвентарь и портить следующие.
+            trial = stock.copy()
+            step = self._expand_recipe(recipe, item, count, trial, stack, depth)
+            if best is None or self._score(step) > self._score(best[0]):
+                best = (step, trial)
+        if best is None:
+            return None
+        stock.clear()
+        stock.update(best[1])
+        return best[0]
+
+    def _expand_recipe(self, recipe: Recipe, item: str, count: int, stock: Counter,
+                       stack: frozenset, depth: int) -> Step:
+        runs = ceil(count / recipe.produces_count)
+        children: List[Step] = []
+        satisfied = True
+
+        for ingredient in recipe.inputs:
+            choice = self._choose_alternative(ingredient.alternatives, stock, stack)
+            if choice is None:
+                children.append(self._missing(
+                    ingredient.tag or "?", ingredient.quantity * runs,
+                    "ни один из вариантов недоступен", 0))
+                satisfied = False
+                continue
+            child = self._resolve(choice, ingredient.quantity * runs, stock, stack, depth + 1)
+            children.append(child)
+            satisfied = satisfied and child.satisfied
+
+        # Рецепт может дать больше, чем нужно: излишек остаётся игроку и пригодится дальше.
+        surplus = runs * recipe.produces_count - count
+        if satisfied and surplus > 0:
+            stock[item] += surplus
+
+        return Step(kind=METHOD_STEPS.get(recipe.method, CRAFT), item=item, count=count,
+                    satisfied=satisfied, station=recipe.station, weight=1,
+                    children=tuple(children))
+
+    def _try_sources(self, item: str, count: int, stock: Counter,
+                     stack: frozenset, depth: int) -> Optional[Step]:
+        sources = self.kb.sources_of(item)
+        if not sources:
+            return None
+
+        best: Optional[Tuple[Step, Counter]] = None
+        for source in sources[:MAX_BRANCHES]:
+            trial = stock.copy()
+            step = self._expand_source(source, item, count, trial, stack, depth)
+            if best is None or self._score(step) > self._score(best[0]):
+                best = (step, trial)
+        if best is None:
+            return None
+        stock.clear()
+        stock.update(best[1])
+        return best[0]
+
+    def _expand_source(self, source: Source, item: str, count: int, stock: Counter,
+                       stack: frozenset, depth: int) -> Step:
+        kind = HUNT if source.kind == "creature" else MINE
+        children: List[Step] = []
+        satisfied = True
+
+        if source.tool_required and source.tool_kind:
+            tool_step = self._ensure_tool(source, stock, stack, depth)
+            if tool_step is not None:
+                children.append(tool_step)
+                satisfied = tool_step.satisfied
+
+        return Step(kind=kind, item=item, count=count, satisfied=satisfied,
+                    source=source.id, tool_kind=source.tool_kind, tool_tier=source.tool_tier,
+                    rare=source.rare, weight=self._source_weight(source),
+                    children=tuple(children))
+
+    @staticmethod
+    def _source_weight(source: Source) -> int:
+        """Во что обходится добыча из источника.
+
+        Единая шкала с оценкой в `_item_cost`: добыча инструментом дороже добычи руками,
+        охота дороже добычи, ненадёжное выпадение дороже всего.
+        """
+        weight = WEIGHT_STEP
+        if source.tool_required:
+            weight += WEIGHT_TOOL_TIER * (source.tool_tier_rank + 1)
+        if source.kind == "creature":
+            weight += WEIGHT_HUNT
+        if source.rare:
+            weight += WEIGHT_UNRELIABLE
+        return weight
+
+    def _ensure_tool(self, source: Source, stock: Counter,
+                     stack: frozenset, depth: int) -> Optional[Step]:
+        """Подходящий инструмент уже есть — шага не нужно; иначе планируем самый простой."""
+        candidates = self.kb.tools_of_kind(source.tool_kind)
+        suitable = [tool for tool in candidates
+                    if self.kb.tier_satisfies(tool.tier, source.tool_tier)]
+        if not suitable:
+            return self._missing(source.tool_kind or "?", 1, "подходящего инструмента не существует", 0)
+
+        # Инструмент не расходуется при добыче, поэтому имеющийся просто засчитывается.
+        for tool in suitable:
+            if stock.get(tool.id, 0) > 0:
+                return Step(kind=HAVE, item=tool.id, count=1, satisfied=True)
+
+        # Из подходящих берём самый дешёвый в изготовлении, а не самый низкий по уровню:
+        # золотой инструмент по уровню слабее каменного, но золото добыть куда сложнее.
+        simplest = min(suitable, key=lambda tool: (self._item_cost(tool.id, stack), tool.id))
+        return self._resolve(simplest.id, 1, stock, stack, depth + 1)
+
+    # --- выбор вариантов ---
+
+    def _choose_alternative(self, alternatives: Sequence[str], stock: Counter,
+                            stack: frozenset) -> Optional[str]:
+        """Из взаимозаменяемых вариантов берём тот, что дешевле обойдётся игроку.
+
+        Сначала то, что уже лежит в инвентаре, затем то, что проще получить. Полный перебор
+        всех вариантов здесь не нужен и вреден: у тега «доски» одиннадцать значений, и перебор
+        размножил бы дерево вывода без пользы для игрока.
+        """
+        if not alternatives:
+            return None
+        available = [item for item in alternatives if stock.get(item, 0) > 0]
+        pool = available or [item for item in alternatives if item not in stack] or list(alternatives)
+        return min(pool, key=lambda item: (self._item_cost(item, stack), item))
+
+    def _recipe_cost(self, recipe: Recipe, stack: frozenset) -> Tuple[float, int, str]:
+        """Оценка рецепта: во что обойдётся единица результата.
+
+        Деление на выход существенно. Палки делаются и из двух досок сразу четыре штуки, и из
+        двух бамбуков по одной; по числу шагов бамбук выглядит дешевле, но в пересчёте на
+        палку он вчетверо дороже.
+        """
+        total = 0
+        for ingredient in recipe.inputs:
+            if not ingredient.alternatives:
+                total += 100
+                continue
+            total += ingredient.quantity * min(
+                self._item_cost(item, stack) for item in ingredient.alternatives)
+        return (total / max(recipe.produces_count, 1), len(recipe.inputs), recipe.id)
+
+    def _item_cost(self, item: str, stack: frozenset, depth: int = 0) -> int:
+        """Грубая оценка трудоёмкости предмета: сколько шагов до него от подручных ресурсов.
+
+        Нужна только для упорядочивания вариантов, поэтому количества игнорируются, а
+        результат кэшируется. Точность здесь не важна — важно, чтобы выбор был устойчивым.
+        """
+        if item in self._cost_cache:
+            return self._cost_cache[item]
+        if depth > 8 or item in stack:
+            return 50
+
+        sources = self.kb.sources_of(item)
+        best = 50
+        for source in sources:
+            # Та же шкала, что и у веса шага: оценка и сравнение планов должны быть согласованы.
+            best = min(best, self._source_weight(source))
+
+        for recipe in self.kb.recipes_for(item):
+            cost = 1
+            for ingredient in recipe.inputs:
+                if not ingredient.alternatives:
+                    cost += 50
+                    continue
+                cost += ingredient.quantity * min(
+                    self._item_cost(alternative, stack | {item}, depth + 1)
+                    for alternative in ingredient.alternatives)
+            best = min(best, int(cost / max(recipe.produces_count, 1)) or 1)
+
+        if depth == 0:
+            self._cost_cache[item] = best
+        return best
+
+    # --- вспомогательное ---
+
+    @staticmethod
+    def _missing(item: str, count: int, reason: str, taken: int) -> Step:
+        children = (Step(kind=HAVE, item=item, count=taken, satisfied=True),) if taken else ()
+        return Step(kind=MISSING, item=item, count=count + taken, satisfied=False,
+                    reason=reason, children=children)
+
+    @staticmethod
+    def _score(step: Step) -> Tuple[int, int, int]:
+        """Насколько хорош вариант плана.
+
+        Сначала выполнимость, затем отсутствие тупиков, затем трудоёмкость. Считать именно
+        трудоёмкость, а не число шагов, существенно: палки выпадают из мёртвого куста за один
+        шаг, но с шансом получить ноль, и три надёжных шага через доски игроку полезнее.
+        """
+        nodes = list(step.walk())
+        dead_ends = sum(1 for node in nodes if node.kind == MISSING)
+        effort = sum(node.weight for node in nodes)
+        return (int(step.satisfied), -dead_ends, -effort)

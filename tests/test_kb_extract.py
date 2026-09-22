@@ -135,10 +135,23 @@ class ExtractedGameDataTests(unittest.TestCase):
         self.assertIn("minecraft:rotten_flesh", self.drops["entities"]["minecraft:zombie"])
 
     def test_tool_tiers_match_the_game(self):
-        self.assertEqual(self.tools["minecraft:diamond_ore"], {"tier": "iron", "tool": "pickaxe"})
-        self.assertEqual(self.tools["minecraft:iron_ore"], {"tier": "stone", "tool": "pickaxe"})
+        self.assertEqual(self.tools["minecraft:diamond_ore"]["tier"], "iron")
+        self.assertEqual(self.tools["minecraft:iron_ore"]["tier"], "stone")
         # Камень добывается любой киркой, уровень не требуется.
-        self.assertEqual(self.tools["minecraft:stone"], {"tool": "pickaxe"})
+        self.assertEqual(self.tools["minecraft:stone"]["tool"], "pickaxe")
+        self.assertNotIn("tier", self.tools["minecraft:stone"])
+
+    def test_tool_is_required_only_where_it_gates_the_drop(self):
+        # Камень и руды без кирки не выпадают, дерево же добывается руками.
+        self.assertTrue(self.tools["minecraft:stone"]["tool_required"])
+        self.assertTrue(self.tools["minecraft:diamond_ore"]["tool_required"])
+        self.assertFalse(self.tools["minecraft:oak_log"]["tool_required"])
+
+    def test_unreliable_drops_are_flagged(self):
+        # Мёртвый куст роняет от нуля до двух палок — на таком источнике план не строят.
+        self.assertTrue(self.drops["blocks"]["minecraft:dead_bush"]["minecraft:stick"])
+        # Алмазная руда даёт алмаз всегда.
+        self.assertFalse(self.drops["blocks"]["minecraft:diamond_ore"]["minecraft:diamond"])
 
     def test_drop_targets_are_known_items(self):
         known_items = set(self.items)
