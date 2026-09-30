@@ -10,11 +10,12 @@ import unittest
 from unittest.mock import patch
 
 from eval.configs import llm_only
+from eval.configs._llm import ModelUnavailable
 
 
 class LlmOnlyConfigTests(unittest.TestCase):
     def predict_with(self, payload):
-        with patch.object(llm_only, "_ask", return_value=payload):
+        with patch.object(llm_only, "ask_json", return_value=payload):
             return llm_only.predict("реплика")
 
     def test_give_is_taken_at_face_value(self):
@@ -62,10 +63,11 @@ class LlmOnlyConfigTests(unittest.TestCase):
     def test_empty_answer_is_not_an_action(self):
         self.assertEqual(self.predict_with({}).outcome, "none")
 
-    def test_network_error_is_reported_not_raised(self):
-        with patch.object(llm_only, "_ask", side_effect=RuntimeError("нет сети")):
+    def test_channel_failure_is_not_a_decision(self):
+        """Недоступность модели помечается отдельно и в статистику решений не входит."""
+        with patch.object(llm_only, "ask_json", side_effect=ModelUnavailable("нет сети")):
             prediction = llm_only.predict("реплика")
-        self.assertEqual(prediction.outcome, "reject")
+        self.assertEqual(prediction.outcome, "error")
         self.assertIn("нет сети", prediction.details["error"])
 
 

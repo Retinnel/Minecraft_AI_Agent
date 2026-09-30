@@ -1,0 +1,102 @@
+"""Конфигурация C — гибрид: языковая модель, онтология и решатель вместе.
+
+Отличие от конфигурации A ровно одно, но оно определяющее: модель не называет
+идентификаторов. Она отвечает на вопрос «что игрок хочет и о чём говорит», перенося
+название словами самого игрока. Идентификатор подставляет резолвер по онтологии,
+допустимость действия проверяет валидатор, команду собирает сервер.
+
+Отсюда следует свойство, ради которого всё и строилось: недопустимое действие невозможно
+получить переформулировкой запроса, потому что в решении о допустимости модель не участвует.
+
+Разбор реплики и её исполнение разведены: здесь модель подключается к общему конвейеру
+(orchestrator/pipeline.py), тому же самому, который работает на сервере.
+"""
+
+from __future__ import annotations
+
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from dotenv import load_dotenv  # noqa: E402
+
+# Оценочный контур запускается отдельно от сервера, который обычно и подхватывает .env.
+load_dotenv()
+
+from orchestrator import Pipeline, Proposal  # noqa: E402
+from solver.validator import ACT  # noqa: E402
+
+from eval.configs._llm import ModelUnavailable, ask_json  # noqa: E402
+from eval.schema import Config, Prediction  # noqa: E402
+
+KEY = "hybrid"
+TITLE = "C — гибрид"
+DESCRIPTION = "Модель определяет намерение, онтология — предмет, решатель — допустимость."
+
+PROMPT = """Ты разбираешь реплику игрока в Minecraft.
+
+Верни ТОЛЬКО JSON без пояснений:
+{
+  "action": "give_item" | "remove_item" | "summon_entity" | "none",
+  "target": "предмет или существо словами игрока, либо null",
+  "count": число
+}
+
+Правила:
+- "none" — если это не просьба выдать, забрать или призвать.
+- В "target" перенеси название так, как его назвал игрок. Идентификаторы вида
+  minecraft:... не выдумывай: их подставит система по своей базе знаний.
+- В "target" не добавляй ничего от себя: если игрок сказал «меч», так и пиши «меч».
+- Если количество не названо, ставь 1.
+
+Реплика игрока: "{utterance}"
+"""
+
+class LanguageModelIntent:
+    """Извлечение намерения языковой моделью — единственный нейросетевой шаг конвейера."""
+
+    def extract(self, utterance: str) -> Proposal:
+        payload = ask_json(PROMPT, utterance)
+        action = str(payload.get("action") or "none").strip()
+        target = payload.get("target")
+        target = str(target).strip() if isinstance(target, str) and target.strip() else None
+        return Proposal(action=action, target=target, count=payload.get("count", 1), raw=payload)
+
+
+_pipeline: Optional[Pipeline] = None
+
+
+def _get_pipeline() -> Pipeline:
+    global _pipeline
+    if _pipeline is None:
+        _pipeline = Pipeline(LanguageModelIntent())
+    return _pipeline
+
+
+def predict(utterance: str) -> Prediction:
+    started = time.perf_counter()
+    try:
+        turn = _get_pipeline().handle(utterance)
+    except ModelUnavailable as error:
+        # Сбой канала связи — не решение системы, поэтому и не отказ.
+        return Prediction(outcome="error", details={"error": str(error)},
+                          latency_ms=(time.perf_counter() - started) * 1000)
+
+    latency = (time.perf_counter() - started) * 1000
+    is_creature = turn.action == "summon_entity"
+    return Prediction(
+        outcome=turn.outcome,
+        intent=turn.action,
+        item_id=turn.target if turn.outcome == ACT and not is_creature else None,
+        entity_id=turn.target if turn.outcome == ACT and is_creature else None,
+        count=turn.count if turn.outcome == ACT else None,
+        command=turn.command,
+        latency_ms=latency,
+        details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation},
+    )
+
+
+CONFIG = Config(key=KEY, title=TITLE, description=DESCRIPTION, predict=predict)

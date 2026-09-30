@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 GOLDEN_SET_PATH = ROOT / "golden_set.jsonl"
 REPORTS_DIR = ROOT / "reports"
 
-AVAILABLE_CONFIGS = ("symbolic", "llm_only")
+AVAILABLE_CONFIGS = ("symbolic", "llm_only", "hybrid")
 
 
 def load_config(key: str) -> Config:
@@ -56,6 +56,11 @@ def classify(case: Case, prediction: Prediction) -> str:
 
       other           — прочее расхождение
     """
+    # Сбой канала связи с моделью решением системы не является и в статистику решений
+    # не входит: иначе измеряется качество сети, а не качество разбора.
+    if prediction.outcome == "error":
+        return "error"
+
     if case.outcome == prediction.outcome == "none":
         return "pass"
 
@@ -139,10 +144,11 @@ def run(config: Config, cases: List[Case]) -> Tuple[List[Dict[str, Any]], Dict[s
             }
         )
 
-    total = len(rows)
+    failed = sum(1 for row in rows if row["verdict"] == "error")
+    total = len(rows) - failed
     passed = sum(1 for row in rows if row["verdict"] == "pass")
     unsafe = sum(1 for row in rows if row["verdict"] in UNSAFE)
-    latencies = [row["latency_ms"] for row in rows]
+    latencies = [row["latency_ms"] for row in rows if row["verdict"] != "error"]
 
     verdict_counts: Dict[str, int] = {}
     for row in rows:
@@ -150,6 +156,8 @@ def run(config: Config, cases: List[Case]) -> Tuple[List[Dict[str, Any]], Dict[s
 
     by_group: Dict[str, Dict[str, int]] = {}
     for row in rows:
+        if row["verdict"] == "error":
+            continue
         bucket = by_group.setdefault(row["group"], {"total": 0, "pass": 0})
         bucket["total"] += 1
         if row["verdict"] == "pass":
@@ -161,6 +169,7 @@ def run(config: Config, cases: List[Case]) -> Tuple[List[Dict[str, Any]], Dict[s
         "description": config.description,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "total": total,
+        "failed": failed,
         "passed": passed,
         "accuracy": round(passed / total, 4) if total else 0.0,
         "unsafe": unsafe,
@@ -188,6 +197,8 @@ def format_report(rows: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
     lines.append("| Показатель | Значение |")
     lines.append("|---|---|")
     lines.append(f"| Всего примеров | {summary['total']} |")
+    if summary.get("failed"):
+        lines.append(f"| Исключено из-за сбоя связи с моделью | {summary['failed']} |")
     lines.append(f"| Совпало с разметкой | {summary['passed']} ({summary['accuracy']:.1%}) |")
     lines.append(f"| Небезопасных расхождений | {summary['unsafe']} ({summary['unsafe_rate']:.1%}) |")
     lines.append(f"| Время отклика, медиана | {summary['latency_ms']['median']} мс |")
@@ -264,9 +275,20 @@ def main() -> int:
                         help="сохранить отчёт в eval/reports/")
     parser.add_argument("--only-failures", action="store_true",
                         help="в консоли показать только расхождения")
+    parser.add_argument("--model",
+                        help="ключ модели из llm_config.json на время прогона; "
+                             "файл настроек при этом не меняется")
     args = parser.parse_args()
 
     cases = load_golden_set(args.golden_set)
+    # Конфигурации с языковой моделью прогоняются при зафиксированных параметрах,
+    # иначе два прогона одного набора несопоставимы.
+    profile = None
+    if args.config != "symbolic":
+        from eval.model_profile import apply
+        profile = apply(args.model)
+        print("Модель: " + ", ".join(f"{key} {value}" for key, value in profile.items()))
+        print()
     config = load_config(args.config)
     rows, summary = run(config, cases)
 
@@ -278,7 +300,8 @@ def main() -> int:
         stamp = datetime.now().strftime("%Y-%m-%d")
         (REPORTS_DIR / f"{stamp}-{config.key}.md").write_text(report, encoding="utf-8")
         (REPORTS_DIR / f"{stamp}-{config.key}.json").write_text(
-            json.dumps({"summary": summary, "rows": rows}, ensure_ascii=False, indent=2),
+            json.dumps({"summary": summary, "model": profile, "rows": rows},
+                       ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         print(f"Отчёт сохранён в {REPORTS_DIR}")
