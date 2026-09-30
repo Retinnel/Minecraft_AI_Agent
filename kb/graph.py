@@ -78,6 +78,28 @@ class Tool:
 
 
 @dataclass(frozen=True)
+class Naming:
+    """Все имена одной сущности: по ним её ищет резолвер."""
+
+    thing: str
+    label_ru: Optional[str]
+    label_en: Optional[str]
+    aliases: Sequence[str]
+    kinds: Sequence[str]
+
+    def names(self) -> List[str]:
+        """Имена в порядке убывания надёжности: официальное русское, затем остальные."""
+        ordered = [self.label_ru, *self.aliases, self.label_en]
+        seen: set[str] = set()
+        result: List[str] = []
+        for name in ordered:
+            if name and name not in seen:
+                seen.add(name)
+                result.append(name)
+        return result
+
+
+@dataclass(frozen=True)
 class Restriction:
     thing: str
     action: str            # give | summon
@@ -96,6 +118,7 @@ class KnowledgeBase:
         # где нужен обзор всей предметной области.
         self._recipe_index: Optional[Dict[str, List[Recipe]]] = None
         self._source_index: Optional[Dict[str, List[Source]]] = None
+        self._name_index: Optional[Dict[str, Naming]] = None
 
     # --- загрузка ---
 
@@ -142,6 +165,49 @@ class KnowledgeBase:
         mapping = {ont.ITEM: "item", ont.BLOCK: "block", ont.CREATURE: "creature"}
         uri = ont.thing_uri(thing_id)
         return sorted(name for cls, name in mapping.items() if (uri, RDF.type, cls) in self.graph)
+
+    def index_names(self) -> Dict[str, Naming]:
+        """Имена всех сущностей разом: резолверу нужен обзор всей предметной области.
+
+        Поштучные обращения к графу здесь особенно накладны: имя требуется не для одной
+        сущности, а для сравнения запроса со всеми сразу.
+        """
+        if self._name_index is None:
+            labels_ru: Dict[str, str] = {}
+            labels_en: Dict[str, str] = {}
+            aliases: Dict[str, List[str]] = {}
+            kinds: Dict[str, List[str]] = {}
+
+            for uri, value in self.graph.subject_objects(RDFS.label):
+                thing_id = self._by_uri.get(uri)
+                if thing_id is None or not isinstance(value, Literal):
+                    continue
+                target = labels_ru if value.language == "ru" else labels_en if value.language == "en" else None
+                if target is not None:
+                    target.setdefault(thing_id, str(value))
+
+            for uri, value in self.graph.subject_objects(SKOS.altLabel):
+                thing_id = self._by_uri.get(uri)
+                if thing_id is not None:
+                    aliases.setdefault(thing_id, []).append(str(value))
+
+            for cls, name in ((ont.ITEM, "item"), (ont.BLOCK, "block"), (ont.CREATURE, "creature")):
+                for uri in self.graph.subjects(RDF.type, cls):
+                    thing_id = self._by_uri.get(uri)
+                    if thing_id is not None:
+                        kinds.setdefault(thing_id, []).append(name)
+
+            self._name_index = {
+                thing_id: Naming(
+                    thing=thing_id,
+                    label_ru=labels_ru.get(thing_id),
+                    label_en=labels_en.get(thing_id),
+                    aliases=tuple(sorted(set(aliases.get(thing_id, ())))),
+                    kinds=tuple(sorted(kinds.get(thing_id, ()))),
+                )
+                for thing_id in self._by_uri.values()
+            }
+        return self._name_index
 
     # --- группы ---
 

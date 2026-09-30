@@ -3,6 +3,7 @@
 Вход:
     data/game/*.json              результат kb.extract
     kb/restrictions.json          рукописный слой запретов
+    kb/aliases.json               рукописный слой разговорных названий
     data/minecraft_catalog.json   разговорные алиасы прошлого семестра
     data/entity_catalog.json      то же для существ
 
@@ -29,6 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GAME_DIR = ROOT / "data" / "game"
 KB_DIR = ROOT / "data" / "kb"
 RESTRICTIONS_PATH = Path(__file__).resolve().parent / "restrictions.json"
+ALIASES_PATH = Path(__file__).resolve().parent / "aliases.json"
 LEGACY_ITEM_CATALOG = ROOT / "data" / "minecraft_catalog.json"
 LEGACY_ENTITY_CATALOG = ROOT / "data" / "entity_catalog.json"
 
@@ -212,6 +214,27 @@ def _add_restrictions(graph: Graph, restrictions: Dict[str, Any]) -> int:
     return added
 
 
+def _add_manual_aliases(graph: Graph, known: set) -> int:
+    """Разговорные названия из рукописного слоя.
+
+    Нужны там, где официальное название расходится с тем, как объект называют в речи.
+    Для запрещённых сущностей это условие работоспособности запрета: чтобы отказать
+    с объяснением, система должна сначала понять, о ком идёт речь.
+    """
+    added = 0
+    for entry in _load(ALIASES_PATH).get("aliases", []):
+        resource_id = entry.get("id")
+        if not resource_id or resource_id not in known:
+            continue
+        uri = ont.thing_uri(resource_id)
+        for alias in entry.get("aliases_ru") or []:
+            text = (alias or "").strip()
+            if text:
+                graph.add((uri, SKOS.altLabel, Literal(text, lang="ru")))
+                added += 1
+    return added
+
+
 def _add_legacy_aliases(graph: Graph, known: set) -> Dict[str, int]:
     """Разговорные названия из рукописных каталогов прошлого семестра.
 
@@ -281,6 +304,11 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     tool_items = _add_tool_items(graph, tags["items"])
     restriction_count = _add_restrictions(graph, restrictions)
     legacy = _add_legacy_aliases(graph, set(items))
+    # Рукописные названия добавляются последними: они относятся ко всем заведённым
+    # сущностям, включая существ и варианты предметов из каталогов прошлого семестра.
+    manual_aliases = _add_manual_aliases(
+        graph, {str(value) for value in graph.objects(None, ont.GAME_ID)}
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / "game.ttl"
@@ -298,6 +326,7 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
         "инструментов размечено": tool_items,
         "запретов": restriction_count,
         "разговорных алиасов": legacy["aliases"],
+        "  из рукописного слоя": manual_aliases,
         "  вариантов с NBT заведено": legacy["variants"],
     }
 
