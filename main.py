@@ -10,6 +10,7 @@ from api import analytics
 from api import challenges
 from api import player_state
 from api import wiki
+from api import compare
 from api.llm_config_manager import get_llm_config
 
 app = FastAPI(title="AI Assistant Admin")
@@ -37,6 +38,7 @@ app.include_router(analytics.router)
 app.include_router(challenges.router)
 app.include_router(player_state.router)
 app.include_router(wiki.router)
+app.include_router(compare.router)
 
 # Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -74,6 +76,12 @@ async def admin_challenges_page():
 @app.get("/admin/wiki")
 async def admin_wiki_page():
     return FileResponse(BASE_DIR / "static" / "wiki.html")
+
+@app.get("/compare")
+async def compare_page():
+    """Страница сравнения конфигураций — демонстрационный материал к защите."""
+    return FileResponse(BASE_DIR / "static" / "compare.html")
+
 
 @app.get("/dashboard")
 async def dashboard_page():
