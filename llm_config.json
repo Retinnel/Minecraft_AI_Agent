@@ -1,10 +1,10 @@
 {
-  "model_type": "ling-2.6-1t",
+  "model_type": "qwen",
   "models": {
     "qwen": {
-      "name": "qwen/qwen3-32b",
+      "name": "qwen/qwen3.8-27b",
       "provider": "groq",
-      "description": "Fast and capable Qwen model via Groq",
+      "description": "Qwen3.8 27B via Groq",
       "parameters": {
         "max_tokens": 100,
         "temperature": 0.7,
@@ -53,6 +53,24 @@
       "description": "Owl Alpha model via OpenRouter",
       "parameters": {
         "max_tokens": 100,
+        "temperature": 0.7
+      }
+    },
+    "gpt-oss-120b": {
+      "name": "openai/gpt-oss-120b",
+      "provider": "groq",
+      "description": "GPT-OSS 120B via Groq — сильная модель для сравнения A/B/C",
+      "parameters": {
+        "max_tokens": 200,
+        "temperature": 0.7
+      }
+    },
+    "gpt-oss-20b": {
+      "name": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "description": "GPT-OSS 20B via Groq — ослабленная модель того же провайдера",
+      "parameters": {
+        "max_tokens": 200,
         "temperature": 0.7
       }
     }
