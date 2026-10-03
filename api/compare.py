@@ -91,6 +91,8 @@ def _run_hybrid(utterance: str) -> Dict[str, Any]:
         "count": prediction.count,
         "command": prediction.command,
         "reason": details.get("reason"),
+        "plan_tree": details.get("plan_tree"),
+        "plan_summary": details.get("plan_summary"),
         "explanation": details.get("explanation") or [],
         "stages": stages,
         "error": details.get("error") if prediction.outcome == "error" else None,

@@ -47,6 +47,13 @@ def format_table(runs: Dict[str, Dict[str, Any]]) -> str:
     lines.append(f"Составлено: {datetime.now().isoformat(timespec='seconds')}")
     lines.append("")
 
+    sizes = {runs[key]["summary"]["total"] + runs[key]["summary"].get("failed", 0) for key in keys}
+    if len(sizes) > 1:
+        lines.append("> ВНИМАНИЕ: прогоны выполнены на разных по объёму наборах "
+                     f"({', '.join(str(size) for size in sorted(sizes))} реплик) "
+                     "и строго несопоставимы. Нужен повторный прогон отставших конфигураций.")
+        lines.append("")
+
     for key in keys:
         summary = runs[key]["summary"]
         model = runs[key].get("model")

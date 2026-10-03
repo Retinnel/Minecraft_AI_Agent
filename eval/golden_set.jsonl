@@ -71,8 +71,16 @@
 {"id": "remove-t-001", "utterance": "забери гнилую плоть", "group": "typical", "outcome": "act", "intent": "remove_item", "item_id": "minecraft:rotten_flesh", "count": 1}
 {"id": "remove-t-002", "utterance": "убери 10 булыжника", "group": "typical", "outcome": "act", "intent": "remove_item", "item_id": "minecraft:cobblestone", "count": 10}
 
+// --- Запрос плана достижения цели ---
+// Сюда переразмечен бывший chat-t-003: с появлением решателя «как скрафтить X» —
+// это запрос плана, а не обычный разговор.
+{"id": "plan-t-001", "utterance": "как скрафтить факел?", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:torch", "count": 1}
+{"id": "plan-t-002", "utterance": "хочу алмазную кирку", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:diamond_pickaxe", "count": 1}
+{"id": "plan-t-003", "utterance": "как получить обсидиан", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:obsidian", "count": 1}
+{"id": "plan-b-001", "utterance": "как добыть незеритовый слиток", "group": "boundary", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:netherite_ingot", "count": 1, "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"}
+{"id": "plan-n-001", "utterance": "как скрафтить звёздный меч", "group": "negative", "outcome": "reject", "intent": "plan_goal", "note": "предмета не существует: отказ, а не выдуманный план"}
+
 // --- Не запросы действий ---
 {"id": "chat-t-001", "utterance": "привет", "group": "typical", "outcome": "none"}
 {"id": "chat-t-002", "utterance": "что делать ночью?", "group": "typical", "outcome": "none"}
-{"id": "chat-t-003", "utterance": "как скрафтить факел?", "group": "boundary", "outcome": "none", "note": "ВРЕМЕННО: сейчас не запрос действия; на этапе 3 переразмечается в запрос плана"}
 {"id": "chat-t-004", "utterance": "спасибо", "group": "typical", "outcome": "none"}

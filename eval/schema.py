@@ -20,7 +20,7 @@ OUTCOMES = ("act", "clarify", "reject", "none")
 
 GROUPS = ("typical", "boundary", "negative")
 
-INTENTS = ("give_item", "remove_item", "summon_entity", None)
+INTENTS = ("give_item", "remove_item", "summon_entity", "plan_goal", None)
 
 
 @dataclass

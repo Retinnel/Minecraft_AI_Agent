@@ -40,13 +40,14 @@ PROMPT = """Ты разбираешь реплику игрока в Minecraft.
 
 Верни ТОЛЬКО JSON без пояснений:
 {
-  "action": "give_item" | "remove_item" | "summon_entity" | "none",
+  "action": "give_item" | "remove_item" | "summon_entity" | "plan_goal" | "none",
   "target": "предмет или существо словами игрока, либо null",
   "count": число
 }
 
 Правила:
-- "none" — если это не просьба выдать, забрать или призвать.
+- "plan_goal" — если игрок спрашивает, как что-то получить, скрафтить или добыть.
+- "none" — если это не просьба выдать, забрать, призвать или спланировать.
 - В "target" перенеси название так, как его назвал игрок. Идентификаторы вида
   minecraft:... не выдумывай: их подставит система по своей базе знаний.
 - В "target" не добавляй ничего от себя: если игрок сказал «меч», так и пиши «меч».
@@ -95,7 +96,8 @@ def predict(utterance: str) -> Prediction:
         count=turn.count if turn.outcome == ACT else None,
         command=turn.command,
         latency_ms=latency,
-        details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation},
+        details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation,
+                 "plan_tree": turn.plan_tree, "plan_summary": turn.plan_summary},
     )
 
 

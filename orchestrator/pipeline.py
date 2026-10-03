@@ -23,9 +23,12 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence
 from kb.graph import KnowledgeBase
 from resolver.lexical import Candidate
 from resolver.resolve import AMBIGUOUS, NOT_FOUND, Resolver
+from solver.planner import Plan, Planner
+from solver.render import render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
 
 NONE = "none"
+PLAN_GOAL = "plan_goal"
 
 # Число, названное в реплике буквально, надёжнее числа из ответа модели: модель его
 # пересказывает, а регулярное выражение читает. Знак значим — «дай -5 алмазов» должно
@@ -68,6 +71,10 @@ class Turn:
     options: Sequence[Candidate] = ()         # варианты для уточняющего вопроса
     explanation: List[str] = field(default_factory=list)
     stages: Dict[str, Any] = field(default_factory=dict)
+    # Заполняется только для plan_goal: дерево достижения цели от текущего инвентаря.
+    plan: Optional[Plan] = None
+    plan_tree: Optional[str] = None
+    plan_summary: Optional[str] = None
 
 
 class Pipeline:
@@ -83,8 +90,17 @@ class Pipeline:
         self.resolver = Resolver(self.kb)
         self.validator = Validator(self.kb)
         self.mode = mode
+        self._planner: Optional[Planner] = None
 
-    def handle(self, utterance: str, *, mode: Optional[str] = None) -> Turn:
+    @property
+    def planner(self) -> Planner:
+        """Строится по требованию: предварительный расчёт стоимостей занимает секунду."""
+        if self._planner is None:
+            self._planner = Planner(self.kb)
+        return self._planner
+
+    def handle(self, utterance: str, *, mode: Optional[str] = None,
+               inventory: Optional[Dict[str, int]] = None) -> Turn:
         mode = mode or self.mode
 
         proposal = self.extractor.extract(utterance)
@@ -135,6 +151,9 @@ class Pipeline:
         verdict = self.validator.validate(proposal.action, resolution.thing, count, mode)
         stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
 
+        if verdict.outcome == ACT and verdict.action == PLAN_GOAL:
+            return self._build_plan(verdict, inventory, stages)
+
         command = None
         if verdict.outcome == ACT:
             command = self._command(verdict.action, verdict.game_id or verdict.target, verdict.count)
@@ -149,6 +168,42 @@ class Pipeline:
             reason=verdict.reason,
             explanation=verdict.explanation,
             stages=stages,
+        )
+
+    def _build_plan(self, verdict, inventory: Optional[Dict[str, int]],
+                    stages: Dict[str, Any]) -> Turn:
+        """План достижения цели от текущего инвентаря.
+
+        Здесь символьная часть работает уже не арбитром, а исполнителем: ответ целиком
+        выводится решателем, а модели остаётся его озвучить. Недостижимая цель даёт не
+        отказ, а план с отметкой, на каком предмете вывод упёрся, — игроку важнее знать,
+        чего не хватает, чем услышать «нельзя».
+        """
+        plan = self.planner.plan(verdict.target, verdict.count, inventory)
+        stages["planner"] = {
+            "feasible": plan.feasible,
+            "steps": len(plan.actions()),
+            "effort": plan.effort,
+            "missing": plan.missing,
+        }
+        explanation = list(verdict.explanation)
+        explanation.append(
+            f"план построен: {len(plan.actions())} действий, трудоёмкость {plan.effort}"
+            if plan.feasible else
+            f"вывод упёрся на: {', '.join(plan.missing[:3])}"
+        )
+        return Turn(
+            outcome=ACT,
+            action=PLAN_GOAL,
+            target=verdict.target,
+            label=self.kb.label(verdict.target),
+            count=verdict.count,
+            reason=None if plan.feasible else "Цель недостижима из текущего состояния.",
+            explanation=explanation,
+            stages=stages,
+            plan=plan,
+            plan_tree=render_tree(plan, self.kb),
+            plan_summary=render_summary(plan, self.kb),
         )
 
     # --- вспомогательное ---

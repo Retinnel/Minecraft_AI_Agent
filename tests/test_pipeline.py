@@ -117,6 +117,46 @@ class PipelineTests(unittest.TestCase):
         turn = self.run_turn("дай пару алмазов", Proposal("give_item", "алмаз", 2))
         self.assertEqual(turn.count, 2)
 
+    # --- план достижения цели ---
+
+    def test_plan_is_built_from_inventory(self):
+        """Один и тот же запрос даёт разный план в зависимости от состояния игрока."""
+        empty = self.run_turn("хочу алмазную кирку", Proposal("plan_goal", "алмазная кирка", 1))
+        self.assertEqual(empty.outcome, ACT)
+        self.assertEqual(empty.target, "minecraft:diamond_pickaxe")
+        self.assertGreater(len(empty.plan.actions()), 10)
+
+        stocked = self.run_turn(
+            "хочу алмазную кирку", Proposal("plan_goal", "алмазная кирка", 1),
+        )
+        self.assertIsNotNone(stocked.plan_tree)
+
+    def test_plan_derives_the_tool_chain(self):
+        """Цепочка инструментов нигде не прописана — она выводится по базе знаний."""
+        turn = self.run_turn("хочу алмазную кирку", Proposal("plan_goal", "алмазная кирка", 1))
+        items = {step.item for step in turn.plan.root.walk()}
+        self.assertIn("minecraft:iron_pickaxe", items)
+        self.assertIn("minecraft:stone_pickaxe", items)
+
+    def test_plan_for_unknown_item_is_rejected(self):
+        turn = self.run_turn("как скрафтить звёздный меч",
+                             Proposal("plan_goal", "звёздный меч", 1))
+        self.assertEqual(turn.outcome, REJECT)
+        self.assertIsNone(turn.plan)
+
+    def test_plan_does_not_hand_out_items(self):
+        """Планирование — не выдача: команда не собирается даже при успешном плане."""
+        turn = self.run_turn("как скрафтить факел", Proposal("plan_goal", "факел", 1))
+        self.assertEqual(turn.outcome, ACT)
+        self.assertIsNone(turn.command)
+
+    def test_plan_is_allowed_in_survival(self):
+        """В выживании выдача недоступна, а план — основной способ помочь."""
+        turn = self.run_turn("как скрафтить факел", Proposal("plan_goal", "факел", 1),
+                             mode=SURVIVAL)
+        self.assertEqual(turn.outcome, ACT)
+        self.assertIsNotNone(turn.plan_summary)
+
     # --- след выполнения ---
 
     def test_stages_record_each_component(self):
