@@ -3,7 +3,7 @@
     "config": "symbolic",
     "title": "B — только символьная схема",
     "description": "Текущая система без LLM: ключевые слова, нечёткий резолв по каталогу, regex на количество.",
-    "timestamp": "2026-10-19T12:26:14",
+    "timestamp": "2026-10-19T14:24:36",
     "total": 61,
     "failed": 0,
     "passed": 29,
@@ -36,8 +36,8 @@
       }
     },
     "latency_ms": {
-      "median": 16.563,
-      "max": 77.237
+      "median": 20.798,
+      "max": 126.748
     }
   },
   "model": null,
@@ -61,7 +61,7 @@
         "command": "/give @s minecraft:diamond 1"
       },
       "verdict": "pass",
-      "latency_ms": 36.247,
+      "latency_ms": 44.747,
       "note": ""
     },
     {
@@ -83,7 +83,7 @@
         "command": "/give @s minecraft:diamond_block 5"
       },
       "verdict": "wrong_target",
-      "latency_ms": 52.844,
+      "latency_ms": 63.044,
       "note": "известный промах: резолвится в diamond_block"
     },
     {
@@ -105,7 +105,7 @@
         "command": "/give @s minecraft:torch 32"
       },
       "verdict": "pass",
-      "latency_ms": 50.67,
+      "latency_ms": 59.734,
       "note": ""
     },
     {
@@ -127,7 +127,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.007,
+      "latency_ms": 0.019,
       "note": ""
     },
     {
@@ -149,7 +149,7 @@
         "command": "/give @s minecraft:chest 1"
       },
       "verdict": "pass",
-      "latency_ms": 33.189,
+      "latency_ms": 39.081,
       "note": ""
     },
     {
@@ -171,7 +171,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.008,
+      "latency_ms": 0.022,
       "note": ""
     },
     {
@@ -193,7 +193,7 @@
         "command": "/give @s minecraft:cobblestone 64"
       },
       "verdict": "pass",
-      "latency_ms": 53.498,
+      "latency_ms": 63.077,
       "note": ""
     },
     {
@@ -215,7 +215,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.008,
+      "latency_ms": 0.014,
       "note": ""
     },
     {
@@ -237,7 +237,7 @@
         "command": null
       },
       "verdict": "false_reject",
-      "latency_ms": 15.985,
+      "latency_ms": 20.531,
       "note": ""
     },
     {
@@ -259,7 +259,7 @@
         "command": "/give @s minecraft:bow 1"
       },
       "verdict": "pass",
-      "latency_ms": 28.596,
+      "latency_ms": 32.428,
       "note": "омонимия с растением; в каталоге только оружие"
     },
     {
@@ -281,7 +281,7 @@
         "command": "/give @s minecraft:arrow 10"
       },
       "verdict": "pass",
-      "latency_ms": 46.775,
+      "latency_ms": 54.945,
       "note": ""
     },
     {
@@ -303,7 +303,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.008,
+      "latency_ms": 0.012,
       "note": ""
     },
     {
@@ -325,7 +325,7 @@
         "command": "/give @s minecraft:obsidian 1"
       },
       "verdict": "pass",
-      "latency_ms": 37.06,
+      "latency_ms": 47.727,
       "note": ""
     },
     {
@@ -347,7 +347,7 @@
         "command": "/give @s minecraft:shield 1"
       },
       "verdict": "pass",
-      "latency_ms": 26.72,
+      "latency_ms": 34.398,
       "note": ""
     },
     {
@@ -369,7 +369,7 @@
         "command": "/give @s minecraft:stick 16"
       },
       "verdict": "pass",
-      "latency_ms": 47.133,
+      "latency_ms": 60.35,
       "note": ""
     },
     {
@@ -391,7 +391,7 @@
         "command": "/give @s minecraft:golden_apple 1"
       },
       "verdict": "pass",
-      "latency_ms": 27.701,
+      "latency_ms": 34.917,
       "note": ""
     },
     {
@@ -413,7 +413,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.007,
+      "latency_ms": 0.014,
       "note": ""
     },
     {
@@ -435,7 +435,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.004,
+      "latency_ms": 0.005,
       "note": ""
     },
     {
@@ -457,7 +457,7 @@
         "command": "/give @s minecraft:slime_ball 1"
       },
       "verdict": "pass",
-      "latency_ms": 36.641,
+      "latency_ms": 51.254,
       "note": ""
     },
     {
@@ -479,7 +479,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.007,
+      "latency_ms": 0.016,
       "note": ""
     },
     {
@@ -501,7 +501,7 @@
         "command": "/give @s minecraft:netherite_ingot 1"
       },
       "verdict": "pass",
-      "latency_ms": 34.757,
+      "latency_ms": 51.906,
       "note": ""
     },
     {
@@ -523,7 +523,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.008,
+      "latency_ms": 0.012,
       "note": ""
     },
     {
@@ -545,7 +545,7 @@
         "command": "/give @s minecraft:elytra 1"
       },
       "verdict": "pass",
-      "latency_ms": 33.742,
+      "latency_ms": 43.563,
       "note": ""
     },
     {
@@ -567,7 +567,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.009,
+      "latency_ms": 0.023,
       "note": ""
     },
     {
@@ -589,7 +589,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.004,
+      "latency_ms": 0.006,
       "note": ""
     },
     {
@@ -611,7 +611,7 @@
         "command": null
       },
       "verdict": "pass",
-      "latency_ms": 16.392,
+      "latency_ms": 17.987,
       "note": "несколько пород дерева"
     },
     {
@@ -633,7 +633,7 @@
         "command": "/give @s minecraft:diamond_sword 1"
       },
       "verdict": "missed_clarify",
-      "latency_ms": 28.03,
+      "latency_ms": 31.164,
       "note": "шесть видов мечей; захардкоженное умолчание diamond_sword подлежит удалению"
     },
     {
@@ -655,7 +655,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.007,
+      "latency_ms": 0.012,
       "note": "алмазная и железная; алиас 'кирка' висит на обеих"
     },
     {
@@ -677,7 +677,7 @@
         "command": null
       },
       "verdict": "pass",
-      "latency_ms": 17.591,
+      "latency_ms": 21.736,
       "note": "несколько пород дерева"
     },
     {
@@ -699,7 +699,7 @@
         "command": null
       },
       "verdict": "over_reject",
-      "latency_ms": 16.563,
+      "latency_ms": 20.798,
       "note": "несколько пород дерева"
     },
     {
@@ -721,7 +721,7 @@
         "command": "/give @s minecraft:diamond_block 1"
       },
       "verdict": "wrong_target",
-      "latency_ms": 51.174,
+      "latency_ms": 72.069,
       "note": "обрезание по лимиту MAX_ITEM_COUNT"
     },
     {
@@ -743,7 +743,7 @@
         "command": "/give @s minecraft:diamond_block 1"
       },
       "verdict": "spurious_act",
-      "latency_ms": 52.028,
+      "latency_ms": 65.344,
       "note": "некорректное количество: отказ с объяснением вместо нормализации в 1"
     },
     {
@@ -765,7 +765,7 @@
         "command": "/give @s minecraft:diamond_block 5"
       },
       "verdict": "spurious_act",
-      "latency_ms": 51.84,
+      "latency_ms": 66.434,
       "note": "некорректное количество: минус сейчас игнорируется регуляркой и выдаётся 5"
     },
     {
@@ -787,7 +787,7 @@
         "command": "/give @s minecraft:glass_bottle 1"
       },
       "verdict": "pass",
-      "latency_ms": 36.169,
+      "latency_ms": 41.751,
       "note": ""
     },
     {
@@ -809,7 +809,7 @@
         "command": "/give @s minecraft:glass_bottle 1"
       },
       "verdict": "pass",
-      "latency_ms": 39.426,
+      "latency_ms": 48.159,
       "note": "разговорная форма, сейчас держится на захардкоженном стемминге по префиксу"
     },
     {
@@ -831,7 +831,7 @@
         "command": "/give @s minecraft:bone 1"
       },
       "verdict": "pass",
-      "latency_ms": 35.195,
+      "latency_ms": 41.813,
       "note": ""
     },
     {
@@ -853,7 +853,7 @@
         "command": null
       },
       "verdict": "false_reject",
-      "latency_ms": 58.169,
+      "latency_ms": 70.494,
       "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"
     },
     {
@@ -875,7 +875,7 @@
         "command": null
       },
       "verdict": "false_reject",
-      "latency_ms": 56.534,
+      "latency_ms": 65.785,
       "note": "тот же дефект"
     },
     {
@@ -897,7 +897,7 @@
         "command": null
       },
       "verdict": "under_reject",
-      "latency_ms": 27.513,
+      "latency_ms": 31.07,
       "note": "предмета не существует"
     },
     {
@@ -919,7 +919,7 @@
         "command": null
       },
       "verdict": "under_reject",
-      "latency_ms": 41.273,
+      "latency_ms": 50.348,
       "note": "предмета не существует"
     },
     {
@@ -941,7 +941,7 @@
         "command": null
       },
       "verdict": "under_reject",
-      "latency_ms": 30.126,
+      "latency_ms": 36.69,
       "note": "служебный блок: запрет правилом онтологии, а не отсутствием записи в каталоге"
     },
     {
@@ -963,7 +963,7 @@
         "command": null
       },
       "verdict": "over_reject",
-      "latency_ms": 14.278,
+      "latency_ms": 17.418,
       "note": "запрос без предмета — недоопределён, значит уточнение"
     },
     {
@@ -985,7 +985,7 @@
         "command": "/summon minecraft:zombie ~ ~ ~"
       },
       "verdict": "pass",
-      "latency_ms": 2.573,
+      "latency_ms": 3.487,
       "note": ""
     },
     {
@@ -1007,7 +1007,7 @@
         "command": "/summon minecraft:creeper ~ ~ ~"
       },
       "verdict": "pass",
-      "latency_ms": 2.15,
+      "latency_ms": 2.628,
       "note": ""
     },
     {
@@ -1029,7 +1029,7 @@
         "command": "/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~"
       },
       "verdict": "pass",
-      "latency_ms": 2.269,
+      "latency_ms": 2.828,
       "note": ""
     },
     {
@@ -1051,7 +1051,7 @@
         "command": "/summon minecraft:cow ~ ~ ~"
       },
       "verdict": "pass",
-      "latency_ms": 2.026,
+      "latency_ms": 2.652,
       "note": ""
     },
     {
@@ -1073,7 +1073,7 @@
         "command": null
       },
       "verdict": "false_reject",
-      "latency_ms": 1.041,
+      "latency_ms": 1.686,
       "note": ""
     },
     {
@@ -1095,7 +1095,7 @@
         "command": "/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~"
       },
       "verdict": "pass",
-      "latency_ms": 1.977,
+      "latency_ms": 3.312,
       "note": "обрезание по лимиту MAX_SUMMON_COUNT"
     },
     {
@@ -1117,7 +1117,7 @@
         "command": "/summon minecraft:enderman ~ ~ ~"
       },
       "verdict": "spurious_act",
-      "latency_ms": 2.304,
+      "latency_ms": 4.025,
       "note": "босс: запрет правилом онтологии; сейчас ошибочно резолвится в enderman по слову «края»"
     },
     {
@@ -1139,7 +1139,7 @@
         "command": null
       },
       "verdict": "pass",
-      "latency_ms": 1.104,
+      "latency_ms": 1.803,
       "note": "существа не существует"
     },
     {
@@ -1161,7 +1161,7 @@
         "command": "/clear @s minecraft:rotten_flesh 1"
       },
       "verdict": "pass",
-      "latency_ms": 77.237,
+      "latency_ms": 126.748,
       "note": ""
     },
     {
@@ -1183,7 +1183,7 @@
         "command": "/clear @s minecraft:cobblestone 10"
       },
       "verdict": "pass",
-      "latency_ms": 72.939,
+      "latency_ms": 96.811,
       "note": ""
     },
     {
@@ -1205,7 +1205,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.008,
+      "latency_ms": 0.021,
       "note": ""
     },
     {
@@ -1227,7 +1227,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.004,
+      "latency_ms": 0.01,
       "note": ""
     },
     {
@@ -1249,7 +1249,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.004,
+      "latency_ms": 0.007,
       "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"
     },
     {
@@ -1271,7 +1271,7 @@
         "command": "/give @s minecraft:obsidian 1"
       },
       "verdict": "wrong_intent",
-      "latency_ms": 53.394,
+      "latency_ms": 69.951,
       "note": ""
     },
     {
@@ -1293,7 +1293,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.01,
+      "latency_ms": 0.026,
       "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"
     },
     {
@@ -1315,7 +1315,7 @@
         "command": null
       },
       "verdict": "intent_missed",
-      "latency_ms": 0.004,
+      "latency_ms": 0.006,
       "note": "предмета не существует: отказ, а не выдуманный план"
     },
     {
@@ -1337,7 +1337,7 @@
         "command": null
       },
       "verdict": "pass",
-      "latency_ms": 0.003,
+      "latency_ms": 0.004,
       "note": ""
     },
     {
@@ -1381,8 +1381,9 @@
         "command": null
       },
       "verdict": "pass",
-      "latency_ms": 0.003,
+      "latency_ms": 0.004,
       "note": ""
     }
-  ]
+  ],
+  "all_rows": null
 }
