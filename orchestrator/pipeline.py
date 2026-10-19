@@ -50,6 +50,10 @@ COMMANDS = {
     "remove_item": "/clear @s {id} {count}",
 }
 
+# Согласие в ответ на вопрос с единственным вариантом.
+AFFIRMATIVE = re.compile(r"^(да|ага|угу|давай|верно|точно|конечно|он самый|она самая|yes|yep)\b",
+                         re.IGNORECASE)
+
 # Признаки просьбы что-то убрать. Нужны только для удаления — единственного действия, ошибка
 # в котором отнимает у игрока то, что у него было.
 REMOVAL_CUES = re.compile(
@@ -209,6 +213,20 @@ class Pipeline:
             )
 
         if resolution.status == NOT_FOUND:
+            suggestions = self._suggest(str(proposal.target), proposal.action, stages)
+            if suggestions:
+                names = ", ".join(f"«{option.label}»" for option in suggestions)
+                return Turn(
+                    outcome=CLARIFY,
+                    action=proposal.action,
+                    count=count,
+                    query=proposal.target,
+                    reason=f"Такого названия я не знаю. Возможно, ты имел в виду {names}?",
+                    options=suggestions,
+                    explanation=[f"«{proposal.target}» нет в базе знаний; модель предложила "
+                                 f"другое название, оно найдено, но без подтверждения не выполняется"],
+                    stages=stages,
+                )
             return Turn(
                 outcome=REJECT,
                 action=proposal.action,
@@ -219,6 +237,37 @@ class Pipeline:
             )
 
         return self._decide(proposal.action, resolution.thing, count, mode, inventory, stages)
+
+    def _suggest(self, phrase: str, action: str, stages: Dict[str, Any]) -> List[Candidate]:
+        """Одна попытка переформулировки, когда резолвер ничего не нашёл.
+
+        Модель знает игру и переводит слова игрока в официальное название; резолвер
+        проверяет, что такое название есть в базе знаний. Найденное предлагается вопросом,
+        а не выполняется: переформулировка — догадка модели, и подтверждать её должен игрок.
+        Векторное сопоставление для этой роли проверялось и отклонено: близость не отделяет
+        парафразы от выдуманных названий (eval/reports/2026-10-19-embedding-probe.md).
+        """
+        rename = getattr(self.extractor, "rename", None)
+        if rename is None:
+            return []
+        try:
+            names = rename(phrase)
+        except Exception:
+            return []
+        if isinstance(names, str):
+            names = [names]
+        stages["rename"] = {"from": phrase, "to": list(names or [])}
+
+        for name in names or []:
+            if name.strip().lower() == phrase.strip().lower():
+                continue
+            resolution = self.resolver.resolve(name, action=action)
+            if resolution.ok:
+                return [candidate for candidate in resolution.candidates
+                        if candidate.thing == resolution.thing][:1]
+            if resolution.status == AMBIGUOUS:
+                return list(resolution.candidates[:3])
+        return []
 
     def _follow_up(self, utterance: str, pending: Optional["Turn"], mode: str,
                    inventory: Optional[Dict[str, int]]) -> Optional["Turn"]:
@@ -232,6 +281,14 @@ class Pipeline:
         if pending is None or pending.outcome != CLARIFY or not pending.options:
             return None
         offered = {option.thing for option in pending.options}
+
+        # «Возможно, ты имел в виду X?» — «да». Согласие относится только к вопросу с одним
+        # вариантом: при нескольких «да» ничего не выбирает.
+        if len(pending.options) == 1 and AFFIRMATIVE.match((utterance or "").strip()):
+            chosen = pending.options[0].thing
+            stages = {"follow_up": {"question": pending.reason, "answer": utterance,
+                                    "chosen": chosen}}
+            return self._decide(pending.action, chosen, pending.count, mode, inventory, stages)
 
         for query in (f"{utterance} {pending.query or ''}".strip(), utterance):
             resolution = self.resolver.resolve(query, action=pending.action)

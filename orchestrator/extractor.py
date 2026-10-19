@@ -94,6 +94,17 @@ def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
     )
 
 
+# Английское название запрашивается вместе с русским: его модель знает твёрже, русские
+# переводы у неё «плавают» («слизневый блок» вместо «Блок слизи»). Оба есть в базе знаний.
+RENAME_PROMPT = """Игрок в Minecraft назвал предмет или существо так: "{utterance}".
+
+Какой это предмет или существо в игре? Верни ТОЛЬКО JSON:
+{"en": "официальное английское название" или null, "ru": "официальное русское название" или null}
+
+Если игрок описал существующий предмет своими словами, назови его. Если такого предмета
+или существа в Minecraft нет, верни null в обоих полях."""
+
+
 def _text(value: Any) -> Optional[str]:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
@@ -124,3 +135,14 @@ class LanguageModelIntent:
             reward_count=payload.get("reward_count", 1),
             raw=payload,
         )
+
+    def rename(self, phrase: str) -> Sequence[str]:
+        """Официальные названия того, что игрок назвал по-своему; пусто, если такого нет.
+
+        Вызывается, когда резолвер ничего не нашёл: «светящийся камень» в базе знаний
+        не записан, а светокамень — записан. Названия, которые вернёт модель, проходят тот
+        же резолвер, так что выдумать несуществующий предмет она не может.
+        """
+        payload = self._ask(RENAME_PROMPT, phrase)
+        names = [_text(payload.get(key)) for key in ("en", "ru", "name")]
+        return [name for name in names if name]

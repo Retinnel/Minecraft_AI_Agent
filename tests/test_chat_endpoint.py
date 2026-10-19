@@ -215,6 +215,46 @@ class ChatEndpointTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.action_type, "clear")
         self.assertEqual(result.command, "/clear @s minecraft:cobblestone 10")
 
+    # --- переформулировка ---
+
+    async def test_unknown_name_is_suggested_not_executed(self):
+        """Модель переводит слова игрока в официальное название, но выполнять догадку нельзя."""
+        answers = {
+            "дай светящийся камень": {"action": "give_item", "target": "светящийся камень", "count": 1},
+            "светящийся камень": {"name": "Светокамень"},
+        }
+        result, _ = await self.chat("дай светящийся камень", answers)
+        self.assertEqual(result.outcome, "clarify")
+        self.assertFalse(result.execute)
+        self.assertEqual(result.options, ["Светокамень"])
+
+        confirmed, model = await self.chat("да", {})
+        self.assertEqual(confirmed.command, "/give @s minecraft:glowstone 1")
+        self.assertEqual(model.prompts, [])
+
+    async def test_invented_name_is_still_rejected(self):
+        """Переформулировка не может создать предмет: её результат проходит резолвер."""
+        answers = {
+            "дай звёздный меч": {"action": "give_item", "target": "звёздный меч", "count": 1},
+            "звёздный меч": {"name": "Звёздный клинок"},
+        }
+        result, _ = await self.chat("дай звёздный меч", answers)
+        self.assertEqual(result.outcome, "reject")
+
+    async def test_model_admitting_nothing_gives_rejection(self):
+        answers = {
+            "призови кракена": {"action": "summon_entity", "target": "кракен", "count": 1},
+            "кракен": {"name": None},
+        }
+        result, _ = await self.chat("призови кракена", answers)
+        self.assertEqual(result.outcome, "reject")
+
+    async def test_yes_does_not_pick_among_several(self):
+        """«Да» выбирает только из одного варианта; при нескольких это не ответ."""
+        await self.chat("дай меч", {"дай меч": {"action": "give_item", "target": "меч", "count": 1}})
+        result, _ = await self.chat("да", {"да": {"action": "none"}})
+        self.assertFalse(result.execute)
+
     # --- продолжение диалога ---
 
     async def test_answer_to_clarification_completes_the_request(self):
