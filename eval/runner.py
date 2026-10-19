@@ -49,6 +49,7 @@ def classify(case: Case, prediction: Prediction) -> str:
       intent_missed   — реплика вообще не распознана как запрос действия
       over_clarify    — надо было действовать, система переспросила
       false_reject    — надо было действовать, система отказала
+      planned_instead — надо было выполнить действие, система построила план
 
     Путаница отказа и уточнения:
       over_reject     — надо было переспросить, система отказала
@@ -75,6 +76,12 @@ def classify(case: Case, prediction: Prediction) -> str:
         if prediction.outcome == "reject":
             return "false_reject"
         if case.intent and prediction.intent != case.intent:
+            # План вместо действия к опасным исходам не относится: plan_goal не собирает
+            # команду и ничего не меняет в мире. Игрок получает не предмет, а объяснение,
+            # как его добыть, — это неудобство того же рода, что отказ, а не молчаливое
+            # действие не с тем предметом.
+            if prediction.intent == "plan_goal":
+                return "planned_instead"
             return "wrong_intent"
         expected_target = case.item_id or case.entity_id
         actual_target = prediction.item_id or prediction.entity_id
