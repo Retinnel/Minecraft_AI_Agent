@@ -1,0 +1,57 @@
+% Компонентная диаграмма гибридной интеллектуальной системы.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt, minimum height=9mm},
+  ext/.style={box, dashed},
+  arr/.style={-{Stealth[length=2mm]}, semithick},
+  biarr/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]}, semithick},
+  lbl/.style={font=\scriptsize, align=center, inner sep=1pt},
+]
+
+% --- клиент виртуальной среды ---
+\node[box, minimum width=2.3cm] (chat) at (0, 0) {Игровой чат};
+\node[box, minimum width=2.3cm] (overlay) at (0, -1.7) {Оверлей-экран};
+\node[box, minimum width=2.3cm] (state) at (0, -3.4) {Сбор состояния\\игрока};
+\node[draw, thick, inner sep=2.5mm, fit=(chat)(overlay)(state),
+      label={[font=\footnotesize]above:Клиент среды}] (client) {};
+
+% --- сервер ---
+\node[box, minimum width=5.2cm] (orch) at (7.0, 0) {Оркестратор\\конвейер обработки реплики};
+\node[box, minimum width=2.1cm, minimum height=14mm] (resolver) at (5.45, -2.7) {Резолвер};
+\node[box, minimum width=2.1cm, minimum height=14mm] (solver) at (8.55, -2.7)
+  {Решатель\\задач};
+\node[box, minimum width=5.2cm] (kb) at (7.0, -5.3) {База знаний\\онтология RDF/OWL};
+\node[draw, thick, inner sep=2.5mm, fit=(orch)(resolver)(solver)(kb),
+      label={[font=\footnotesize]above:Сервер}] (server) {};
+
+% --- внешние системы ---
+\node[ext, minimum width=2.4cm] (llm) at (13.3, 0) {Провайдер\\языковой модели};
+\node[box, minimum width=2.4cm] (importer) at (13.3, -5.3) {Импортёр};
+\node[ext, minimum width=2.4cm] (data) at (13.3, -7.2) {Данные среды\\и локализация};
+
+% --- клиент и сервер ---
+\draw[arr] ([yshift=3mm]orch.west -| client.east) -- node[lbl, above] {реплика,\\состояние}
+  ([yshift=3mm]orch.west);
+\draw[arr] ([yshift=-3mm]orch.west) -- node[lbl, below] {ответ, план,\\команда}
+  ([yshift=-3mm]orch.west -| client.east);
+
+% --- оркестратор и модель ---
+\draw[arr] ([yshift=3mm]orch.east) -- node[lbl, above] {реплика}
+  ([yshift=3mm]llm.west);
+\draw[arr] ([yshift=-3mm]llm.west) -- node[lbl, below] {намерение}
+  ([yshift=-3mm]orch.east);
+
+% --- внутри сервера: подписи собраны в промежутке между колонками ---
+\draw[biarr] (orch.south -| resolver.north) -- node[lbl, right] {название /\\сущность}
+  (resolver.north);
+\draw[biarr] (orch.south -| solver.north) -- node[lbl, left] {действие /\\вердикт,\\план}
+  (solver.north);
+\draw[biarr] (resolver.south) -- node[lbl, right] {имена} (resolver.south |- kb.north);
+\draw[biarr] (solver.south) -- node[lbl, left] {рецепты,\\источники,\\запреты}
+  (solver.south |- kb.north);
+
+% --- сборка базы знаний ---
+\draw[arr] (data.north) -- (importer.south);
+\draw[arr] (importer.west) -- node[lbl, above, pos=0.35] {триплеты} (kb.east);
+
+\end{tikzpicture}

@@ -1,0 +1,60 @@
+% Схема алгоритма вывода одного узла плана. Вызывается рекурсивно для каждого
+% ингредиента рецепта и для недостающего инструмента.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=5mm,
+  term/.style={draw, rounded rectangle, align=center, minimum width=3.4cm, minimum height=8mm},
+  proc/.style={draw, align=center, minimum width=6.2cm, minimum height=9mm, inner sep=3pt},
+  % Предопределённый процесс: прямоугольник с двумя внутренними вертикальными линиями.
+  sub/.style={proc, inner xsep=4mm, append after command={
+    \pgfextra{
+      \draw ([xshift=2mm]\tikzlastnode.north west) -- ([xshift=2mm]\tikzlastnode.south west);
+      \draw ([xshift=-2mm]\tikzlastnode.north east) -- ([xshift=-2mm]\tikzlastnode.south east);
+    }}},
+  cond/.style={draw, diamond, aspect=3.2, align=center, inner sep=0pt, minimum width=6.2cm},
+  exit/.style={draw, align=center, text width=3.4cm, minimum height=9mm, inner sep=3pt},
+  arr/.style={-{Stealth[length=1.8mm]}, semithick},
+  ylbl/.style={font=\scriptsize, above, pos=0.25},
+  nlbl/.style={font=\scriptsize, right, pos=0.4},
+]
+
+% --- основная ветвь ---
+\node[term] (start) {Начало: предмет $X$, количество $N$,\\запасы, стек вывода, глубина};
+\node[proc, below=of start] (take) {Взять из запасов $\min(\text{запас}_X, N)$,\\остаток потребности $N'$};
+\node[cond, below=of take] (done) {$N' = 0$?};
+\node[cond, below=of done] (limit) {Превышена глубина\\или бюджет перебора?};
+\node[cond, below=of limit] (cycle) {$X$ уже в стеке вывода?};
+\node[sub, below=of cycle] (recipes) {Для каждого рецепта $X$: вывод ингредиентов\\на копии запасов (рекурсивно)};
+\node[sub, below=of recipes] (sources) {Для каждого источника добычи $X$: достроить\\недостающий инструмент (рекурсивно)};
+\node[cond, below=of sources] (any) {Найден хотя бы\\один способ?};
+\node[proc, below=of any] (best) {Выбрать лучший вариант по выполнимости,\\числу тупиков и трудоёмкости; записать развилку};
+\node[proc, below=of best] (apply) {Принять запасы выбранного варианта};
+\node[term, below=of apply] (end) {Конец: шаг плана};
+
+% --- исходы, завершающие вывод досрочно ---
+\node[exit, right=12mm of done] (have) {Шаг <<есть>>};
+\node[exit, right=12mm of limit] (lost) {Шаг <<не получено>>:\\предел вывода};
+\node[exit, right=12mm of cycle] (loop) {Шаг <<не получено>>:\\цикл};
+\node[exit, right=12mm of any] (none) {Шаг <<не получено>>:\\нет способа};
+
+% --- переходы основной ветви ---
+\foreach \a/\b in {start/take, take/done, recipes/sources, sources/any, best/apply, apply/end}
+  \draw[arr] (\a) -- (\b);
+\draw[arr] (done) -- node[nlbl] {нет} (limit);
+\draw[arr] (limit) -- node[nlbl] {нет} (cycle);
+\draw[arr] (cycle) -- node[nlbl] {нет} (recipes);
+\draw[arr] (any) -- node[nlbl] {да} (best);
+
+% --- досрочные исходы ---
+\draw[arr] (done) -- node[ylbl] {да} (have);
+\draw[arr] (limit) -- node[ylbl] {да} (lost);
+\draw[arr] (cycle) -- node[ylbl] {да} (loop);
+\draw[arr] (any) -- node[ylbl] {нет} (none);
+
+% Все досрочные исходы сходятся к концу алгоритма по общей линии справа.
+\coordinate (rail) at ($(have.east) + (5mm, 0)$);
+\foreach \n in {have, lost, loop, none}
+  \draw[semithick] (\n.east) -- (\n.east -| rail);
+\draw[arr] (rail) |- (end.east);
+
+\end{tikzpicture}

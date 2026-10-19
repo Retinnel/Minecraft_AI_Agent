@@ -1,0 +1,55 @@
+% Диаграмма последовательности сквозного сценария «запрос плана достижения цели».
+\begin{tikzpicture}[
+  font=\footnotesize,
+  head/.style={draw, rounded corners=1pt, align=center, inner sep=2pt,
+               minimum width=2.05cm, minimum height=8mm},
+  life/.style={dashed, gray},
+  call/.style={-{Stealth[length=1.8mm]}, semithick},
+  back/.style={-{Stealth[length=1.8mm]}, semithick, dashed},
+  lbl/.style={font=\scriptsize, align=center, inner sep=1pt, above},
+]
+
+% Абсциссы линий жизни.
+\def\xC{0}
+\def\xO{2.35}
+\def\xM{4.7}
+\def\xR{7.05}
+\def\xV{9.4}
+\def\xP{11.75}
+\def\xK{14.1}
+\def\bottom{-13.6}
+
+% --- участники ---
+\foreach \x/\name in {\xC/Клиент\\среды, \xO/Оркестратор, \xM/Языковая\\модель,
+                      \xR/Резолвер, \xV/Валидатор, \xP/Планировщик, \xK/База\\знаний} {
+  \node[head] at (\x, 0) {\name};
+  \draw[life] (\x, -0.45) -- (\x, \bottom);
+}
+
+% --- разбор реплики ---
+\draw[call] (\xC, -1.75) -- node[lbl] {реплика,\\инвентарь,\\режим} (\xO, -1.75);
+\draw[call] (\xO, -2.45) -- node[lbl] {реплика} (\xM, -2.45);
+\draw[back] (\xM, -3.55) -- node[lbl] {действие,\\название,\\количество} (\xO, -3.55);
+
+% --- сопоставление с онтологией ---
+\draw[call] (\xO, -4.25) -- node[lbl] {название, действие} (\xR, -4.25);
+\draw[call] (\xR, -4.95) -- node[lbl] {поиск по индексу имён} (\xK, -4.95);
+\draw[back] (\xK, -5.65) -- node[lbl] {кандидаты} (\xR, -5.65);
+\draw[back] (\xR, -6.35) -- node[lbl] {сущность} (\xO, -6.35);
+
+% --- проверка допустимости ---
+\draw[call] (\xO, -7.05) -- node[lbl] {действие, сущность, количество, режим} (\xV, -7.05);
+\draw[call] (\xV, -7.75) -- node[lbl] {существование, запреты} (\xK, -7.75);
+\draw[back] (\xV, -8.45) -- node[lbl] {вердикт, цепочка правил} (\xO, -8.45);
+
+% --- построение плана ---
+\draw[call] (\xO, -9.15) -- node[lbl, pos=0.62] {цель, количество, инвентарь} (\xP, -9.15);
+\draw[call] (\xP, -10.05) -- node[lbl] {рецепты,\\источники} (\xK, -10.05);
+\draw[back] (\xP, -10.75) -- node[lbl, pos=0.62] {дерево плана, развилки} (\xO, -10.75);
+
+% --- формулирование ответа ---
+\draw[call] (\xO, -11.65) -- node[lbl] {выход\\решателя} (\xM, -11.65);
+\draw[back] (\xM, -12.35) -- node[lbl] {текст ответа} (\xO, -12.35);
+\draw[back] (\xO, -13.25) -- node[lbl] {ответ,\\план} (\xC, -13.25);
+
+\end{tikzpicture}

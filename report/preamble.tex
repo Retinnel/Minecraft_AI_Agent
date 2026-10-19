@@ -149,6 +149,17 @@
 \usepackage[final]{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg}
 
+% Зачем: диаграммы рисуются средствами LaTeX, а не вставляются картинками.
+% Векторный рисунок печатается без потери качества, использует шрифт документа
+% и хранится как исходный текст под контролем версий.
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, shapes.misc, fit, calc}
+
+% Зачем: рисунок не должен уплывать за пределы своего раздела. Без ограничения
+% крупная схема, не поместившаяся рядом со ссылкой, переносится в конец
+% документа или за выводы раздела.
+\usepackage[section]{placeins}
+
 % Зачем: Добавление подписей к рисункам
 \usepackage{caption}
 \usepackage{subcaption}
