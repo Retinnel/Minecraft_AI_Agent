@@ -27,6 +27,13 @@ public class AssistantOverlayScreen extends Screen {
     private Button closeButton;
     private Button statusTabButton;
     private Button recipesTabButton;
+    private Button planTabButton;
+    private Button whyButton;
+    private Button modeButton;
+
+    // Вкладка плана: прокрутка длинного дерева и переключение на объяснение выбора.
+    private int planScroll = 0;
+    private boolean showWhy = false;
 
     private EditBox recipeQueryBox;
     private Button recipeSearchButton;
@@ -35,7 +42,8 @@ public class AssistantOverlayScreen extends Screen {
 
     private enum Tab {
         STATUS,
-        RECIPES
+        RECIPES,
+        PLAN
     }
 
     private Tab activeTab = Tab.STATUS;
@@ -169,32 +177,50 @@ public class AssistantOverlayScreen extends Screen {
         fetchCompactData();
     }
     
+    // Ширина панели одна на все вкладки: дереву плана нужно больше места, чем статусу.
+    private int panelWidth() {
+        return Math.min(this.width - 40, 460);
+    }
+
     @Override
     protected void init() {
         super.init();
 
-        int panelW = 340;
+        int panelW = panelWidth();
         int panelH = 220;
         int left = (this.width - panelW) / 2;
         int top = (this.height - panelH) / 2;
 
         // Вкладки
         int tabY = top - 24;
+        int tabW = (panelW - 8) / 3;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
-        }).bounds(left, tabY, panelW / 2 - 2, 20).build();
+        }).bounds(left, tabY, tabW, 20).build();
 
         recipesTabButton = Button.builder(Component.literal("§fРецепты"), btn -> {
             setActiveTab(Tab.RECIPES);
-        }).bounds(left + panelW / 2 + 2, tabY, panelW / 2 - 2, 20).build();
+        }).bounds(left + tabW + 4, tabY, tabW, 20).build();
+
+        planTabButton = Button.builder(Component.literal("§fПлан"), btn -> {
+            setActiveTab(Tab.PLAN);
+        }).bounds(left + (tabW + 4) * 2, tabY, tabW, 20).build();
 
         addRenderableWidget(statusTabButton);
         addRenderableWidget(recipesTabButton);
+        addRenderableWidget(planTabButton);
+
+        whyButton = Button.builder(Component.literal(whyLabel()), btn -> {
+            showWhy = !showWhy;
+            planScroll = 0;
+            btn.setMessage(Component.literal(whyLabel()));
+        }).bounds(left + panelW - 130, top + 30, 115, 18).build();
+        addRenderableWidget(whyButton);
         
         int btnY = this.height - 40;
         int btnWidth = 95;
-        int spacing = 10;
-        int startX = (this.width - (btnWidth * 3 + spacing * 2)) / 2;
+        int spacing = 8;
+        int startX = (this.width - (btnWidth * 4 + spacing * 3)) / 2;
         
         // Кнопка обновления
         refreshButton = Button.builder(Component.literal("§b🔄 Обновить"), btn -> {
@@ -208,11 +234,19 @@ public class AssistantOverlayScreen extends Screen {
         // Кнопка закрытия
         closeButton = Button.builder(Component.literal("§c✕ Закрыть"), btn -> {
             onClose();
+        }).bounds(startX + (btnWidth + spacing) * 3, btnY, btnWidth, 20).build();
+
+        // Переключатель режима. Режим хранится на сервере: от него зависит, какие действия
+        // вообще предъявляются модели.
+        modeButton = Button.builder(Component.literal(modeLabel()), btn -> {
+            toggleMode();
         }).bounds(startX + (btnWidth + spacing) * 2, btnY, btnWidth, 20).build();
         
         addRenderableWidget(refreshButton);
         addRenderableWidget(promptSettingsButton);
+        addRenderableWidget(modeButton);
         addRenderableWidget(closeButton);
+        refreshMode();
 
         // Recipes controls (rendered + enabled only on Recipes tab)
         recipeQueryBox = new EditBox(
@@ -245,28 +279,37 @@ public class AssistantOverlayScreen extends Screen {
 
     private void applyTabVisibility() {
         boolean isStatus = activeTab == Tab.STATUS;
+        boolean isPlan = activeTab == Tab.PLAN;
+        boolean isRecipes = activeTab == Tab.RECIPES;
+        if (whyButton != null) {
+            whyButton.visible = isPlan;
+            whyButton.active = isPlan;
+        }
+        if (planTabButton != null) {
+            planTabButton.setMessage(Component.literal(isPlan ? "§b§lПлан" : "§fПлан"));
+        }
         if (refreshButton != null) {
             refreshButton.visible = isStatus;
             refreshButton.active = isStatus;
         }
         if (recipeQueryBox != null) {
-            recipeQueryBox.visible = !isStatus;
-            recipeQueryBox.setEditable(!isStatus);
+            recipeQueryBox.visible = isRecipes;
+            recipeQueryBox.setEditable(isRecipes);
         }
         if (recipeSearchButton != null) {
-            recipeSearchButton.visible = !isStatus;
-            recipeSearchButton.active = !isStatus;
+            recipeSearchButton.visible = isRecipes;
+            recipeSearchButton.active = isRecipes;
         }
 
         if (statusTabButton != null) {
             statusTabButton.setMessage(Component.literal(isStatus ? "§b§lСтатус" : "§fСтатус"));
         }
         if (recipesTabButton != null) {
-            recipesTabButton.setMessage(Component.literal(!isStatus ? "§b§lРецепты" : "§fРецепты"));
+            recipesTabButton.setMessage(Component.literal(isRecipes ? "§b§lРецепты" : "§fРецепты"));
         }
 
         // Автофокус на поле ввода при открытии вкладки "Рецепты"
-        if (!isStatus && recipeQueryBox != null) {
+        if (isRecipes && recipeQueryBox != null) {
             this.setFocused(recipeQueryBox);
             recipeQueryBox.setFocused(true);
         } else if (recipeQueryBox != null) {
@@ -280,7 +323,7 @@ public class AssistantOverlayScreen extends Screen {
         renderBackground(graphics);
         
         // Основная панель (центрированная)
-        int panelW = 340;
+        int panelW = panelWidth();
         int panelH = 220;
         int left = (this.width - panelW) / 2;
         int top = (this.height - panelH) / 2;
@@ -301,6 +344,8 @@ public class AssistantOverlayScreen extends Screen {
 
         if (activeTab == Tab.STATUS) {
             renderStatusTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.PLAN) {
+            renderPlanTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
@@ -471,6 +516,128 @@ public class AssistantOverlayScreen extends Screen {
             }
         }
     }
+
+    // --- вкладка плана ---
+
+    private String whyLabel() {
+        return showWhy ? "§bДерево плана" : "§bПочему так";
+    }
+
+    private String modeLabel() {
+        return "survival".equals(runtime.getAssistantMode()) ? "§aРежим: выживание" : "§eРежим: творчество";
+    }
+
+    private void refreshMode() {
+        runtime.getHttpClient().getMode().thenAccept(response -> {
+            if (response == null) {
+                return;
+            }
+            Minecraft.getInstance().execute(() -> {
+                runtime.setAssistantMode(response.mode);
+                if (modeButton != null) {
+                    modeButton.setMessage(Component.literal(modeLabel()));
+                }
+            });
+        });
+    }
+
+    private void toggleMode() {
+        String next = "survival".equals(runtime.getAssistantMode()) ? "creative" : "survival";
+        runtime.getHttpClient().setMode(next).thenAccept(response -> {
+            if (response == null || !response.ok) {
+                return;
+            }
+            Minecraft.getInstance().execute(() -> {
+                runtime.setAssistantMode(response.mode);
+                if (modeButton != null) {
+                    modeButton.setMessage(Component.literal(modeLabel()));
+                }
+            });
+        });
+    }
+
+    /**
+     * Строки для вкладки: дерево плана либо объяснение выбора между вариантами.
+     */
+    private java.util.List<String> planLines() {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        String text = showWhy ? runtime.getLastPlanAlternatives() : runtime.getLastPlanTree();
+        if (text != null && !text.isBlank()) {
+            lines.addAll(java.util.Arrays.asList(text.split("\\r?\\n")));
+        }
+        return lines;
+    }
+
+    private void renderPlanTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        String summary = runtime.getLastPlanSummary();
+        graphics.drawString(font, showWhy ? "§l🔍 Почему план такой" : "§l🗺 План", left + 15, top + 34,
+                COLOR_HEADER);
+
+        int textLeft = left + 15;
+        int maxWidth = panelW - 30;
+        int y = top + 54;
+        int bottom = top + panelH - 12;
+
+        java.util.List<String> lines = planLines();
+        if (lines.isEmpty()) {
+            // Плана нет — показываем цепочку правил последнего решения, если она есть:
+            // это объяснение отказа или выдачи.
+            java.util.List<String> explanation = runtime.getLastExplanation();
+            if (explanation == null || explanation.isEmpty()) {
+                graphics.drawString(font, "§7Спроси в чате, например: «как сделать алмазную кирку».",
+                        textLeft, y, COLOR_MUTED);
+                return;
+            }
+            graphics.drawString(font, "§7Цепочка правил последнего решения:", textLeft, y, COLOR_MUTED);
+            y += font.lineHeight + 4;
+            for (String rule : explanation) {
+                if (y > bottom) {
+                    break;
+                }
+                graphics.drawString(font, font.plainSubstrByWidth("• " + rule, maxWidth), textLeft, y,
+                        COLOR_TEXT);
+                y += font.lineHeight + 2;
+            }
+            return;
+        }
+
+        if (!showWhy && summary != null && !summary.isBlank()) {
+            graphics.drawString(font, font.plainSubstrByWidth("§7" + summary, maxWidth), textLeft, y,
+                    COLOR_MUTED);
+            y += font.lineHeight + 4;
+        }
+
+        int visible = Math.max(1, (bottom - y) / (font.lineHeight + 1));
+        planScroll = Math.max(0, Math.min(planScroll, Math.max(0, lines.size() - visible)));
+        for (int i = planScroll; i < lines.size() && i < planScroll + visible; i++) {
+            String line = lines.get(i);
+            // Длинные строки обрезаются: структура дерева и название предмета идут в начале
+            // строки и остаются видны.
+            String clipped = font.plainSubstrByWidth(line, maxWidth);
+            if (clipped.length() < line.length()) {
+                clipped = font.plainSubstrByWidth(line, maxWidth - font.width("…")) + "…";
+            }
+            int color = line.contains("— есть") ? COLOR_HEALTH_HIGH
+                    : line.contains("не получено") ? COLOR_HEALTH_LOW : COLOR_TEXT;
+            graphics.drawString(font, clipped, textLeft, y, color);
+            y += font.lineHeight + 1;
+        }
+        if (lines.size() > visible) {
+            graphics.drawString(font, "§7колесо мыши: " + (planScroll + 1) + "–"
+                    + Math.min(lines.size(), planScroll + visible) + " из " + lines.size(),
+                    left + panelW - 150, top + panelH - 11, COLOR_MUTED);
+        }
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (activeTab == Tab.PLAN) {
+            planScroll = Math.max(0, planScroll - (int) Math.signum(delta) * 3);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
 
     private String getPlayerCoords() {
         var player = Minecraft.getInstance().player;

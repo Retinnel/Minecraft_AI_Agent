@@ -223,6 +223,53 @@ public final class HttpAssistantClient {
                 });
     }
 
+    /**
+     * Текущий режим ассистента: creative или survival.
+     */
+    public CompletableFuture<ModeResponse> getMode() {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/rp/mode"))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+        return sendForMode(req);
+    }
+
+    /**
+     * Переключение режима. Режим меняет набор действий, доступных ассистенту, поэтому
+     * хранится на сервере, а не в моде: в выживании сервер просто не предложит модели выдачу.
+     */
+    public CompletableFuture<ModeResponse> setMode(String mode) {
+        String json = GSON.toJson(Map.of("mode", mode));
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/rp/mode"))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(json.getBytes(StandardCharsets.UTF_8)))
+                .build();
+        return sendForMode(req);
+    }
+
+    private CompletableFuture<ModeResponse> sendForMode(HttpRequest req) {
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenApply(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] /api/rp/mode failed: HTTP " + resp.statusCode());
+                        return null;
+                    }
+                    try {
+                        return GSON.fromJson(resp.body(), ModeResponse.class);
+                    } catch (Exception e) {
+                        System.out.println("[AI Assistant] /api/rp/mode parse error: " + e);
+                        return null;
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.out.println("[AI Assistant] /api/rp/mode exception: " + ex);
+                    return null;
+                });
+    }
+
     public CompletableFuture<CompactResponse> getCompactStatus() {
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + "/api/rp/compact"))
@@ -263,6 +310,21 @@ public final class HttpAssistantClient {
         public int item_count;
         public String entity_id;
         public int entity_count;
+        public String error;
+        // Поля гибридного конвейера: исход, режим, план и объяснение.
+        public String outcome;
+        public String assistant_mode;
+        public String plan_tree;
+        public String plan_summary;
+        public String plan_alternatives;
+        public java.util.List<String> explanation;
+        public java.util.List<String> options;
+    }
+
+    public static final class ModeResponse {
+        public boolean ok = true;
+        public String mode;
+        public String label;
         public String error;
     }
 

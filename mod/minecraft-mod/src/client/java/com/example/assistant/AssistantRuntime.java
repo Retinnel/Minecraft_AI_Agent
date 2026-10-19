@@ -52,6 +52,15 @@ public final class AssistantRuntime {
     private String lastAdviceShown;
     private String lastInventoryFingerprint = "";
 
+    // Последний план и объяснение для оверлея. План в строку чата не помещается, поэтому
+    // в чат уходит короткая сводка, а дерево целиком — сюда.
+    private volatile String lastPlanTree;
+    private volatile String lastPlanSummary;
+    private volatile String lastPlanAlternatives;
+    private volatile java.util.List<String> lastExplanation = java.util.List.of();
+    private volatile String lastOutcome;
+    private volatile String assistantMode = "creative";
+
     private boolean startupDone;
 
     public AssistantRuntime(AssistantConfig cfg) {
@@ -78,6 +87,53 @@ public final class AssistantRuntime {
      */
     public HttpAssistantClient getHttpClient() {
         return http;
+    }
+
+    public String getLastPlanTree() {
+        return lastPlanTree;
+    }
+
+    public String getLastPlanSummary() {
+        return lastPlanSummary;
+    }
+
+    public String getLastPlanAlternatives() {
+        return lastPlanAlternatives;
+    }
+
+    public java.util.List<String> getLastExplanation() {
+        return lastExplanation;
+    }
+
+    public String getLastOutcome() {
+        return lastOutcome;
+    }
+
+    public String getAssistantMode() {
+        return assistantMode;
+    }
+
+    public void setAssistantMode(String mode) {
+        if (mode != null && !mode.isBlank()) {
+            this.assistantMode = mode;
+        }
+    }
+
+    /**
+     * Запоминает то, что относится к оверлею: план, объяснение, режим.
+     */
+    private void rememberForOverlay(HttpAssistantClient.RPResponse rpResponse) {
+        setAssistantMode(rpResponse.assistant_mode);
+        if (rpResponse.outcome == null) {
+            return;
+        }
+        lastOutcome = rpResponse.outcome;
+        lastExplanation = rpResponse.explanation == null ? java.util.List.of() : rpResponse.explanation;
+        if (rpResponse.plan_tree != null && !rpResponse.plan_tree.isBlank()) {
+            lastPlanTree = rpResponse.plan_tree;
+            lastPlanSummary = rpResponse.plan_summary;
+            lastPlanAlternatives = rpResponse.plan_alternatives;
+        }
     }
 
     public void onClientTick(Minecraft client) {
@@ -410,6 +466,7 @@ public final class AssistantRuntime {
                     return;
                 }
 
+                rememberForOverlay(rpResponse);
                 String msg = handleChatResponse(mc, rpResponse);
                 if (msg == null || msg.isBlank()) {
                     System.out.println("[AI Assistant] Chat response text is empty after handling");
@@ -418,6 +475,10 @@ public final class AssistantRuntime {
 
                 System.out.println("[AI Assistant] Chat response: " + msg);
                 mc.player.displayClientMessage(Component.literal("[AI] " + msg), false);
+                if (rpResponse.plan_tree != null && !rpResponse.plan_tree.isBlank()) {
+                    mc.player.displayClientMessage(
+                            Component.literal("§7[AI] Подробный план — в оверлее, клавиша O"), false);
+                }
             });
         }).exceptionally(ex -> {
             System.out.println("[AI Assistant] Chat request failed: " + ex);
