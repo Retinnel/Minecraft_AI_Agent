@@ -91,3 +91,40 @@ class GoldenSetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepeatedRunTests(unittest.TestCase):
+    """Свёртка повторных прогонов: медиана, разброс и нестабильные реплики."""
+
+    @staticmethod
+    def fake_run(verdicts):
+        from eval.runner import UNSAFE
+        rows = [{"id": f"c{index}", "group": "typical", "verdict": verdict, "latency_ms": 10.0}
+                for index, verdict in enumerate(verdicts)]
+        passed = sum(1 for verdict in verdicts if verdict == "pass")
+        summary = {
+            "config": "x", "title": "X", "description": "", "timestamp": "t",
+            "total": len(verdicts), "failed": 0, "passed": passed,
+            "unsafe": sum(1 for verdict in verdicts if verdict in UNSAFE),
+            "verdicts": {verdict: verdicts.count(verdict) for verdict in set(verdicts)},
+            "by_group": {"typical": {"total": len(verdicts), "pass": passed}},
+            "latency_ms": {"median": 10.0, "max": 10.0},
+        }
+        return rows, summary
+
+    def test_median_and_spread(self):
+        from eval.runner import aggregate
+        runs = [self.fake_run(["pass", "pass", "wrong_target"]),
+                self.fake_run(["pass", "pass", "pass"]),
+                self.fake_run(["pass", "intent_missed", "pass"])]
+        summary = aggregate(runs)
+        self.assertEqual(summary["repeat"], 3)
+        self.assertEqual(summary["passed"], 2)
+        self.assertEqual(summary["passed_range"], [2, 3])
+        self.assertEqual(summary["unsafe_range"], [0, 1])
+
+    def test_unstable_cases_are_listed(self):
+        from eval.runner import aggregate
+        runs = [self.fake_run(["pass", "wrong_target"]), self.fake_run(["pass", "pass"])]
+        summary = aggregate(runs)
+        self.assertEqual(set(summary["unstable"]), {"c1"})

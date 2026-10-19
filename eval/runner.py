@@ -273,6 +273,104 @@ def _describe(payload: Dict[str, Any]) -> str:
     return str(outcome)
 
 
+def aggregate(runs: List[Tuple[List[Dict[str, Any]], Dict[str, Any]]]) -> Dict[str, Any]:
+    """Сводка по нескольким прогонам одного набора.
+
+    Один прогон конфигурации с языковой моделью измерением не является: даже при нулевой
+    температуре провайдер отвечает на один вход по-разному, и два прогона с интервалом в
+    несколько минут расходились на полтора пункта. Поэтому в сводку идут медиана и
+    разброс, а реплики, исход которых менялся от прогона к прогону, перечисляются отдельно.
+    """
+    summaries = [summary for _, summary in runs]
+    first = summaries[0]
+
+    def spread(values: List[float]) -> Dict[str, float]:
+        return {"median": statistics.median(values), "min": min(values), "max": max(values)}
+
+    passed = [summary["passed"] for summary in summaries]
+    unsafe = [summary["unsafe"] for summary in summaries]
+    totals = [summary["total"] for summary in summaries]
+
+    by_group: Dict[str, Dict[str, Any]] = {}
+    for group in first["by_group"]:
+        values = [summary["by_group"].get(group, {}).get("pass", 0) for summary in summaries]
+        by_group[group] = {"total": first["by_group"][group]["total"],
+                           "pass": statistics.median(values),
+                           "pass_range": [min(values), max(values)]}
+
+    verdicts: Dict[str, float] = {}
+    for verdict in {key for summary in summaries for key in summary["verdicts"]}:
+        verdicts[verdict] = statistics.median(summary["verdicts"].get(verdict, 0) for summary in summaries)
+
+    # Реплики, исход которых менялся: они и создают разброс.
+    outcomes: Dict[str, List[str]] = {}
+    for rows, _ in runs:
+        for row in rows:
+            outcomes.setdefault(row["id"], []).append(row["verdict"])
+    unstable = {case_id: verdict_list for case_id, verdict_list in outcomes.items()
+                if len(set(verdict_list)) > 1}
+
+    latencies = [row["latency_ms"] for rows, _ in runs for row in rows if row["verdict"] != "error"]
+    total = statistics.median(totals)
+    median_passed = statistics.median(passed)
+    median_unsafe = statistics.median(unsafe)
+    return {
+        **{key: first[key] for key in ("config", "title", "description")},
+        "timestamp": summaries[-1]["timestamp"],
+        "repeat": len(runs),
+        "total": total,
+        "failed": sum(summary.get("failed", 0) for summary in summaries),
+        "passed": median_passed,
+        "passed_range": [min(passed), max(passed)],
+        "accuracy": round(median_passed / total, 4) if total else 0.0,
+        "unsafe": median_unsafe,
+        "unsafe_range": [min(unsafe), max(unsafe)],
+        "unsafe_rate": round(median_unsafe / total, 4) if total else 0.0,
+        "verdicts": dict(sorted(verdicts.items(), key=lambda item: -item[1])),
+        "by_group": by_group,
+        "latency_ms": {
+            "median": round(statistics.median(latencies), 3) if latencies else 0.0,
+            "max": round(max(latencies), 3) if latencies else 0.0,
+        },
+        "unstable": unstable,
+        "runs": summaries,
+    }
+
+
+def _n(value: float) -> str:
+    """Медиана двух прогонов бывает дробной; целые печатаются без «.0»."""
+    return f"{value:g}"
+
+
+def format_repeated(summary: Dict[str, Any]) -> str:
+    lines = [f"# Повторные прогоны золотого набора — {summary['title']}", "",
+             summary["description"], "",
+             f"Прогонов: {summary['repeat']}. Последний: {summary['timestamp']}.", "",
+             "## Сводка", "",
+             "| Показатель | Медиана | Разброс |", "|---|---|---|"]
+    total = summary["total"]
+    lo, hi = summary["passed_range"]
+    lines.append(f"| Совпало с разметкой | {_n(summary['passed'])} из {_n(total)} "
+                 f"({summary['accuracy']:.1%}) | {lo}–{hi} |")
+    lo, hi = summary["unsafe_range"]
+    lines.append(f"| Недопустимых действий | {_n(summary['unsafe'])} ({summary['unsafe_rate']:.1%}) "
+                 f"| {lo}–{hi} |")
+    for group, bucket in summary["by_group"].items():
+        lo, hi = bucket["pass_range"]
+        lines.append(f"| Пройдено, {group} | {_n(bucket['pass'])} из {bucket['total']} | {lo}–{hi} |")
+    if summary.get("failed"):
+        lines.append(f"| Сбоев связи с моделью за все прогоны | {summary['failed']} | |")
+    lines += ["", "## Нестабильные реплики", ""]
+    if summary["unstable"]:
+        lines += ["Исход этих реплик менялся от прогона к прогону:", "",
+                  "| id | Исходы по прогонам |", "|---|---|"]
+        lines += [f"| {case_id} | {', '.join(verdicts)} |"
+                  for case_id, verdicts in sorted(summary["unstable"].items())]
+    else:
+        lines.append("Исход всех реплик совпал во всех прогонах.")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Прогон золотого набора реплик игрока.")
     parser.add_argument("--config", default="symbolic", choices=AVAILABLE_CONFIGS,
@@ -285,6 +383,8 @@ def main() -> int:
     parser.add_argument("--model",
                         help="ключ модели из llm_config.json на время прогона; "
                              "файл настроек при этом не меняется")
+    parser.add_argument("--repeat", type=int, default=1,
+                        help="сколько раз прогнать набор; в сводку идут медиана и разброс")
     args = parser.parse_args()
 
     cases = load_golden_set(args.golden_set)
@@ -297,9 +397,18 @@ def main() -> int:
         print("Модель: " + ", ".join(f"{key} {value}" for key, value in profile.items()))
         print()
     config = load_config(args.config)
-    rows, summary = run(config, cases)
+    runs = []
+    for index in range(max(1, args.repeat)):
+        if args.repeat > 1:
+            print(f"Прогон {index + 1} из {args.repeat}...")
+        runs.append(run(config, cases))
 
-    report = format_report(rows, summary)
+    rows, summary = runs[-1]
+    if len(runs) > 1:
+        summary = aggregate(runs)
+        report = format_repeated(summary)
+    else:
+        report = format_report(rows, summary)
     print(report)
 
     if args.report:
@@ -307,7 +416,8 @@ def main() -> int:
         stamp = datetime.now().strftime("%Y-%m-%d")
         (REPORTS_DIR / f"{stamp}-{config.key}.md").write_text(report, encoding="utf-8")
         (REPORTS_DIR / f"{stamp}-{config.key}.json").write_text(
-            json.dumps({"summary": summary, "model": profile, "rows": rows},
+            json.dumps({"summary": summary, "model": profile, "rows": rows,
+                        "all_rows": [run_rows for run_rows, _ in runs] if len(runs) > 1 else None},
                        ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
