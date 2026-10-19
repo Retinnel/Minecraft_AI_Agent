@@ -1,0 +1,126 @@
+"""Извлечение намерения языковой моделью — нейросетевой шаг на входе конвейера.
+
+Модель отвечает на вопрос «что игрок хочет и о чём говорит» и переносит название объекта
+словами самого игрока. Идентификаторы она не называет: их подставляет резолвер по онтологии.
+
+Перечень действий, предъявляемый модели, собирается из режима работы. В выживании выдачи
+в нём нет, и модель не может её предложить, — а если всё же предложит, валидатор отклонит.
+Режим управляет составом действий, а не текстом уговоров в промпте.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, Optional, Sequence
+
+from orchestrator.pipeline import Proposal
+
+# Что означает каждое действие — ровно в тех словах, что увидит модель.
+ACTION_HINTS = {
+    "give_item": "игрок просит выдать предмет или блок",
+    "remove_item": "игрок просит забрать или убрать предмет из инвентаря",
+    "summon_entity": "игрок просит призвать существо",
+    "plan_goal": "игрок спрашивает, как что-то получить, скрафтить или добыть",
+    "create_quest": "игрок просит задание, испытание или челлендж",
+}
+
+EXTRACTABLE = tuple(ACTION_HINTS)
+
+PROMPT = """Ты разбираешь реплику игрока в Minecraft.
+
+Верни ТОЛЬКО JSON без пояснений:
+{{
+  "action": {actions} | "none",
+  "target": "предмет или существо словами игрока, либо null",
+  "count": число{quest_fields}
+}}
+
+Значения action:
+{hints}
+- "none" — во всех остальных случаях: разговор, вопрос, приветствие.
+
+Правила:
+- В "target" перенеси название так, как его назвал игрок. Идентификаторы вида
+  minecraft:... не выдумывай: их подставит система по своей базе знаний.
+- В "target" не добавляй ничего от себя: если игрок сказал «меч», так и пиши «меч».
+- Если количество не названо, ставь 1.{quest_rules}
+{feedback}{context}
+Реплика игрока: "{{utterance}}"
+"""
+
+# Предыдущий обмен нужен для продолжений: «и ещё крипера» после призыва зомби означает
+# призыв, хотя глагола в реплике нет. Передаётся одна строка, а не история целиком.
+CONTEXT = """
+Предыдущий обмен: {context}
+Если реплика продолжает его («и ещё …», «а теперь …»), сохрани то же действие.
+"""
+
+QUEST_FIELDS = """,
+  "goal_kind": "collect" | "kill" — только для create_quest,
+  "reward": "награда словами — только для create_quest",
+  "reward_count": число — только для create_quest"""
+
+QUEST_RULES = """
+- Для create_quest придумай задание сам: в "target" — что собрать или кого победить,
+  в "count" — сколько, в "reward" — что дать в награду. Задание должно быть посильным
+  без редких предметов, награда — соразмерной."""
+
+FEEDBACK = """
+Предыдущее предложение отклонено: {reason}
+Предложи другое, учитывая причину.
+"""
+
+# В выживании выдачи нет, и просьба «дай X» должна вести к плану, как X добыть. Без явного
+# правила модель ищет ближайшее доступное действие и иногда выбирает задание.
+NO_GIVE_RULE = """
+- Выдача предметов сейчас недоступна. Просьбу дать предмет трактуй как "plan_goal":
+  игрок получит план, как добыть его самому."""
+
+
+def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
+                 context: Optional[str] = None) -> str:
+    """Промпт под набор действий, доступных в текущем режиме."""
+    usable = [action for action in actions if action in ACTION_HINTS]
+    quest = "create_quest" in usable
+    rules = QUEST_RULES if quest else ""
+    if "give_item" not in usable and "plan_goal" in usable:
+        rules += NO_GIVE_RULE
+    return PROMPT.format(
+        actions=" | ".join(f'"{action}"' for action in usable),
+        hints="\n".join(f'- "{action}" — {ACTION_HINTS[action]}.' for action in usable),
+        quest_fields=QUEST_FIELDS if quest else "",
+        quest_rules=rules,
+        feedback=FEEDBACK.format(reason=feedback) if feedback else "",
+        context=CONTEXT.format(context=context) if context else "",
+    )
+
+
+def _text(value: Any) -> Optional[str]:
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+class LanguageModelIntent:
+    """Извлечение намерения языковой моделью.
+
+    Обращение к модели передаётся снаружи: на сервере это живой провайдер, в тестах —
+    заглушка. Так конвейер проверяется целиком без сети и без квоты.
+    """
+
+    def __init__(self, ask: Optional[Callable[[str, str], Dict[str, Any]]] = None) -> None:
+        if ask is None:
+            from orchestrator.llm import ask_json
+            ask = ask_json
+        self._ask = ask
+
+    def extract(self, utterance: str, *, actions: Sequence[str] = EXTRACTABLE,
+                feedback: Optional[str] = None, context: Optional[str] = None) -> Proposal:
+        payload = self._ask(build_prompt(actions, feedback, context), utterance)
+        action = str(payload.get("action") or "none").strip()
+        return Proposal(
+            action=action,
+            target=_text(payload.get("target")),
+            count=payload.get("count", 1),
+            goal_kind=_text(payload.get("goal_kind")),
+            reward=_text(payload.get("reward")),
+            reward_count=payload.get("reward_count", 1),
+            raw=payload,
+        )

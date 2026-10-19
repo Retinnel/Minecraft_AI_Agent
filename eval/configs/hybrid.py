@@ -9,7 +9,8 @@
 получить переформулировкой запроса, потому что в решении о допустимости модель не участвует.
 
 Разбор реплики и её исполнение разведены: здесь модель подключается к общему конвейеру
-(orchestrator/pipeline.py), тому же самому, который работает на сервере.
+(orchestrator/pipeline.py) тем же извлекателем намерения (orchestrator/extractor.py), что
+работает на сервере. Прогон измеряет ту систему, которая работает в игре, а не её копию.
 """
 
 from __future__ import annotations
@@ -26,46 +27,15 @@ from dotenv import load_dotenv  # noqa: E402
 # Оценочный контур запускается отдельно от сервера, который обычно и подхватывает .env.
 load_dotenv()
 
-from orchestrator import Pipeline, Proposal  # noqa: E402
+from orchestrator import Pipeline  # noqa: E402
+from orchestrator.extractor import LanguageModelIntent  # noqa: E402
+from orchestrator.llm import ModelUnavailable  # noqa: E402
 from solver.validator import ACT  # noqa: E402
-
-from eval.configs._llm import ModelUnavailable, ask_json  # noqa: E402
 from eval.schema import Config, Prediction  # noqa: E402
 
 KEY = "hybrid"
 TITLE = "C — гибрид"
 DESCRIPTION = "Модель определяет намерение, онтология — предмет, решатель — допустимость."
-
-PROMPT = """Ты разбираешь реплику игрока в Minecraft.
-
-Верни ТОЛЬКО JSON без пояснений:
-{
-  "action": "give_item" | "remove_item" | "summon_entity" | "plan_goal" | "none",
-  "target": "предмет или существо словами игрока, либо null",
-  "count": число
-}
-
-Правила:
-- "plan_goal" — если игрок спрашивает, как что-то получить, скрафтить или добыть.
-- "none" — если это не просьба выдать, забрать, призвать или спланировать.
-- В "target" перенеси название так, как его назвал игрок. Идентификаторы вида
-  minecraft:... не выдумывай: их подставит система по своей базе знаний.
-- В "target" не добавляй ничего от себя: если игрок сказал «меч», так и пиши «меч».
-- Если количество не названо, ставь 1.
-
-Реплика игрока: "{utterance}"
-"""
-
-class LanguageModelIntent:
-    """Извлечение намерения языковой моделью — единственный нейросетевой шаг конвейера."""
-
-    def extract(self, utterance: str) -> Proposal:
-        payload = ask_json(PROMPT, utterance)
-        action = str(payload.get("action") or "none").strip()
-        target = payload.get("target")
-        target = str(target).strip() if isinstance(target, str) and target.strip() else None
-        return Proposal(action=action, target=target, count=payload.get("count", 1), raw=payload)
-
 
 _pipeline: Optional[Pipeline] = None
 

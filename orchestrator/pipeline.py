@@ -24,11 +24,21 @@ from kb.graph import KnowledgeBase
 from resolver.lexical import Candidate
 from resolver.resolve import AMBIGUOUS, NOT_FOUND, Resolver
 from solver.planner import Plan, Planner
+from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
 
 NONE = "none"
 PLAN_GOAL = "plan_goal"
+CREATE_QUEST = "create_quest"
+
+# Действия, которые может предложить модель. Остальные действия реестра (например, получение
+# награды за задание) выполняются системой сами и модели не предъявляются.
+PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST)
+
+# Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
+# целевой системы: модель учитывает причину отказа, но перебором не занимается.
+QUEST_RETRIES = 1
 
 # Число, названное в реплике буквально, надёжнее числа из ответа модели: модель его
 # пересказывает, а регулярное выражение читает. Знак значим — «дай -5 алмазов» должно
@@ -40,21 +50,38 @@ COMMANDS = {
     "remove_item": "/clear @s {id} {count}",
 }
 
+# Признаки просьбы что-то убрать. Нужны только для удаления — единственного действия, ошибка
+# в котором отнимает у игрока то, что у него было.
+REMOVAL_CUES = re.compile(
+    r"(забер|забир|убер|убир|удал|выброс|выкин|очист|сотр|clear|remove|delete|take\s)",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class Proposal:
     """Что языковая модель поняла из реплики."""
 
-    action: str                      # give_item | remove_item | summon_entity | none
+    action: str                      # give_item | remove_item | summon_entity | plan_goal | ...
     target: Optional[str] = None     # предмет или существо словами игрока, не идентификатор
     count: Any = 1
+    # Только для create_quest: вид цели и награда, придуманные моделью.
+    goal_kind: Optional[str] = None
+    reward: Optional[str] = None
+    reward_count: Any = 1
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
 class IntentExtractor(Protocol):
-    """Источник намерения. Единственное место, где участвует языковая модель."""
+    """Источник намерения. Единственное место на входе конвейера, где участвует модель.
 
-    def extract(self, utterance: str) -> Proposal: ...
+    actions — действия, доступные в текущем режиме: модели предъявляются только они.
+    feedback — причина, по которой предыдущее предложение отклонено.
+    context — предыдущий обмен репликами одной строкой.
+    """
+
+    def extract(self, utterance: str, *, actions: Sequence[str] = PROPOSABLE,
+                feedback: Optional[str] = None, context: Optional[str] = None) -> Proposal: ...
 
 
 @dataclass
@@ -68,6 +95,7 @@ class Turn:
     count: Any = 1
     command: Optional[str] = None
     reason: Optional[str] = None
+    query: Optional[str] = None               # название словами игрока — для продолжения диалога
     options: Sequence[Candidate] = ()         # варианты для уточняющего вопроса
     explanation: List[str] = field(default_factory=list)
     stages: Dict[str, Any] = field(default_factory=dict)
@@ -77,6 +105,8 @@ class Turn:
     plan_summary: Optional[str] = None
     # Чем ещё можно было получить цель и почему выбрано не оно.
     plan_alternatives: Optional[str] = None
+    # Заполняется только для create_quest: принятое задание в виде, пригодном для сохранения.
+    quest: Optional[Dict[str, Any]] = None
 
 
 class Pipeline:
@@ -101,19 +131,56 @@ class Pipeline:
             self._planner = Planner(self.kb)
         return self._planner
 
-    def handle(self, utterance: str, *, mode: Optional[str] = None,
-               inventory: Optional[Dict[str, int]] = None) -> Turn:
-        mode = mode or self.mode
+    def actions_for(self, mode: str) -> Sequence[str]:
+        """Действия, которые предъявляются модели в данном режиме."""
+        allowed = set(self.validator.available_actions(mode))
+        return tuple(action for action in PROPOSABLE if action in allowed)
 
-        proposal = self.extractor.extract(utterance)
+    def handle(self, utterance: str, *, mode: Optional[str] = None,
+               inventory: Optional[Dict[str, int]] = None,
+               pending: Optional["Turn"] = None,
+               context: Optional[str] = None) -> Turn:
+        """Обрабатывает реплику.
+
+        pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
+        оказаться ответом на него («алмазный» после «какой меч?»).
+        context — предыдущий обмен репликами одной строкой, для продолжений вроде
+        «и ещё крипера».
+        """
+        mode = mode or self.mode
+        actions = self.actions_for(mode)
+
+        follow_up = self._follow_up(utterance, pending, mode, inventory)
+        if follow_up is not None:
+            return follow_up
+
+        proposal = self.extractor.extract(utterance, actions=actions, context=context)
         stages: Dict[str, Any] = {
             "llm": {"action": proposal.action, "target": proposal.target, "count": proposal.count}
         }
         if not proposal.action or proposal.action == NONE:
             return Turn(outcome=NONE, stages=stages)
 
+        if proposal.action == CREATE_QUEST and CREATE_QUEST in actions:
+            return self._build_quest(utterance, proposal, actions, mode, inventory, stages)
+
         count = self._reconcile_count(utterance, proposal.count)
         stages["count"] = count
+
+        # Удаление необратимо, поэтому одного слова модели для него мало: в реплике должна
+        # быть просьба что-то убрать. Без этого модель, не найдя в перечне выдачи, хватает
+        # ближайший глагол — и «дай 10 факелов» в выживании превращается в «убираю 10
+        # факелов». Сомнение здесь разрешается вопросом, а не действием.
+        if proposal.action == "remove_item" and not REMOVAL_CUES.search(utterance or ""):
+            return Turn(
+                outcome=CLARIFY,
+                action="remove_item",
+                count=count,
+                query=proposal.target,
+                reason="Убрать это из инвентаря? Если да, скажи прямо: «убери …».",
+                explanation=["удаление предложено моделью, но в реплике нет просьбы что-либо убрать"],
+                stages=stages,
+            )
 
         # Цель не названа — уточняем, а не додумываем. Вопрос формулирует валидатор.
         if not str(proposal.target or "").strip():
@@ -134,6 +201,7 @@ class Pipeline:
                 outcome=CLARIFY,
                 action=proposal.action,
                 count=count,
+                query=proposal.target,
                 reason=self._ask_which(resolution.candidates),
                 options=resolution.candidates,
                 explanation=[f"запрос «{proposal.target}» допускает несколько прочтений"],
@@ -150,7 +218,34 @@ class Pipeline:
                 stages=stages,
             )
 
-        verdict = self.validator.validate(proposal.action, resolution.thing, count, mode)
+        return self._decide(proposal.action, resolution.thing, count, mode, inventory, stages)
+
+    def _follow_up(self, utterance: str, pending: Optional["Turn"], mode: str,
+                   inventory: Optional[Dict[str, int]]) -> Optional["Turn"]:
+        """Ответ на уточняющий вопрос разбирается без модели.
+
+        После «какой именно: алмазный, железный…?» реплика «алмазный» сама по себе ни о чём
+        не говорит, но вместе с исходным запросом однозначна. Ответ ищется только среди
+        предложенных вариантов: если реплика ни одному не соответствует, это уже новый
+        запрос, и он идёт обычным путём.
+        """
+        if pending is None or pending.outcome != CLARIFY or not pending.options:
+            return None
+        offered = {option.thing for option in pending.options}
+
+        for query in (f"{utterance} {pending.query or ''}".strip(), utterance):
+            resolution = self.resolver.resolve(query, action=pending.action)
+            chosen = resolution.thing if resolution.ok else None
+            if chosen in offered:
+                stages = {"follow_up": {"question": pending.reason, "answer": utterance,
+                                        "chosen": chosen}}
+                return self._decide(pending.action, chosen, pending.count, mode, inventory, stages)
+        return None
+
+    def _decide(self, action: str, thing: str, count: Any, mode: str,
+                inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> "Turn":
+        """Вердикт валидатора и, если действие допустимо, команда или план."""
+        verdict = self.validator.validate(action, thing, count, mode)
         stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
 
         if verdict.outcome == ACT and verdict.action == PLAN_GOAL:
@@ -171,6 +266,89 @@ class Pipeline:
             explanation=verdict.explanation,
             stages=stages,
         )
+
+    def _build_quest(self, utterance: str, proposal: Proposal, actions: Sequence[str],
+                     mode: str, inventory: Optional[Dict[str, int]],
+                     stages: Dict[str, Any]) -> Turn:
+        """Задание, придуманное моделью, принимается только после доказательства выполнимости.
+
+        Модель предлагает цель и награду; решатель строит план достижения цели из текущего
+        состояния, проверяет награду правилами выдачи и оценивает трудоёмкость. Отклонённое
+        возвращается модели с причиной один раз. Если и второе предложение не проходит,
+        игрок получает отказ, а не невыполнимое задание.
+        """
+        checker = QuestChecker(self.kb, self.planner, self.validator)
+        attempts: List[Dict[str, Any]] = []
+        current = proposal
+        reason = "Не получилось составить посильное задание."
+
+        for attempt in range(QUEST_RETRIES + 1):
+            verdict, reason = self._check_quest(current, checker, inventory, mode)
+            attempts.append({"target": current.target, "count": current.count,
+                             "reward": current.reward, "accepted": bool(verdict and verdict.accepted),
+                             "reason": None if verdict and verdict.accepted else reason})
+            stages["quest"] = attempts
+
+            if verdict is not None and verdict.accepted:
+                return Turn(
+                    outcome=ACT,
+                    action=CREATE_QUEST,
+                    target=verdict.target,
+                    label=self.kb.label(verdict.target),
+                    count=verdict.goal_count,
+                    explanation=verdict.explanation,
+                    stages=stages,
+                    plan=verdict.plan,
+                    plan_tree=render_tree(verdict.plan, self.kb) if verdict.plan else None,
+                    plan_summary=render_summary(verdict.plan, self.kb) if verdict.plan else None,
+                    quest={
+                        "goal_kind": verdict.goal_kind,
+                        "target": verdict.target,
+                        "goal_count": verdict.goal_count,
+                        "reward": verdict.reward,
+                        "reward_label": self.kb.label(verdict.reward) if verdict.reward else None,
+                        "reward_count": verdict.reward_count,
+                        "reward_game_id": verdict.reward_game_id,
+                        "effort": verdict.effort,
+                        "attempts": len(attempts),
+                    },
+                )
+
+            if attempt < QUEST_RETRIES:
+                current = self.extractor.extract(utterance, actions=(CREATE_QUEST,), feedback=reason)
+                if current.action != CREATE_QUEST:
+                    break
+
+        return Turn(outcome=REJECT, action=CREATE_QUEST, reason=reason,
+                    explanation=[f"задание отклонено: {reason}"], stages=stages)
+
+    def _check_quest(self, proposal: Proposal, checker: QuestChecker,
+                     inventory: Optional[Dict[str, int]], mode: str):
+        """Сопоставляет предложенное задание с онтологией и проверяет решателем."""
+        goal_kind = (proposal.goal_kind or "").strip().lower()
+        if goal_kind not in (COLLECT, KILL):
+            goal_kind = COLLECT
+        if not proposal.target or not proposal.reward:
+            return None, "в задании не названы цель или награда"
+
+        # Цель задания сопоставляется как существо для «победить» и как вещь для «собрать».
+        goal_action = "summon_entity" if goal_kind == KILL else "give_item"
+        target = self.resolver.resolve(proposal.target, action=goal_action)
+        if not target.ok:
+            return None, f"цель «{proposal.target}» не опознана однозначно, назови конкретный объект"
+        reward = self.resolver.resolve(proposal.reward, action="give_item")
+        if not reward.ok:
+            return None, f"награда «{proposal.reward}» не опознана однозначно, назови конкретный предмет"
+
+        try:
+            goal_count = int(proposal.count)
+            reward_count = int(proposal.reward_count or 1)
+        except (TypeError, ValueError):
+            return None, "количество в задании должно быть числом"
+
+        verdict = checker.check(goal_kind, target.thing, goal_count, reward.thing, reward_count,
+                                inventory=inventory, mode=mode)
+        return verdict, verdict.reason or "задание не прошло проверку"
 
     def _build_plan(self, verdict, inventory: Optional[Dict[str, int]],
                     stages: Dict[str, Any]) -> Turn:

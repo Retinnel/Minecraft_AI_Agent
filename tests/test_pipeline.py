@@ -22,8 +22,8 @@ class StubIntent:
         self.proposal = proposal or Proposal("none")
         self.seen = []
 
-    def extract(self, utterance):
-        self.seen.append(utterance)
+    def extract(self, utterance, **context):
+        self.seen.append((utterance, context))
         return self.proposal
 
 

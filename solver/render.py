@@ -70,12 +70,29 @@ def render_tree(plan: Plan, kb: KnowledgeBase) -> str:
     return "\n".join(lines)
 
 
+def _plural(count: int, one: str, few: str, many: str) -> str:
+    """Согласование существительного с числом: 1 шаг, 3 шага, 18 шагов."""
+    tail = count % 100
+    if 11 <= tail <= 14:
+        return many
+    if count % 10 == 1:
+        return one
+    if 2 <= count % 10 <= 4:
+        return few
+    return many
+
+
+def _inline(label: str) -> str:
+    """Название внутри фразы пишется со строчной: «добыть алмаз», а не «добыть Алмаз»."""
+    return label[:1].lower() + label[1:] if label else label
+
+
 def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
     """Короткая сводка для игрового чата: помещается в одну-две строки."""
     goal = kb.label(plan.goal) or plan.goal
 
     if not plan.feasible:
-        blocked = ", ".join((kb.label(item) or item) for item in plan.missing[:3])
+        blocked = ", ".join(_inline(kb.label(item) or item) for item in plan.missing[:3])
         return f"{goal} сейчас не получить: не удалось вывести {blocked}."
 
     actions = plan.actions()
@@ -87,11 +104,15 @@ def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
 
     parts = []
     if mined:
-        names = ", ".join(dict.fromkeys((kb.label(s.item) or s.item) for s in mined[:3]))
-        parts.append(f"добыть {names}")
+        names = list(dict.fromkeys(_inline(kb.label(s.item) or s.item) for s in mined))
+        listed = ", ".join(names[:3]) + (" и другое" if len(names) > 3 else "")
+        parts.append(f"добыть {listed}")
     if crafted:
-        parts.append(f"изготовить {len(crafted)} предмет(ов)")
-    return f"{goal}: " + "; ".join(parts) + f". Всего шагов: {len(actions)}."
+        parts.append(f"изготовить {len(crafted)} "
+                     f"{_plural(len(crafted), 'предмет', 'предмета', 'предметов')}")
+    steps = len(actions)
+    return (f"{goal}: " + "; ".join(parts)
+            + f". Всего {steps} {_plural(steps, 'шаг', 'шага', 'шагов')}.")
 
 
 KIND_RU = {CRAFT: "изготовить", SMELT: "переплавить", STONECUT: "вырезать",

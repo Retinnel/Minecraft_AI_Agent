@@ -792,183 +792,224 @@ async def get_rp_response() -> GroqAdvice:
     return _build_silent_poll_response(last)
 
 
+# --- гибридный конвейер ---
+#
+# Реплика игрока проходит общий конвейер (orchestrator/): модель извлекает намерение,
+# резолвер сопоставляет название с онтологией, валидатор проверяет допустимость, планировщик
+# строит план, модель формулирует ответ по выходу решателя. Тот же конвейер прогоняется
+# оценочным контуром, поэтому измеренное совпадает с тем, что работает в игре.
+
+_assistant_pipeline_instance = None
+_assistant_responder_instance = None
+
+# Детерминированные команды смены режима. Режим меняет набор доступных действий, и решать
+# это по ответу модели было бы странно: команда однозначна и разбирается без неё.
+MODE_COMMANDS = (
+    ("survival", re.compile(r"\bрежим\w*\s+(выживани|survival)", re.IGNORECASE)),
+    ("creative", re.compile(r"\bрежим\w*\s+(творч|креатив|creative)", re.IGNORECASE)),
+)
+
+# Как действие конвейера называется в протоколе мода.
+MOD_ACTION_TYPES = {"give_item": "give", "remove_item": "clear", "summon_entity": "summon"}
+
+# Строка чата длиннее этого предела в игре переносится неудобно; план целиком идёт в оверлей.
+CHAT_REPLY_LIMIT = 240
+
+
+def _assistant_pipeline():
+    global _assistant_pipeline_instance
+    if _assistant_pipeline_instance is None:
+        from orchestrator import Pipeline
+        from orchestrator.extractor import LanguageModelIntent
+        _assistant_pipeline_instance = Pipeline(LanguageModelIntent())
+    return _assistant_pipeline_instance
+
+
+def _assistant_responder():
+    global _assistant_responder_instance
+    if _assistant_responder_instance is None:
+        from orchestrator.responder import Responder
+        _assistant_responder_instance = Responder()
+    return _assistant_responder_instance
+
+
+def _assistant_session():
+    from orchestrator.session import shared
+    return shared()
+
+
+def _inventory_counts() -> Dict[str, int]:
+    """Инвентарь из последнего снимка, который прислал мод."""
+    from api.player_state import get_player_state
+
+    counts = (get_player_state().get("inventory") or {}).get("counts") or {}
+    result: Dict[str, int] = {}
+    for item_id, count in counts.items():
+        try:
+            result[str(item_id)] = int(count)
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _state_snapshot() -> str:
+    from api.player_state import get_player_state_prompt_context
+    return get_player_state_prompt_context()
+
+
+def _mode_command(text: str) -> Optional[str]:
+    for mode, pattern in MODE_COMMANDS:
+        if pattern.search(text or ""):
+            return mode
+    return None
+
+
+def _clip(text: str, limit: int = CHAT_REPLY_LIMIT) -> str:
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqAdvice:
+    """Переводит итог конвейера в ответ, который понимает мод."""
+    threats = getattr(last, "threats_detected", None) or [] if last else []
+    level = _determine_severity_level(last, threats) if last else "INFO"
+    session = _assistant_session()
+
+    action_type = MOD_ACTION_TYPES.get(turn.action or "")
+    executes = turn.outcome == "act" and action_type is not None and bool(turn.command)
+    is_summon = turn.action == "summon_entity"
+
+    return GroqAdvice(
+        response=_clip(reply_text),
+        confidence=0.9 if source == "model" else 0.8,
+        level=level,
+        threats=threats,
+        source=source,
+        mode="action" if executes else "chat",
+        execute=executes,
+        command=turn.command if executes else None,
+        action_type=action_type if executes else None,
+        item_id=turn.target if executes and not is_summon else None,
+        item_count=int(turn.count) if executes and not is_summon else None,
+        entity_id=turn.target if executes and is_summon else None,
+        entity_count=int(turn.count) if executes and is_summon else None,
+        error=turn.reason if turn.outcome == "reject" else None,
+        outcome=turn.outcome,
+        assistant_mode=session.mode,
+        plan_tree=turn.plan_tree,
+        plan_summary=turn.plan_summary,
+        plan_alternatives=turn.plan_alternatives,
+        explanation=list(turn.explanation or []),
+        options=[option.label for option in (turn.options or [])],
+    )
+
+
+def _persist_quest(turn):
+    """Сохраняет принятое решателем задание. Отказ хранилища превращает исход в отказ."""
+    from api.challenges import create_challenge
+
+    quest = turn.quest or {}
+    result = create_challenge(
+        goal_type=quest.get("goal_kind") or "collect",
+        goal_target_id=quest.get("target"),
+        goal_count=quest.get("goal_count"),
+        reward_item_id=quest.get("reward_game_id") or quest.get("reward"),
+        reward_count=quest.get("reward_count"),
+        source="assistant",
+    )
+    if not result.get("ok"):
+        turn.outcome = "reject"
+        turn.reason = str(result.get("error") or "Не удалось сохранить задание.")
+        # Задание не сохранено, и показывать план к нему было бы обещанием, которого нет.
+        turn.plan = turn.plan_tree = turn.plan_summary = None
+    return turn
+
+
+async def _mode_reply(mode: str, text: str, last: Any) -> GroqAdvice:
+    session = _assistant_session()
+    session.set_mode(mode)
+    reply = (f"Режим: {session.mode_label}. "
+             + ("Предметы не выдаю — помогу планом и заданиями."
+                if mode == "survival" else "Могу выдавать предметы и призывать существ."))
+    result = GroqAdvice(response=reply, confidence=1.0, level="INFO", threats=[],
+                        source="rule", mode="chat", outcome="act", assistant_mode=session.mode)
+    return await _store_chat_result(result, text)
+
+
+@router.get("/mode")
+async def get_assistant_mode() -> Dict[str, Any]:
+    session = _assistant_session()
+    return {"mode": session.mode, "label": session.mode_label}
+
+
+@router.post("/mode")
+async def set_assistant_mode(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Переключатель режима из оверлея мода."""
+    session = _assistant_session()
+    if not session.set_mode(str(payload.get("mode") or "")):
+        return {"ok": False, "error": "Режим должен быть creative или survival.", "mode": session.mode}
+    return {"ok": True, "mode": session.mode, "label": session.mode_label}
+
+
 @router.post("/chat")
 async def player_chat_message(message: ChatMessage) -> GroqAdvice:
-    """Handle player chat message and send it to LLM for RP response.
-    
-    Args:
-        message: ChatMessage with player's text
-        
-    Returns:
-        LLM's RP response to the player's message
+    """Реплика игрока из игрового чата.
+
+    Детерминированные команды разбираются без модели; всё остальное проходит гибридный
+    конвейер. Недоступность модели сообщается игроку отдельно и не выдаётся за отказ:
+    решения по запросу в этом случае не принималось.
     """
-    text = message.text
+    from orchestrator.llm import ModelUnavailable
+
+    text = (message.text or "").strip()
     _safe_console_log(f"[Chat] Received message: {text}", print_message=False)
-    _safe_console_log(f"[AI Assistant API] /api/rp/chat called with: {text}")
-    
-    if not text or not text.strip():
-        logger.warning("[Chat] Message is empty")
-        return GroqAdvice(
-            response="...",
-            confidence=0.0,
-            level="INFO",
-            threats=[],
-            source="chat",
-        )
-    
+    if not text:
+        return GroqAdvice(response="...", confidence=0.0, level="INFO", threats=[], source="chat")
+
     last = _safe_last_log()
-    
-    # Get recent logs for context
-    recent_logs = _recent_logs(limit=5)
-    conversation_history = _conversation_window()
-    available_tools = get_tool_registry()
-    logger.info(f"[Chat] Using {len(recent_logs)} logs as context")
+    session = _assistant_session()
 
-    # Interactive chat uses a lightweight tool-service loop:
-    # assistant decision -> optional tool call -> final assistant response.
-    if groq_client.is_available():
-        _safe_console_log(f"[Chat] {groq_client.provider} client available, generating response...", print_message=False)
-        _safe_console_log(f"[AI Assistant API] {groq_client.provider} client available, generating response...")
-
-        decision_payload = await groq_client.generate_tool_decision_async(
-            text,
-            recent_logs,
-            conversation_history,
-            available_tools,
-        )
-        if decision_payload:
-            tool_call = decision_payload.get("tool_call")
-            assistant_response = str(decision_payload.get("assistant_response") or "").strip()
-
-            if isinstance(tool_call, dict) and tool_call.get("name"):
-                tool_name = str(tool_call.get("name") or "").strip()
-                tool_arguments = tool_call.get("arguments") or {}
-                tool_result = execute_tool_call(tool_name, tool_arguments)
-
-                _append_conversation_message("user", text)
-                _append_tool_context(tool_name, tool_arguments, tool_result)
-
-                final_response_text = await groq_client.generate_tool_followup_async(
-                    text,
-                    recent_logs,
-                    _conversation_window(),
-                    tool_result,
-                )
-                final_response = _build_response_from_tool_result(tool_result, final_response_text, last)
-                _safe_console_log(f"[Chat] Tool loop response: {final_response.model_dump()}", print_message=False)
-                _safe_console_log(f"[AI Assistant API] Tool loop response: {final_response.model_dump()}")
-                return await _store_chat_result(final_response, text, add_user=False)
-
-            if assistant_response:
-                result = _build_chat_result(
-                    response=assistant_response,
-                    last=last,
-                    source="chat",
-                    confidence=0.9,
-                    mode="chat",
-                )
-                _safe_console_log(f"[Chat] Assistant response without tool: {result.model_dump()}", print_message=False)
-                _safe_console_log(f"[AI Assistant API] Assistant response without tool: {result.model_dump()}")
-                return await _store_chat_result(result, text)
-
-        logger.warning("[Chat] Tool decision payload was empty or invalid")
-        print("[AI Assistant API] Tool decision payload was empty or invalid")
-    else:
-        _safe_console_log(f"[Chat] {groq_client.provider} client not available", level="warning", print_message=False)
-        _safe_console_log(f"[AI Assistant API] {groq_client.provider} client not available")
-
-    if _looks_like_summon_request(text):
-        direct_summon_result = execute_tool_call(
-            "summon_entity",
-            {"entity_query": text, "count": _extract_requested_count(text)},
-        )
-        direct_summon_response = _build_response_from_tool_result(
-            direct_summon_result,
-            None if direct_summon_result.get("ok") else "",
-            last,
-        )
-        _safe_console_log(f"[Chat] Direct summon response: {direct_summon_response.model_dump()}", print_message=False)
-        _safe_console_log(f"[AI Assistant API] Direct summon response: {direct_summon_response.model_dump()}")
-        return await _store_chat_result(direct_summon_response, text)
-
-    if _looks_like_remove_request(text):
-        direct_remove_result = execute_tool_call(
-            "remove_item",
-            {"item_query": text, "count": _extract_requested_count(text)},
-        )
-        direct_remove_response = _build_response_from_tool_result(
-            direct_remove_result,
-            None if direct_remove_result.get("ok") else "",
-            last,
-        )
-        _safe_console_log(f"[Chat] Direct remove response: {direct_remove_response.model_dump()}", print_message=False)
-        _safe_console_log(f"[AI Assistant API] Direct remove response: {direct_remove_response.model_dump()}")
-        return await _store_chat_result(direct_remove_response, text)
+    mode = _mode_command(text)
+    if mode:
+        return await _mode_reply(mode, text, last)
 
     if _looks_like_claim_challenge_request(text):
-        direct_claim_response = _build_chat_result(
-            response="Награда за челлендж выдаётся автоматически сразу после выполнения. Проверь статус челленджа или инвентарь.",
-            last=last,
-            source="chat",
-            confidence=0.9,
-            mode="chat",
+        result = _build_chat_result(
+            response="Награда за челлендж выдаётся автоматически сразу после выполнения. "
+                     "Проверь статус челленджа или инвентарь.",
+            last=last, source="chat", confidence=0.9, mode="chat",
         )
-        _safe_console_log(f"[Chat] Direct challenge claim response: {direct_claim_response.model_dump()}", print_message=False)
-        _safe_console_log(f"[AI Assistant API] Direct challenge claim response: {direct_claim_response.model_dump()}")
-        return await _store_chat_result(direct_claim_response, text)
+        return await _store_chat_result(result, text)
 
     if _looks_like_challenge_status_request(text):
-        challenge_status_response = _build_challenge_status_response(last)
-        _safe_console_log(f"[Chat] Challenge status response: {challenge_status_response.model_dump()}", print_message=False)
-        _safe_console_log(f"[AI Assistant API] Challenge status response: {challenge_status_response.model_dump()}")
-        return await _store_chat_result(challenge_status_response, text)
+        return await _store_chat_result(_build_challenge_status_response(last), text)
 
-    direct_action_resolution = _resolve_direct_action_request(text)
-    if direct_action_resolution.get("status") == "ambiguous":
-        direct_action_error = _build_action_error(last, direct_action_resolution["message"])
-        return await _store_chat_result(direct_action_error, text)
-
-    direct_action_payload = _build_direct_action_payload(text)
-    if direct_action_payload:
-        direct_action_response = _build_chat_action_response(direct_action_payload, last)
-        if direct_action_response:
-            _safe_console_log(f"[Chat] Direct action response: {direct_action_response.model_dump()}", print_message=False)
-            _safe_console_log(f"[AI Assistant API] Direct action response: {direct_action_response.model_dump()}")
-            return await _store_chat_result(direct_action_response, text)
-
-    if groq_client.is_available():
-        fallback_chat = await groq_client.generate_chat_response_async(text, recent_logs, conversation_history)
-        if fallback_chat:
-            fallback_chat_response = _build_chat_result(
-                response=fallback_chat,
-                last=last,
-                source="chat",
-                confidence=0.75,
-                mode="chat",
-            )
-            _safe_console_log(f"[Chat] Fallback chat response: {fallback_chat_response.model_dump()}", print_message=False)
-            _safe_console_log(f"[AI Assistant API] Fallback chat response: {fallback_chat_response.model_dump()}")
-            return await _store_chat_result(fallback_chat_response, text)
-
-    if _looks_like_action_request(text):
-        fallback_action = _build_action_error(
-            last,
-            "Не могу выполнить выдачу предмета: LLM недоступна или не смогла разобрать запрос.",
-            source="fallback",
-            fallback=True,
+    try:
+        turn = await asyncio.to_thread(
+            _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
+            pending=session.pending, context=session.last_exchange)
+    except ModelUnavailable as error:
+        logger.warning(f"[Chat] Модель недоступна: {error}")
+        result = GroqAdvice(
+            response="Не могу разобрать запрос: языковая модель сейчас недоступна.",
+            confidence=0.0, level="INFO", threats=[], source="fallback", fallback=True,
+            mode="chat", error="model_unavailable", assistant_mode=session.mode,
         )
-        return await _store_chat_result(fallback_action, text)
+        return await _store_chat_result(result, text)
 
-    # Fallback response
-    fallback = _build_chat_result(
-        response="[RP] Интересное мнение, друже!",
-        last=last,
-        source="fallback",
-        confidence=0.5,
-        mode="chat",
-        fallback=True,
+    if turn.outcome == "act" and turn.action == "create_quest":
+        turn = _persist_quest(turn)
+
+    reply = await asyncio.to_thread(
+        _assistant_responder().reply, turn, text,
+        state=_state_snapshot(), summary=session.summary(), window=session.window(),
     )
-    return await _store_chat_result(fallback, text)
+    session.record(text, turn, reply.text)
+
+    result = _advice_from_turn(turn, reply.text, last, source=reply.source)
+    _safe_console_log(f"[Chat] {turn.outcome} {turn.action} {turn.target}: {result.response}",
+                      print_message=False)
+    return await _store_chat_result(result, text)
 
 
 @router.get("/models/available")
