@@ -45,6 +45,13 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(self.resolve("дай гэпл").thing, "minecraft:golden_apple")
         self.assertEqual(self.resolve("нужна реда").thing, "minecraft:redstone")
 
+    def test_verbs_of_obtaining_are_not_part_of_the_name(self):
+        """Модель иногда переносит глагол в название: «скрафтить факел» — это факел."""
+        self.assertEqual(self.resolve("скрафтить факел", "plan_goal").thing, "minecraft:torch")
+        self.assertEqual(self.resolve("добыть незеритовый слиток", "plan_goal").thing,
+                         "minecraft:netherite_ingot")
+        self.assertEqual(self.resolve("скрафтить звёздный меч", "plan_goal").status, NOT_FOUND)
+
     def test_adjective_narrows_target(self):
         result = self.resolve("хочу алмазную кирку")
         self.assertEqual(result.thing, "minecraft:diamond_pickaxe")
