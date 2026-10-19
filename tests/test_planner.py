@@ -204,3 +204,22 @@ class AlternativesTests(unittest.TestCase):
         self.assertIn("выбрано", text)
         self.assertIn("отвергнуто", text)
         self.assertIn("Железный голем", text)
+
+
+class InfeasibleSummaryTests(unittest.TestCase):
+    """Недостижимая цель: сводка называет, на чём вывод упёрся и с чего начать."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.kb = KnowledgeBase.load(KB_PATH)
+        cls.planner = Planner(cls.kb)
+
+    def test_nearest_achievable_subgoals_are_named(self):
+        from solver.render import render_summary
+        plan = self.planner.plan("minecraft:beacon", 1)
+        self.assertFalse(plan.feasible)
+        summary = render_summary(plan, self.kb)
+        self.assertIn("не удалось вывести", summary)
+        self.assertIn("Уже сейчас можно получить", summary)
+        self.assertIn("обсидиан", summary)
+

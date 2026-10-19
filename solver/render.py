@@ -93,7 +93,15 @@ def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
 
     if not plan.feasible:
         blocked = ", ".join(_inline(kb.label(item) or item) for item in plan.missing[:3])
-        return f"{goal} сейчас не получить: не удалось вывести {blocked}."
+        text = f"{goal} сейчас не получить: не удалось вывести {blocked}."
+        # Ближайшие достижимые подцели: составные части цели, которые получить можно.
+        # Игроку полезнее знать, с чего начать, чем услышать только «нельзя».
+        ready = [step for step in plan.root.children if step.satisfied and step.kind != HAVE]
+        if ready:
+            names = ", ".join(dict.fromkeys(_inline(kb.label(step.item) or step.item)
+                                            for step in ready))
+            text += f" Уже сейчас можно получить: {names}."
+        return text
 
     actions = plan.actions()
     if not actions:
