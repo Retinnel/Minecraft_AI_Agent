@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from kb.graph import KnowledgeBase
+from solver.render import render_alternatives
 from solver.planner import CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, Planner
 
 KB_PATH = Path(__file__).resolve().parent.parent / "data" / "kb" / "game.ttl"
@@ -151,3 +152,55 @@ class PlannerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AlternativesTests(unittest.TestCase):
+    """Развилки вывода: решатель помнит, что ещё рассматривал и почему выбрал не это.
+
+    Это не отладочный след, а материал для ответа на вопрос «почему план именно такой».
+    Проверяется, что выбор действительно был и что причина отказа выражена в тех же
+    величинах, по которым шло сравнение.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.kb = KnowledgeBase.load(KB_PATH)
+        cls.planner = Planner(cls.kb)
+
+    def decision_for(self, plan, item):
+        return next((d for d in plan.decisions if d.item == item), None)
+
+    def test_single_option_is_not_a_decision(self):
+        """Там, где способ один, объяснять нечего — развилка не записывается."""
+        plan = self.planner.plan("minecraft:diamond_pickaxe", 1)
+        self.assertTrue(all(len(d.options) > 1 for d in plan.decisions))
+
+    def test_exactly_one_option_is_chosen(self):
+        plan = self.planner.plan("minecraft:diamond_pickaxe", 1)
+        for decision in plan.decisions:
+            with self.subTest(item=decision.item):
+                self.assertEqual(sum(1 for o in decision.options if o.chosen), 1)
+
+    def test_hunting_is_rejected_in_favour_of_mining(self):
+        """Заготовленный ответ на защите: железо можно выбить из голема, но это дороже."""
+        plan = self.planner.plan("minecraft:iron_ingot", 1)
+        decision = self.decision_for(plan, "minecraft:iron_ingot")
+        self.assertIsNotNone(decision)
+        hunted = [o for o in decision.options if o.detail == "minecraft:iron_golem"]
+        self.assertTrue(hunted, "вариант с охотой должен быть рассмотрен")
+        self.assertFalse(hunted[0].chosen)
+        self.assertGreater(hunted[0].effort, decision.chosen.effort)
+
+    def test_rejected_variants_keep_their_source(self):
+        """Три рецепта железного слитка различаются сырьём, а не станцией."""
+        plan = self.planner.plan("minecraft:iron_ingot", 1)
+        decision = self.decision_for(plan, "minecraft:iron_ingot")
+        smelts = {o.via for o in decision.options if o.via}
+        self.assertGreater(len(smelts), 1)
+
+    def test_explanation_mentions_both_sides(self):
+        plan = self.planner.plan("minecraft:iron_ingot", 1)
+        text = render_alternatives(plan, self.kb)
+        self.assertIn("выбрано", text)
+        self.assertIn("отвергнуто", text)
+        self.assertIn("Железный голем", text)

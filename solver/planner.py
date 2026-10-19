@@ -88,11 +88,50 @@ class Step:
             yield from child.walk()
 
 
+@dataclass(frozen=True)
+class Option:
+    """Один рассмотренный способ получить предмет."""
+
+    kind: str              # craft | smelt | mine | hunt | ...
+    detail: str            # станция изготовления либо источник добычи
+    # Из чего изготавливается. Без этого три рецепта железного слитка выглядят одинаково
+    # («переплавить в печи») и различие между ними не видно.
+    via: Optional[str]
+    feasible: bool
+    effort: int            # трудоёмкость поддерева целиком
+    dead_ends: int         # сколько шагов внутри не удалось вывести
+    chosen: bool = False
+
+
+@dataclass(frozen=True)
+class Decision:
+    """Выбор между способами получить один предмет.
+
+    Записывается, чтобы на вопрос «почему план именно такой» отвечал сам решатель, а не
+    докладчик. Отвергнутые варианты — не отладочный след: они показывают, что выбор был,
+    и по какому признаку он сделан.
+    """
+
+    item: str
+    depth: int
+    options: Tuple[Option, ...]
+
+    @property
+    def chosen(self) -> Optional[Option]:
+        return next((option for option in self.options if option.chosen), None)
+
+    @property
+    def rejected(self) -> Tuple[Option, ...]:
+        return tuple(option for option in self.options if not option.chosen)
+
+
 @dataclass
 class Plan:
     goal: str
     count: int
     root: Step
+    # Только те предметы, где способов получения было больше одного.
+    decisions: Tuple[Decision, ...] = ()
 
     @property
     def feasible(self) -> bool:
@@ -127,6 +166,7 @@ class Planner:
         self.max_expansions = max_expansions
         self._cost_cache: Dict[str, int] = {}
         self._budget = 0
+        self._decisions: List[Decision] = []
 
     # --- публичный интерфейс ---
 
@@ -134,8 +174,12 @@ class Planner:
              inventory: Optional[Dict[str, int]] = None) -> Plan:
         stock = Counter(inventory or {})
         self._budget = self.max_expansions
+        self._decisions = []
         root = self._resolve(goal, count, stock, frozenset(), 0)
-        return Plan(goal=goal, count=count, root=root)
+        # В ответе остаются только настоящие развилки: там, где способ был один,
+        # объяснять нечего.
+        decisions = tuple(decision for decision in self._decisions if len(decision.options) > 1)
+        return Plan(goal=goal, count=count, root=root, decisions=decisions)
 
     @property
     def budget_exhausted(self) -> bool:
@@ -176,6 +220,10 @@ class Planner:
         # запасов. Иначе неудачная попытка изготовить закрыла бы дорогу к добыче: у алмаза
         # есть рецепт из алмазного блока, который упирается в цикл, но сам алмаз прекрасно
         # добывается из руды.
+        # Отметка в журнале развилок: всё записанное дальше относится к этому предмету
+        # и к тому, что раскрывается под ним.
+        mark = len(self._decisions)
+
         candidates: List[Tuple[Step, Counter]] = []
         for attempt in (self._try_recipes, self._try_sources):
             trial = stock.copy()
@@ -190,6 +238,7 @@ class Planner:
             step, trial = max(candidates, key=lambda pair: self._score(pair[0]))
             stock.clear()
             stock.update(trial)
+            self._merge_decisions(item, depth, step, mark)
         else:
             step = self._missing(item, remaining, "нет ни рецепта, ни источника добычи", 0)
 
@@ -213,15 +262,19 @@ class Planner:
             return None
 
         best: Optional[Tuple[Step, Counter]] = None
+        tried: List[Tuple[Step, str, Optional[str]]] = []
         for recipe in sorted(recipes, key=lambda r: self._recipe_cost(r, stack))[:MAX_BRANCHES]:
             # Каждый вариант считается на своей копии запасов: неудачная попытка не должна
             # съедать инвентарь и портить следующие.
             trial = stock.copy()
             step = self._expand_recipe(recipe, item, count, trial, stack, depth)
+            main = recipe.inputs[0].alternatives[0] if recipe.inputs and recipe.inputs[0].alternatives else None
+            tried.append((step, recipe.station, main))
             if best is None or self._score(step) > self._score(best[0]):
                 best = (step, trial)
         if best is None:
             return None
+        self._record(item, depth, tried, best[0])
         stock.clear()
         stock.update(best[1])
         return best[0]
@@ -260,13 +313,16 @@ class Planner:
             return None
 
         best: Optional[Tuple[Step, Counter]] = None
+        tried: List[Tuple[Step, str, Optional[str]]] = []
         for source in sources[:MAX_BRANCHES]:
             trial = stock.copy()
             step = self._expand_source(source, item, count, trial, stack, depth)
+            tried.append((step, source.id, None))
             if best is None or self._score(step) > self._score(best[0]):
                 best = (step, trial)
         if best is None:
             return None
+        self._record(item, depth, tried, best[0])
         stock.clear()
         stock.update(best[1])
         return best[0]
@@ -412,6 +468,48 @@ class Planner:
                 break
 
         self._cost_cache = cost
+
+    # --- журнал развилок ---
+
+    def _record(self, item: str, depth: int, tried: Sequence[Tuple[Step, str, Optional[str]]],
+                winner: Step) -> None:
+        """Записывает рассмотренные варианты одного способа получения."""
+        options = tuple(
+            Option(kind=step.kind, detail=detail, via=via, feasible=step.satisfied,
+                   effort=sum(node.weight for node in step.walk()),
+                   dead_ends=sum(1 for node in step.walk() if node.kind == MISSING),
+                   chosen=step is winner)
+            for step, detail, via in tried
+        )
+        self._decisions.append(Decision(item=item, depth=depth, options=options))
+
+    def _merge_decisions(self, item: str, depth: int, winner: Step, mark: int) -> None:
+        """Сводит изготовление и добычу одного предмета в одну развилку.
+
+        Внутри каждого способа лучший вариант уже отмечен, но выбор между способами делается
+        позже и здесь: у проигравшего способа отметка снимается. Иначе выходило бы, что
+        выбраны оба.
+        """
+        indexes = [index for index in range(mark, len(self._decisions))
+                   if self._decisions[index].item == item
+                   and self._decisions[index].depth == depth]
+        if not indexes:
+            return
+
+        options: List[Option] = []
+        for index in indexes:
+            for option in self._decisions[index].options:
+                # Способ, проигравший сравнение, не может считаться выбранным.
+                won = (option.kind in (MINE, HUNT)) == (winner.kind in (MINE, HUNT))
+                options.append(option if (option.chosen and won)
+                               else Option(kind=option.kind, detail=option.detail,
+                                           via=option.via, feasible=option.feasible,
+                                           effort=option.effort, dead_ends=option.dead_ends,
+                                           chosen=False))
+
+        for index in reversed(indexes):
+            del self._decisions[index]
+        self._decisions.append(Decision(item=item, depth=depth, options=tuple(options)))
 
     # --- вспомогательное ---
 

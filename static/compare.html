@@ -79,6 +79,10 @@
     margin-top: 14px; padding: 10px 14px; border-radius: 6px; font-size: 16px;
     background: rgba(69, 199, 106, .1); border: 1px solid var(--good); color: #a9e8ba;
   }
+  .why { margin-top: 14px; }
+  .why summary {
+    cursor: pointer; color: var(--accent); font-size: 15px; padding: 4px 0;
+  }
   .plan { font-size: 15px; line-height: 1.45; max-height: 420px; overflow: auto; }
   .note {
     margin-top: 14px; padding: 10px 14px; border-radius: 6px; font-size: 16px;
@@ -198,6 +202,12 @@ function renderPanel(target, data, trace, options) {
     html += '<div class="command plan">' + escapeHtml(data.plan_tree) + "</div>";
     if (data.plan_summary) {
       html += '<div class="note">' + escapeHtml(data.plan_summary) + "</div>";
+    }
+    if (data.plan_alternatives) {
+      // Ответ решателя на вопрос «почему план именно такой». Свёрнут, чтобы не отвлекать
+      // от самого плана: раскрывается, когда вопрос прозвучит.
+      html += '<details class="why"><summary>Почему именно так</summary>' +
+        '<div class="command plan">' + escapeHtml(data.plan_alternatives) + "</div></details>";
     }
   } else if (data.command) {
     html += '<div class="command">' + escapeHtml(data.command) + "</div>";

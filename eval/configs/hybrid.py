@@ -97,7 +97,8 @@ def predict(utterance: str) -> Prediction:
         command=turn.command,
         latency_ms=latency,
         details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation,
-                 "plan_tree": turn.plan_tree, "plan_summary": turn.plan_summary},
+                 "plan_tree": turn.plan_tree, "plan_summary": turn.plan_summary,
+                 "plan_alternatives": turn.plan_alternatives},
     )
 
 

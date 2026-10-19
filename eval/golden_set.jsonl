@@ -75,7 +75,8 @@
 // Сюда переразмечен бывший chat-t-003: с появлением решателя «как скрафтить X» —
 // это запрос плана, а не обычный разговор.
 {"id": "plan-t-001", "utterance": "как скрафтить факел?", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:torch", "count": 1}
-{"id": "plan-t-002", "utterance": "хочу алмазную кирку", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:diamond_pickaxe", "count": 1}
+{"id": "plan-t-002", "utterance": "как сделать алмазную кирку", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:diamond_pickaxe", "count": 1}
+{"id": "plan-b-002", "utterance": "хочу алмазную кирку", "group": "boundary", "outcome": "act", "intent": "give_item", "item_id": "minecraft:diamond_pickaxe", "count": 1, "policy": true, "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"}
 {"id": "plan-t-003", "utterance": "как получить обсидиан", "group": "typical", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:obsidian", "count": 1}
 {"id": "plan-b-001", "utterance": "как добыть незеритовый слиток", "group": "boundary", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:netherite_ingot", "count": 1, "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"}
 {"id": "plan-n-001", "utterance": "как скрафтить звёздный меч", "group": "negative", "outcome": "reject", "intent": "plan_goal", "note": "предмета не существует: отказ, а не выдуманный план"}

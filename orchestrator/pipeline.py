@@ -24,7 +24,7 @@ from kb.graph import KnowledgeBase
 from resolver.lexical import Candidate
 from resolver.resolve import AMBIGUOUS, NOT_FOUND, Resolver
 from solver.planner import Plan, Planner
-from solver.render import render_summary, render_tree
+from solver.render import render_alternatives, render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
 
 NONE = "none"
@@ -75,6 +75,8 @@ class Turn:
     plan: Optional[Plan] = None
     plan_tree: Optional[str] = None
     plan_summary: Optional[str] = None
+    # Чем ещё можно было получить цель и почему выбрано не оно.
+    plan_alternatives: Optional[str] = None
 
 
 class Pipeline:
@@ -185,6 +187,7 @@ class Pipeline:
             "steps": len(plan.actions()),
             "effort": plan.effort,
             "missing": plan.missing,
+            "decisions": len(plan.decisions),
         }
         explanation = list(verdict.explanation)
         explanation.append(
@@ -204,6 +207,7 @@ class Pipeline:
             plan=plan,
             plan_tree=render_tree(plan, self.kb),
             plan_summary=render_summary(plan, self.kb),
+            plan_alternatives=render_alternatives(plan, self.kb),
         )
 
     # --- вспомогательное ---

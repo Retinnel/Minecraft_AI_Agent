@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from kb.graph import KnowledgeBase
 from solver.planner import (CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, SMITH, STONECUT,
-                            Plan, Step)
+                            Decision, Option, Plan, Step)
 
 STATION_RU = {
     "crafting_table": "на верстаке",
@@ -92,3 +92,67 @@ def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
     if crafted:
         parts.append(f"изготовить {len(crafted)} предмет(ов)")
     return f"{goal}: " + "; ".join(parts) + f". Всего шагов: {len(actions)}."
+
+
+KIND_RU = {CRAFT: "изготовить", SMELT: "переплавить", STONECUT: "вырезать",
+           SMITH: "выковать", MINE: "добыть", HUNT: "выбить"}
+
+
+def _describe_option(option: Option, kb: KnowledgeBase) -> str:
+    action = KIND_RU.get(option.kind, option.kind)
+    if option.kind in (MINE, HUNT):
+        where = kb.label(option.detail) or option.detail
+        return f"{action} из «{where}»"
+    where = STATION_RU.get(option.detail, option.detail)
+    source = f" из «{kb.label(option.via) or option.via}»" if option.via else ""
+    return f"{action} {where}{source}"
+
+
+def _why_rejected(option: Option, chosen: Optional[Option]) -> str:
+    """Причина отказа от варианта, выраженная в тех же величинах, по которым шёл выбор."""
+    if not option.feasible:
+        return "недостижимо"
+    if chosen is None:
+        return "не выбрано"
+    if option.dead_ends > chosen.dead_ends:
+        return f"тупиков больше: {option.dead_ends} против {chosen.dead_ends}"
+    if option.effort > chosen.effort:
+        return f"трудоёмкость выше: {option.effort} против {chosen.effort}"
+    # Равноценные варианты различает устойчивый порядок перебора, а не оценка.
+    # Называть это «трудоёмкость выше» было бы неправдой.
+    return f"равноценно по трудоёмкости ({option.effort}), выбран первый по порядку"
+
+
+def render_alternatives(plan: Plan, kb: KnowledgeBase, limit: int = 4) -> str:
+    """Развилки вывода: что ещё рассматривалось и почему выбрано не оно.
+
+    Это ответ решателя на вопрос «почему план именно такой». Веса, по которым идёт
+    сравнение, — проектное решение о том, что удобнее игроку, и они названы явно, чтобы
+    выбор можно было оспорить по существу, а не принимать на веру.
+    """
+    if not plan.decisions:
+        return "Развилок не было: каждый предмет получается единственным способом."
+
+    # Сначала развилки ближе к цели: они понятнее и интереснее при разборе. Один и тот же
+    # предмет раскрывается в нескольких ветвях одинаково, поэтому остаётся первое вхождение.
+    ordered: List[Decision] = []
+    seen: set = set()
+    for decision in sorted(plan.decisions, key=lambda item: (item.depth, item.item)):
+        if decision.item not in seen:
+            seen.add(decision.item)
+            ordered.append(decision)
+
+    lines: List[str] = []
+    for decision in ordered[:limit]:
+        name = kb.label(decision.item) or decision.item
+        chosen = decision.chosen
+        lines.append(f"{name}: выбрано — {_describe_option(chosen, kb)} "
+                     f"(трудоёмкость {chosen.effort})" if chosen
+                     else f"{name}: вариант не выбран")
+        for option in decision.rejected:
+            lines.append(f"    отвергнуто: {_describe_option(option, kb)} "
+                         f"— {_why_rejected(option, chosen)}")
+
+    if len(ordered) > limit:
+        lines.append(f"    ещё развилок: {len(ordered) - limit}")
+    return "\n".join(lines)
