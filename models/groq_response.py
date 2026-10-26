@@ -28,6 +28,7 @@ class GroqAdvice(BaseModel):
     plan_alternatives: Optional[str] = None    # отвергнутые варианты и причины
     explanation: List[str] = Field(default_factory=list)  # цепочка применённых правил
     options: List[str] = Field(default_factory=list)      # варианты уточняющего вопроса
+    campaign: Optional[dict] = None            # кампания: персонаж, этап, прогресс — для оверлея
 
 
 class ChatMessage(BaseModel):

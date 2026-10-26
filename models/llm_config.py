@@ -16,6 +16,8 @@ class PromptsConfig(BaseModel):
     chat_based: str
     action_based: Optional[str] = None
     tool_result_based: Optional[str] = None
+    # Персонажи кампании: ключ → имя, род занятий, манера речи, обращение к игроку.
+    campaign_personas: Optional[Dict[str, Dict[str, str]]] = None
 
 
 class LLMConfig(BaseModel):

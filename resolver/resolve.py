@@ -37,6 +37,7 @@ KINDS_FOR_ACTION = {
     "give_item": ("item", "block"),
     "remove_item": ("item", "block"),
     "summon_entity": ("creature",),
+    "start_campaign": ("item", "block"),
 }
 
 RESOLVED = "resolved"

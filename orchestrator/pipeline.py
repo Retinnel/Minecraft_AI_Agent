@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence
 from kb.graph import KnowledgeBase
 from resolver.lexical import Candidate
 from resolver.resolve import AMBIGUOUS, NOT_FOUND, Resolver
+from solver.campaign import Campaign, CampaignBuilder, GoalCandidate
 from solver.planner import Plan, Planner
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
@@ -31,10 +32,13 @@ from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
 NONE = "none"
 PLAN_GOAL = "plan_goal"
 CREATE_QUEST = "create_quest"
+START_CAMPAIGN = "start_campaign"
+PROPOSE_GOAL = "propose_goal"
 
 # Действия, которые может предложить модель. Остальные действия реестра (например, получение
 # награды за задание) выполняются системой сами и модели не предъявляются.
-PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST)
+PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
+              START_CAMPAIGN, PROPOSE_GOAL)
 
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
@@ -111,6 +115,11 @@ class Turn:
     plan_alternatives: Optional[str] = None
     # Заполняется только для create_quest: принятое задание в виде, пригодном для сохранения.
     quest: Optional[Dict[str, Any]] = None
+    # Заполняется только для start_campaign: доказанная цепочка этапов.
+    campaign: Optional[Campaign] = None
+    # Цель выбрана ассистентом из кандидатов решателя, а не названа игроком.
+    proposed: bool = False
+    candidates: Sequence[GoalCandidate] = ()
 
 
 class Pipeline:
@@ -127,6 +136,7 @@ class Pipeline:
         self.validator = Validator(self.kb)
         self.mode = mode
         self._planner: Optional[Planner] = None
+        self._campaigns: Optional[CampaignBuilder] = None
 
     @property
     def planner(self) -> Planner:
@@ -134,6 +144,12 @@ class Pipeline:
         if self._planner is None:
             self._planner = Planner(self.kb)
         return self._planner
+
+    @property
+    def campaigns(self) -> CampaignBuilder:
+        if self._campaigns is None:
+            self._campaigns = CampaignBuilder(self.kb, self.planner, self.validator)
+        return self._campaigns
 
     def actions_for(self, mode: str) -> Sequence[str]:
         """Действия, которые предъявляются модели в данном режиме."""
@@ -143,13 +159,15 @@ class Pipeline:
     def handle(self, utterance: str, *, mode: Optional[str] = None,
                inventory: Optional[Dict[str, int]] = None,
                pending: Optional["Turn"] = None,
-               context: Optional[str] = None) -> Turn:
+               context: Optional[str] = None,
+               state: Optional[str] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
         оказаться ответом на него («алмазный» после «какой меч?»).
         context — предыдущий обмен репликами одной строкой, для продолжений вроде
         «и ещё крипера».
+        state — снимок состояния игрока словами, для выбора цели кампании.
         """
         mode = mode or self.mode
         actions = self.actions_for(mode)
@@ -167,6 +185,9 @@ class Pipeline:
 
         if proposal.action == CREATE_QUEST and CREATE_QUEST in actions:
             return self._build_quest(utterance, proposal, actions, mode, inventory, stages)
+
+        if proposal.action == PROPOSE_GOAL and PROPOSE_GOAL in actions:
+            return self._propose_goal(mode, inventory, state, stages)
 
         count = self._reconcile_count(utterance, proposal.count)
         stages["count"] = count
@@ -307,6 +328,8 @@ class Pipeline:
 
         if verdict.outcome == ACT and verdict.action == PLAN_GOAL:
             return self._build_plan(verdict, inventory, stages)
+        if verdict.outcome == ACT and verdict.action == START_CAMPAIGN:
+            return self._build_campaign(verdict, mode, inventory, stages)
 
         command = None
         if verdict.outcome == ACT:
@@ -444,6 +467,87 @@ class Pipeline:
             plan_summary=render_summary(plan, self.kb),
             plan_alternatives=render_alternatives(plan, self.kb),
         )
+
+    def _build_campaign(self, verdict, mode: str, inventory: Optional[Dict[str, int]],
+                        stages: Dict[str, Any], *, proposed: bool = False,
+                        candidates: Sequence[GoalCandidate] = ()) -> Turn:
+        """Кампания к цели: цепочка этапов, доказанная решателем.
+
+        Модель здесь не участвует: что бы она ни сказала о цели, этапы и награды выводятся
+        из дерева плана и инвентаря. Недостижимая цель — отказ с причиной решателя.
+        """
+        campaign = self.campaigns.build(verdict.target, verdict.count, inventory or {}, mode)
+        stages["campaign"] = {
+            "feasible": campaign.feasible,
+            "stages": campaign.targets,
+            "effort": campaign.effort,
+        }
+        label = self.kb.label(verdict.target)
+        if not campaign.feasible:
+            return Turn(
+                outcome=REJECT, action=START_CAMPAIGN, target=verdict.target, label=label,
+                count=verdict.count, reason=campaign.reason,
+                explanation=list(verdict.explanation) + list(campaign.explanation),
+                stages=stages, proposed=proposed, candidates=tuple(candidates),
+            )
+        first = campaign.stages[0]
+        return Turn(
+            outcome=ACT, action=START_CAMPAIGN, target=verdict.target, label=label,
+            count=verdict.count,
+            explanation=list(verdict.explanation) + [
+                f"кампания: этапов {len(campaign.stages)}, трудоёмкость {campaign.effort}"],
+            stages=stages,
+            campaign=campaign,
+            plan=first.plan,
+            plan_tree=render_tree(first.plan, self.kb),
+            plan_summary=render_summary(first.plan, self.kb),
+            proposed=proposed,
+            candidates=tuple(candidates),
+        )
+
+    def _propose_goal(self, mode: str, inventory: Optional[Dict[str, int]],
+                      state: Optional[str], stages: Dict[str, Any]) -> Turn:
+        """Цель предлагает ассистент: решатель отбирает достижимые, модель выбирает уместную.
+
+        Выбор модели сверяется со списком кандидатов; что-либо вне списка — или отсутствие
+        модели — даёт самую короткую из доказанных целей. Так кампания к предложенной цели
+        не может оказаться невыполнимой, кто бы её ни назвал.
+        """
+        candidates = self.campaigns.propose_goals(inventory or {}, mode)
+        stages["candidates"] = [candidate.item for candidate in candidates]
+        if not candidates:
+            return Turn(outcome=REJECT, action=PROPOSE_GOAL,
+                        reason="Из того, что у тебя есть, посильной цели не вывести.",
+                        explanation=["решатель не нашёл достижимых целей"], stages=stages)
+
+        chosen = candidates[0]
+        choice: Dict[str, Any] = {"goal": None, "why": None, "accepted": False}
+        choose = getattr(self.extractor, "choose", None)
+        if choose is not None:
+            try:
+                listed = [{"item": candidate.item, "label": self.kb.label(candidate.item) or candidate.item,
+                           "stages": candidate.stages, "effort": candidate.effort}
+                          for candidate in candidates]
+                answer = choose(listed, state or "") or {}
+                choice.update({"goal": answer.get("goal"), "why": answer.get("why")})
+                wanted = str(answer.get("goal") or "").strip().lower()
+                for candidate, entry in zip(candidates, listed):
+                    if wanted and wanted in (candidate.item.lower(), entry["label"].lower()):
+                        chosen = candidate
+                        choice["accepted"] = True
+                        break
+            except Exception:
+                pass
+        stages["choice"] = choice
+
+        verdict = self.validator.validate(START_CAMPAIGN, chosen.item, 1, mode)
+        stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
+        if verdict.outcome != ACT:
+            return Turn(outcome=verdict.outcome, action=START_CAMPAIGN, target=chosen.item,
+                        reason=verdict.reason, explanation=verdict.explanation, stages=stages,
+                        proposed=True, candidates=tuple(candidates))
+        return self._build_campaign(verdict, mode, inventory, stages, proposed=True,
+                                    candidates=candidates)
 
     # --- вспомогательное ---
 

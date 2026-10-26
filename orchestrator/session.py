@@ -39,6 +39,9 @@ class Session:
     asked_about: List[str] = field(default_factory=list)
     refused: List[str] = field(default_factory=list)
     quests: List[str] = field(default_factory=list)
+    # Кампания одной строкой и персонаж, от лица которого идут поручения.
+    campaign: Optional[str] = None
+    persona: Optional[str] = None
     # Уточняющий вопрос, на который игрок ещё не ответил.
     pending: Optional[object] = None
     # Предыдущий обмен одной строкой — для продолжений вроде «и ещё крипера».
@@ -80,6 +83,9 @@ class Session:
                 self._remember(self.asked_about, f"как получить «{label}»")
             elif turn.action == "create_quest":
                 self._remember(self.quests, f"«{label}» ×{turn.count}")
+            elif turn.action == "start_campaign":
+                total = len(turn.campaign.stages) if turn.campaign else 0
+                self.campaign = f"«{label}», этапов {total}"
         elif turn.outcome == "reject" and turn.reason:
             subject = f"«{label}»: " if label else ""
             self._remember(self.refused, f"{subject}{turn.reason}")
@@ -106,14 +112,19 @@ class Session:
             lines.append("Спрашивал: " + "; ".join(self.asked_about) + ".")
         if self.quests:
             lines.append("Задания: " + "; ".join(self.quests) + ".")
+        if self.campaign:
+            lines.append(f"Кампания: {self.campaign}.")
+        if self.persona:
+            lines.append(f"Персонаж: {self.persona}.")
         if self.refused:
             lines.append("Отказано: " + "; ".join(self.refused) + ".")
         return "\n".join(lines)
 
     def reset(self) -> None:
-        mode = self.mode
+        mode, persona = self.mode, self.persona
         self.__init__()
         self.mode = mode
+        self.persona = persona
 
 
 _session: Optional[Session] = None

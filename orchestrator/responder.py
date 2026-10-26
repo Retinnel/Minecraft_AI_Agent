@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
-from orchestrator.pipeline import CREATE_QUEST, NONE, PLAN_GOAL, Turn
+from orchestrator.pipeline import CREATE_QUEST, NONE, PLAN_GOAL, START_CAMPAIGN, Turn
 from solver.validator import ACT, CLARIFY, MAX_ITEM_COUNT, MAX_SUMMON_COUNT, REJECT
 
 TEMPLATE = "template"
@@ -76,6 +76,10 @@ class Responder:
         if turn.outcome == ACT:
             if turn.action == PLAN_GOAL:
                 return turn.plan_summary or "План построен."
+            if turn.action == START_CAMPAIGN and turn.campaign:
+                # Обычно кампанию озвучивает рассказчик; шаблон — на случай, если его нет.
+                return (f"Кампания к цели «{turn.label or turn.target}»: "
+                        f"этапов {len(turn.campaign.stages)}.")
             if turn.action == CREATE_QUEST and turn.quest:
                 quest = turn.quest
                 verb = "Победи" if quest.get("goal_kind") == "kill" else "Собери"

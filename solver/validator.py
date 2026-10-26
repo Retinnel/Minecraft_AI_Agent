@@ -26,8 +26,9 @@ MODES = (CREATIVE, SURVIVAL)
 # инструмента ей не показывают. Валидатор повторяет ту же проверку на своей стороне.
 MODE_ACTIONS = {
     CREATIVE: ("give_item", "remove_item", "summon_entity", "plan_goal",
-               "create_quest", "claim_quest_reward"),
-    SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward"),
+               "create_quest", "claim_quest_reward", "start_campaign", "propose_goal"),
+    SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward",
+               "start_campaign", "propose_goal"),
 }
 
 # Действие требует, чтобы целью был предмет либо существо.
@@ -36,12 +37,14 @@ ACTION_SUBJECT = {
     "remove_item": "item",
     "summon_entity": "creature",
     "plan_goal": "item",
+    "start_campaign": "item",
 }
 
 MAX_ITEM_COUNT = 64
 MAX_SUMMON_COUNT = 16
 ACTION_LIMITS = {"give_item": MAX_ITEM_COUNT, "remove_item": MAX_ITEM_COUNT,
-                 "summon_entity": MAX_SUMMON_COUNT, "plan_goal": MAX_ITEM_COUNT}
+                 "summon_entity": MAX_SUMMON_COUNT, "plan_goal": MAX_ITEM_COUNT,
+                 "start_campaign": MAX_ITEM_COUNT}
 
 # Какому запрету соответствует действие.
 ACTION_RESTRICTION = {"give_item": "give", "summon_entity": "summon"}

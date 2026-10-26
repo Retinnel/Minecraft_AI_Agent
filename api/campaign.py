@@ -25,6 +25,9 @@ from pydantic import BaseModel, Field
 
 from api import challenges
 from api.player_state import get_player_state
+# Шаблоны реплик живут у рассказчика: состояние берёт их как запасной текст, пока
+# персонаж не написал свой.
+from orchestrator.narrator import campaign_outro, stage_brief, stage_done, stage_reason  # noqa: F401
 
 router = APIRouter(prefix="/api/campaign", tags=["campaign"])
 
@@ -187,45 +190,6 @@ def _serialize_stage(stage, total: int) -> Dict[str, Any]:
         # Реплики персонажа: поручение и реплика на завершение. Заполняет рассказчик.
         "texts": {"brief": None, "done": None},
     }
-
-
-def stage_reason(stage: Dict[str, Any]) -> str:
-    """Зачем этап нужен — факт из онтологии, который персонаж пересказывает игроку."""
-    unlocks = stage.get("unlocks")
-    for_label = stage.get("for_label")
-    if unlocks == "tool" and for_label:
-        return f"Открывает добычу: {for_label}."
-    if unlocks == "station" and for_label:
-        return f"Открывает изготовление: {for_label}."
-    if unlocks == "material" and for_label:
-        return f"Понадобится для: {for_label}."
-    return "Цель кампании."
-
-
-def stage_brief(stage: Dict[str, Any]) -> str:
-    """Шаблон поручения, если рассказчик его не написал."""
-    text = stage.get("texts", {}).get("brief")
-    if text:
-        return text
-    return (f"Этап {stage['index']} из {stage['total']}: собери {stage['count']} × "
-            f"{stage['label']}. {stage_reason(stage)}")
-
-
-def stage_done(stage: Dict[str, Any]) -> str:
-    """Шаблон реплики на завершение этапа, если рассказчик её не написал."""
-    text = stage.get("texts", {}).get("done")
-    if text:
-        return text
-    reward = (f" Награда — {stage['reward_label']} ×{stage['reward_count']}."
-              if stage.get("reward") else "")
-    return f"Этап {stage['index']} из {stage['total']} пройден: {stage['label']}.{reward}"
-
-
-def campaign_outro(campaign: Dict[str, Any]) -> str:
-    text = campaign.get("texts", {}).get("outro")
-    if text:
-        return text
-    return f"Кампания «{campaign['title']}» пройдена: {campaign['label']} в руках."
 
 
 # --- доступ -------------------------------------------------------------------------------

@@ -20,7 +20,12 @@ ACTION_HINTS = {
     "remove_item": "игрок просит забрать или убрать предмет из инвентаря",
     "summon_entity": "игрок просит призвать существо",
     "plan_goal": "игрок спрашивает, как что-то получить, скрафтить или добыть",
-    "create_quest": "игрок просит задание, испытание или челлендж",
+    "create_quest": "игрок просит одно короткое задание, испытание или челлендж",
+    "start_campaign": ("игрок называет дальнюю цель и хочет, чтобы его вели к ней по этапам: "
+                       "«веди меня к…», «хочу пройти путь до…», «начни кампанию»; "
+                       "в \"target\" — сама цель"),
+    "propose_goal": ("игрок просит предложить ему цель или занятие, не называя её: "
+                     "«дай цель», «чем заняться», «что делать дальше»; \"target\" — null"),
 }
 
 EXTRACTABLE = tuple(ACTION_HINTS)
@@ -105,6 +110,22 @@ RENAME_PROMPT = """Игрок в Minecraft назвал предмет или с
 или существа в Minecraft нет, верни null в обоих полях."""
 
 
+# Выбор цели кампании. Решатель уже отобрал цели, достижимые из инвентаря; модели остаётся
+# выбрать уместную. Выбор вне списка не проходит: конвейер сверяет ответ с кандидатами.
+CHOOSE_PROMPT = """Ты — игровой ассистент в Minecraft. Игрок просит предложить ему цель.
+Система уже отобрала цели, достижимые из его инвентаря. Выбери одну — самую полезную для
+развития игрока прямо сейчас.
+
+Кандидаты (название — этапов, трудоёмкость):
+{candidates}
+
+Состояние игрока:
+{state}
+
+Верни ТОЛЬКО JSON без пояснений:
+{{"goal": "название из списка, точно как написано", "why": "одна короткая фраза по-русски, почему"}}"""
+
+
 def _text(value: Any) -> Optional[str]:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
@@ -146,3 +167,16 @@ class LanguageModelIntent:
         payload = self._ask(RENAME_PROMPT, phrase)
         names = [_text(payload.get(key)) for key in ("en", "ru", "name")]
         return [name for name in names if name]
+
+    def choose(self, candidates: Sequence[Dict[str, Any]], state: str = "") -> Dict[str, Any]:
+        """Выбор цели кампании среди кандидатов решателя.
+
+        Возвращает {"goal": название, "why": причина}. Название сверяется с кандидатами
+        на стороне конвейера; что-либо вне списка выбрать нельзя.
+        """
+        listed = "\n".join(
+            f"- {candidate['label']} — {candidate['stages']}, {candidate['effort']}"
+            for candidate in candidates)
+        prompt = CHOOSE_PROMPT.format(candidates=listed, state=state or "нет сведений")
+        payload = self._ask(prompt, "")
+        return {"goal": _text(payload.get("goal")), "why": _text(payload.get("why"))}

@@ -812,6 +812,13 @@ MODE_COMMANDS = (
 # Как действие конвейера называется в протоколе мода.
 MOD_ACTION_TYPES = {"give_item": "give", "remove_item": "clear", "summon_entity": "summon"}
 
+# Выбор персонажа кампании и отмена кампании — команды, разбираемые без модели, как режим.
+PERSONA_WORDS = (("кузнец", "smith"), ("старейшин", "elder"), ("картограф", "cartographer"))
+PERSONA_COMMAND = re.compile(r"\b(персонаж|рассказчик)", re.IGNORECASE)
+CAMPAIGN_CANCEL = re.compile(
+    r"(отмен\w*|хватит|заверш\w*|прекрат\w*|стоп)\s+кампани\w*|кампани\w*\s+(отмен\w*|хватит|стоп)",
+    re.IGNORECASE)
+
 # Строка чата длиннее этого предела в игре переносится неудобно; план целиком идёт в оверлей.
 CHAT_REPLY_LIMIT = 240
 
@@ -833,9 +840,111 @@ def _assistant_responder():
     return _assistant_responder_instance
 
 
+_assistant_narrator_instance = None
+
+
+def _assistant_narrator():
+    global _assistant_narrator_instance
+    if _assistant_narrator_instance is None:
+        from orchestrator.narrator import Narrator
+        _assistant_narrator_instance = Narrator()
+    return _assistant_narrator_instance
+
+
 def _assistant_session():
     from orchestrator.session import shared
     return shared()
+
+
+def _persona_command(text: str) -> Optional[str]:
+    """«Персонаж: кузнец» → ключ пресета; без узнаваемого имени — None."""
+    if not PERSONA_COMMAND.search(text or ""):
+        return None
+    lowered = (text or "").lower()
+    for word, key in PERSONA_WORDS:
+        if word in lowered:
+            return key
+    return None
+
+
+def _campaign_brief() -> Optional[Dict[str, Any]]:
+    """Сжатая сводка кампании для мода: кто говорит, какой этап, сколько сделано."""
+    from api import campaign as campaigns
+
+    record = campaigns.get_active_campaign()
+    if record is None:
+        return None
+    stage = campaigns.current_stage(record)
+    narrator = _assistant_narrator()
+    return {
+        "id": record["id"],
+        "title": record["title"],
+        "persona": record.get("persona"),
+        "persona_name": narrator.persona_name(record.get("persona")),
+        "goal": record["goal"],
+        "label": record["label"],
+        "status": record["status"],
+        "current": record.get("current"),
+        "total": len(record.get("stages") or []),
+        "stage_label": stage["label"] if stage else None,
+        "stage_count": stage["count"] if stage else None,
+        "progress_count": stage.get("progress_count", 0) if stage else None,
+        "reward_label": stage.get("reward_label") if stage else None,
+        "reward_count": stage.get("reward_count") if stage else None,
+        "stages": [{"index": s["index"], "label": s["label"], "count": s["count"],
+                    "status": s["status"], "progress_count": s.get("progress_count", 0)}
+                   for s in record.get("stages") or []],
+    }
+
+
+def _persist_campaign(turn):
+    """Запускает кампанию, доказанную конвейером, и даёт слово персонажу.
+
+    Отказ хранилища (идёт другая кампания, занято заданием) превращает исход в отказ: обещать
+    путь, которого нет, нельзя. Возвращает итог и реплику персонажа либо None, если
+    кампания не запущена и ответ должен собрать обычный формулировщик.
+    """
+    from api import campaign as campaigns
+
+    session = _assistant_session()
+    narrator = _assistant_narrator()
+    persona_key, _ = narrator.persona(session.persona)
+    result = campaigns.start_campaign(
+        turn.target, int(turn.count or 1), mode=session.mode, inventory=_inventory_counts(),
+        persona=persona_key, source="assistant",
+    )
+    if not result.get("ok"):
+        turn.outcome = "reject"
+        turn.reason = str(result.get("error") or "Не удалось начать кампанию.")
+        turn.campaign = None
+        turn.plan = turn.plan_tree = turn.plan_summary = None
+        return turn, None
+
+    record = result["campaign"]
+    why = (turn.stages.get("choice") or {}).get("why") if turn.proposed else None
+    intro = narrator.intro(record, proposed=turn.proposed, why=why)
+    campaigns.set_campaign_text("intro", intro.text)
+
+    stage = campaigns.current_stage(record)
+    parts = [intro.text]
+    sources = [intro.source]
+    if stage is not None:
+        brief = narrator.brief(record, stage)
+        campaigns.set_stage_text(stage["index"], "brief", brief.text)
+        # Имя персонажа уже прозвучало во вступлении.
+        parts.append(_unsigned(brief.text, narrator.persona_name(persona_key)))
+        sources.append(brief.source)
+    # Старт объявлен этой же репликой: проактивному каналу объявлять его повторно незачем.
+    campaigns.consume_campaign_events()
+
+    from orchestrator.narrator import Reply
+    source = "model" if all(item == "model" for item in sources) else "template"
+    return turn, Reply(" ".join(parts), source)
+
+
+def _unsigned(text: str, name: str) -> str:
+    prefix = f"{name}: "
+    return text[len(prefix):] if text.startswith(prefix) else text
 
 
 def _inventory_counts() -> Dict[str, int]:
@@ -973,6 +1082,23 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if mode:
         return await _mode_reply(mode, text, last)
 
+    persona = _persona_command(text)
+    if persona:
+        session.persona = persona
+        name = _assistant_narrator().persona_name(persona)
+        return await _store_chat_result(_build_chat_result(
+            response=f"Хорошо. Дальше с тобой говорит {name}.",
+            last=last, source="chat", confidence=0.9, mode="chat"), text)
+
+    if CAMPAIGN_CANCEL.search(text):
+        from api import campaign as campaigns
+        cancelled = campaigns.cancel_campaign()
+        campaigns.consume_campaign_events()
+        session.campaign = None
+        return await _store_chat_result(_build_chat_result(
+            response=cancelled.get("summary") or cancelled.get("error") or "Кампании нет.",
+            last=last, source="chat", confidence=0.9, mode="chat"), text)
+
     if _looks_like_claim_challenge_request(text):
         result = _build_chat_result(
             response="Награда за челлендж выдаётся автоматически сразу после выполнения. "
@@ -987,7 +1113,7 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     try:
         turn = await asyncio.to_thread(
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
-            pending=session.pending, context=session.last_exchange)
+            pending=session.pending, context=session.last_exchange, state=_state_snapshot())
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
@@ -1000,13 +1126,22 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if turn.outcome == "act" and turn.action == "create_quest":
         turn = _persist_quest(turn)
 
-    reply = await asyncio.to_thread(
-        _assistant_responder().reply, turn, text,
-        state=_state_snapshot(), summary=session.summary(), window=session.window(),
-    )
+    narrated = None
+    if turn.outcome == "act" and turn.action == "start_campaign":
+        turn, narrated = await asyncio.to_thread(_persist_campaign, turn)
+
+    if narrated is None:
+        reply = await asyncio.to_thread(
+            _assistant_responder().reply, turn, text,
+            state=_state_snapshot(), summary=session.summary(), window=session.window(),
+        )
+    else:
+        reply = narrated
     session.record(text, turn, reply.text)
 
     result = _advice_from_turn(turn, reply.text, last, source=reply.source)
+    if narrated is not None:
+        result.campaign = _campaign_brief()
     _safe_console_log(f"[Chat] {turn.outcome} {turn.action} {turn.target}: {result.response}",
                       print_message=False)
     return await _store_chat_result(result, text)
