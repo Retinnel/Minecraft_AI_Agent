@@ -8,6 +8,7 @@ from api import logs, settings
 from api import advice
 from api import analytics
 from api import challenges
+from api import campaign
 from api import player_state
 from api import wiki
 from api import compare
@@ -36,6 +37,7 @@ app.include_router(settings.router)
 app.include_router(advice.router)
 app.include_router(analytics.router)
 app.include_router(challenges.router)
+app.include_router(campaign.router)
 app.include_router(player_state.router)
 app.include_router(wiki.router)
 app.include_router(compare.router)

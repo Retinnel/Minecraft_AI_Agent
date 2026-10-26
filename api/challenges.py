@@ -216,6 +216,16 @@ def _queue_reward_action(challenge: Dict[str, Any], reward_result: Dict[str, Any
     return action
 
 
+def update_pending_reward_response(challenge_id: Optional[str], response: str) -> bool:
+    """Подменяет текст ещё не доставленной награды: кампания озвучивает её словами персонажа."""
+    for action in _challenge_state.get("pending_rewards") or []:
+        if isinstance(action, dict) and challenge_id and action.get("challenge_id") == challenge_id:
+            action["response"] = response
+            save_challenge_state()
+            return True
+    return False
+
+
 def consume_pending_reward_action() -> Optional[Dict[str, Any]]:
     pending_rewards = _challenge_state.get("pending_rewards")
     if not isinstance(pending_rewards, list) or not pending_rewards:

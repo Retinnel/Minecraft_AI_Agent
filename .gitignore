@@ -71,6 +71,7 @@ config.yaml
 
 # Runtime state (пишется приложением во время работы)
 data/challenge_state.json
+data/campaign_state.json
 
 # Данные игры, загружаемые скриптами (ассеты Mojang не тиражируем в репозитории)
 data/game/
