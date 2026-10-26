@@ -49,6 +49,21 @@ RECIPE_STATIONS = {
     "minecraft:smithing_transform": "smithing_table",
 }
 
+# Рецепт, умещающийся в сетку 2×2, собирается в инвентаре без верстака. Различие нужно
+# кампании: иначе этап «сделай верстак» требовал бы верстака.
+HAND_STATION = "inventory"
+HAND_GRID = 2
+
+
+def _fits_in_hand(recipe_type: str, payload: Dict[str, Any]) -> bool:
+    if recipe_type == "minecraft:crafting_shaped":
+        pattern = payload.get("pattern") or []
+        return len(pattern) <= HAND_GRID and all(len(row) <= HAND_GRID for row in pattern)
+    if recipe_type == "minecraft:crafting_shapeless":
+        return len(payload.get("ingredients") or []) <= HAND_GRID * HAND_GRID
+    return False
+
+
 # Теги уровня инструмента, из которых выводится requires-tool-tier.
 TOOL_TIER_TAGS = {
     "minecraft:needs_stone_tool": "stone",
@@ -236,7 +251,8 @@ def extract_recipes(jar: GameJar) -> List[Dict[str, Any]]:
             "id": GameJar.resource_id(name, prefix),
             "type": recipe_type,
             "method": method,
-            "station": RECIPE_STATIONS[recipe_type],
+            "station": HAND_STATION if _fits_in_hand(recipe_type, payload)
+            else RECIPE_STATIONS[recipe_type],
             "result": result,
             "inputs": inputs,
         })

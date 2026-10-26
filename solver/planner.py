@@ -30,6 +30,20 @@ MISSING = "missing"    # получить не удалось
 
 METHOD_STEPS = {"craft": CRAFT, "smelt": SMELT, "stonecut": STONECUT, "smith": SMITH}
 
+# Станция рецепта как предмет, который для неё нужен. Ручной крафт («inventory») станции
+# не требует. Станция в план не входит шагом, но её цена учитывается при выборе рецепта:
+# иначе между печью и доменной печью побеждал бы алфавит, а доменная печь сама требует
+# печи. Кампания превращает недостающую станцию в отдельный этап.
+STATION_ITEMS = {
+    "crafting_table": "minecraft:crafting_table",
+    "furnace": "minecraft:furnace",
+    "blast_furnace": "minecraft:blast_furnace",
+    "smoker": "minecraft:smoker",
+    "campfire": "minecraft:campfire",
+    "stonecutter": "minecraft:stonecutter",
+    "smithing_table": "minecraft:smithing_table",
+}
+
 # Ограничение глубины вывода. Самая длинная осмысленная цепочка в игре — от голых рук до
 # незеритового снаряжения — укладывается примерно в десяток уровней; запас взят вдвое.
 MAX_DEPTH = 20
@@ -263,7 +277,8 @@ class Planner:
 
         best: Optional[Tuple[Step, Counter]] = None
         tried: List[Tuple[Step, str, Optional[str]]] = []
-        for recipe in sorted(recipes, key=lambda r: self._recipe_cost(r, stack))[:MAX_BRANCHES]:
+        for recipe in sorted(recipes,
+                             key=lambda r: self._recipe_cost(r, stack, stock))[:MAX_BRANCHES]:
             # Каждый вариант считается на своей копии запасов: неудачная попытка не должна
             # съедать инвентарь и портить следующие.
             trial = stock.copy()
@@ -401,12 +416,15 @@ class Planner:
         pool = available or [item for item in alternatives if item not in stack] or list(alternatives)
         return min(pool, key=lambda item: (self._item_cost(item, stack), item))
 
-    def _recipe_cost(self, recipe: Recipe, stack: frozenset) -> Tuple[float, int, str]:
+    def _recipe_cost(self, recipe: Recipe, stack: frozenset,
+                     stock: Optional[Counter] = None) -> Tuple[float, int, str]:
         """Оценка рецепта: во что обойдётся единица результата.
 
         Деление на выход существенно. Палки делаются и из двух досок сразу четыре штуки, и из
         двух бамбуков по одной; по числу шагов бамбук выглядит дешевле, но в пересчёте на
         палку он вчетверо дороже.
+
+        Станция, которой у игрока нет, прибавляет свою цену один раз: она не расходуется.
         """
         total = 0
         for ingredient in recipe.inputs:
@@ -415,7 +433,12 @@ class Planner:
                 continue
             total += ingredient.quantity * min(
                 self._item_cost(item, stack) for item in ingredient.alternatives)
-        return (total / max(recipe.produces_count, 1), len(recipe.inputs), recipe.id)
+        station_cost = 0
+        station_item = STATION_ITEMS.get(recipe.station)
+        if station_item and not (stock and stock.get(station_item, 0) > 0):
+            station_cost = self._item_cost(station_item, stack)
+        return (total / max(recipe.produces_count, 1) + station_cost,
+                len(recipe.inputs), recipe.id)
 
     def _item_cost(self, item: str, stack: frozenset = frozenset()) -> int:
         """Оценка трудоёмкости предмета: во что он обойдётся от подручных ресурсов."""

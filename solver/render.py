@@ -13,6 +13,7 @@ from solver.planner import (CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, SMITH, STON
                             Decision, Option, Plan, Step)
 
 STATION_RU = {
+    "inventory": "в руках",
     "crafting_table": "на верстаке",
     "furnace": "в печи",
     "blast_furnace": "в доменной печи",

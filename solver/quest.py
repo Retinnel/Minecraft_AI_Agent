@@ -63,9 +63,11 @@ class QuestChecker:
         self.validator = validator or Validator(kb)
 
     def check(self, goal_kind: str, target: str, goal_count: int,
-              reward: str, reward_count: int = 1,
+              reward: Optional[str] = None, reward_count: int = 1,
               inventory: Optional[Dict[str, int]] = None,
               mode: str = "creative") -> QuestVerdict:
+        """Проверяет задание. Без награды (`reward=None`) проверяется только цель —
+        так кампания доказывает этапы, а награды назначает отдельным правилом."""
         trace: List[str] = []
 
         if goal_kind not in GOAL_KINDS:
@@ -99,16 +101,24 @@ class QuestChecker:
                                 explanation=trace)
 
         # 2. Награда проходит обычные правила выдачи
-        reward_verdict = self.validator.validate("give_item", reward, reward_count, mode="creative")
-        if not reward_verdict.allowed:
-            trace.extend(reward_verdict.explanation)
-            trace.append("награда недопустима")
-            return QuestVerdict(REJECT, goal_kind, target, goal_count,
-                                reward=reward,
-                                reason=f"Награда не подходит: {reward_verdict.reason}",
-                                explanation=trace)
-        trace.append(f"награда допустима: «{self.kb.label(reward) or reward}» "
-                     f"×{reward_verdict.count}")
+        reward_game_id: Optional[str] = None
+        if reward is None:
+            reward_count = 0
+            trace.append("награда не задана")
+        else:
+            reward_verdict = self.validator.validate("give_item", reward, reward_count,
+                                                     mode="creative")
+            if not reward_verdict.allowed:
+                trace.extend(reward_verdict.explanation)
+                trace.append("награда недопустима")
+                return QuestVerdict(REJECT, goal_kind, target, goal_count,
+                                    reward=reward,
+                                    reason=f"Награда не подходит: {reward_verdict.reason}",
+                                    explanation=trace)
+            reward_count = reward_verdict.count
+            reward_game_id = reward_verdict.game_id
+            trace.append(f"награда допустима: «{self.kb.label(reward) or reward}» "
+                         f"×{reward_count}")
 
         # 3. Цель достижима
         plan: Optional[Plan] = None
@@ -118,7 +128,7 @@ class QuestChecker:
                 blocked = ", ".join((self.kb.label(item) or item) for item in plan.missing[:3])
                 trace.append(f"план сбора не выводится, упёрся в {blocked}")
                 return QuestVerdict(REJECT, goal_kind, target, goal_count, reward,
-                                    reward_verdict.count,
+                                    reward_count,
                                     reason=f"«{label}» сейчас не достать, задание невыполнимо.",
                                     explanation=trace, plan=plan)
             # Трудоёмкость складывается из сложности пути и запрошенного объёма: собрать
@@ -131,7 +141,7 @@ class QuestChecker:
             if restriction is not None and restriction.category == "boss":
                 trace.append(f"«{label}» относится к боссам")
                 return QuestVerdict(REJECT, goal_kind, target, goal_count, reward,
-                                    reward_verdict.count,
+                                    reward_count,
                                     reason=f"Задание на победу над «{label}» слишком опасно.",
                                     explanation=trace)
             effort = goal_count
@@ -141,18 +151,18 @@ class QuestChecker:
         if effort > MAX_EFFORT:
             trace.append(f"трудоёмкость {effort} выше предела {MAX_EFFORT}")
             return QuestVerdict(REJECT, goal_kind, target, goal_count, reward,
-                                reward_verdict.count,
+                                reward_count,
                                 reason="Задание слишком тяжёлое, давай что-нибудь попроще.",
                                 explanation=trace, effort=effort, plan=plan)
         if effort < MIN_EFFORT:
             trace.append(f"трудоёмкость {effort} ниже предела {MIN_EFFORT}")
             return QuestVerdict(REJECT, goal_kind, target, goal_count, reward,
-                                reward_verdict.count,
+                                reward_count,
                                 reason="Задание слишком простое, оно уже выполнено.",
                                 explanation=trace, effort=effort, plan=plan)
         trace.append(f"соразмерность подтверждена: {effort} в пределах "
                      f"{MIN_EFFORT}–{MAX_EFFORT}")
 
-        return QuestVerdict(ACT, goal_kind, target, goal_count, reward, reward_verdict.count,
-                            reward_game_id=reward_verdict.game_id, effort=effort,
+        return QuestVerdict(ACT, goal_kind, target, goal_count, reward, reward_count,
+                            reward_game_id=reward_game_id, effort=effort,
                             explanation=trace, plan=plan)
