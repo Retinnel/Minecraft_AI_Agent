@@ -15,16 +15,17 @@
 ]
 
 % --- граница системы ---
-\draw[thick] (1.5, 1.0) rectangle (13.0, -10.0);
+\draw[thick] (1.5, 1.0) rectangle (13.0, -11.5);
 \node[anchor=north east] at (12.9, 0.95) {Игровой ассистент};
 
 % --- варианты использования игрока ---
 \node[uc] (give) at (4.5, 0) {Получить предмет\\или призвать\\существо};
-\node[uc] (clarify) at (4.5, -1.95) {Ответить на\\уточняющий\\вопрос};
+\node[uc] (clarify) at (4.5, -2.05) {Ответить на\\уточняющий\\вопрос};
 \node[uc] (plan) at (4.5, -3.9) {Получить план\\достижения цели};
-\node[uc] (explain) at (4.5, -5.6) {Получить\\объяснение\\решения};
-\node[uc] (quest) at (4.5, -7.45) {Получить задание\\с проверкой\\выполнимости};
-\node[uc] (mode) at (4.5, -9.15) {Сменить режим\\работы};
+\node[uc] (explain) at (4.5, -5.5) {Получить\\объяснение\\решения};
+\node[uc] (quest) at (4.5, -7.3) {Получить задание\\с проверкой\\выполнимости};
+\node[uc] (campaign) at (4.5, -9.15) {Пройти кампанию\\к дальней цели};
+\node[uc] (mode) at (4.5, -10.7) {Сменить режим\\работы};
 
 % --- варианты использования администраторов ---
 \node[uc] (rebuild) at (10.2, -0.75) {Пересобрать\\базу знаний};
@@ -33,9 +34,9 @@
 \node[uc] (eval) at (10.2, -7.6) {Провести\\оценку качества};
 
 % --- действующие лица ---
-\pic at (0.45, -4.6) {actor};
-\node at (0.45, -5.45) {Игрок};
-\coordinate (p) at (0.7, -4.35);
+\pic at (0.45, -5.0) {actor};
+\node at (0.45, -5.85) {Игрок};
+\coordinate (p) at (0.7, -4.75);
 
 \pic at (14.8, -1.55) {actor};
 \node[align=center] at (14.8, -2.55) {Администратор\\базы знаний};
@@ -46,7 +47,7 @@
 \coordinate (a2) at (14.5, -6.5);
 
 % --- связи игрока ---
-\foreach \target in {give, plan, explain, quest, mode}
+\foreach \target in {give, plan, explain, quest, campaign, mode}
   \draw[link] (p) -- (\target.west);
 
 % --- связи администраторов ---
@@ -58,5 +59,6 @@
 % --- отношения между вариантами ---
 \draw[dep] (clarify) -- node[lbl, right=2pt] {<<расширяет>>} (give);
 \draw[dep] (plan) -- node[lbl, right=2pt] {<<включает>>} (explain);
+\draw[dep] (campaign) -- node[lbl, right=2pt] {<<включает>>} (quest);
 
 \end{tikzpicture}
