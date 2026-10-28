@@ -85,6 +85,12 @@ async def compare_page():
     return FileResponse(BASE_DIR / "static" / "compare.html")
 
 
+@app.get("/chat")
+async def chat_page():
+    """Игровой чат без игрового клиента: та же точка входа /api/rp/chat, что у мода."""
+    return FileResponse(BASE_DIR / "static" / "chat.html")
+
+
 @app.get("/dashboard")
 async def dashboard_page():
     return FileResponse(BASE_DIR / "static" / "dashboard.html")

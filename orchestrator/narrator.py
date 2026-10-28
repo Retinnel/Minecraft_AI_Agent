@@ -49,8 +49,10 @@ PERSONA_PROMPT = """Ты — {name}, {role}. Ты говоришь с игрок
 Решение уже принято системой; тебе нужно только сообщить его игроку в своём образе.
 
 Правила:
-- Одна-две короткие фразы по-русски, в образе персонажа.
+- Одна-две короткие фразы по-русски, в образе персонажа; всего не больше 25 слов —
+  реплика идёт в строку игрового чата.
 - Не меняй и не добавляй факты: названия, числа, причины и награды бери только из блока «Факты».
+- Количество «1» не проговаривай числом: «верстак», а не «один верстак» или «×1».
 - Ничего не обещай и не советуй сверх фактов.
 - Не используй разметку и не подписывайся именем.
 
@@ -103,14 +105,22 @@ def stage_done(stage: Dict[str, Any]) -> str:
     return f"Этап {stage['index']} из {stage['total']} пройден: {stage['label']}.{reward}"
 
 
+def _amount(label: str, count: Any) -> str:
+    """«Верстак» для единицы и «Алмаз ×3» для остального: единицу числом не проговаривают."""
+    try:
+        value = int(count)
+    except (TypeError, ValueError):
+        value = 1
+    return f"{label} ×{value}" if value > 1 else str(label)
+
+
 def campaign_intro(campaign: Dict[str, Any], *, proposed: bool = False,
                    why: Optional[str] = None) -> str:
     text = (campaign.get("texts") or {}).get("intro")
     if text:
         return text
     total = len(campaign.get("stages") or [])
-    goal = f"{campaign['label']} ×{campaign['count']}" if int(campaign.get("count") or 1) > 1 \
-        else campaign["label"]
+    goal = _amount(campaign["label"], campaign.get("count"))
     if proposed:
         reason = f" {why.rstrip('.')}." if why else ""
         return f"Предлагаю цель: {goal}.{reason} Этапов {total}."
@@ -166,7 +176,7 @@ class Narrator:
     def intro(self, campaign: Dict[str, Any], *, proposed: bool = False,
               why: Optional[str] = None) -> Reply:
         """Открытие кампании: цель, число этапов; для предложенной цели — почему она."""
-        facts = [f"Цель кампании: {campaign['label']} ×{campaign['count']}.",
+        facts = [f"Цель кампании: {_amount(campaign['label'], campaign.get('count'))}.",
                  f"Этапов всего: {len(campaign.get('stages') or [])}."]
         if proposed:
             facts.append("Цель предложил ассистент, игрок её не называл.")
@@ -178,7 +188,7 @@ class Narrator:
     def brief(self, campaign: Dict[str, Any], stage: Dict[str, Any]) -> Reply:
         """Поручение этапа: что собрать, сколько, зачем, какая награда."""
         facts = [f"Этап {stage['index']} из {stage['total']}.",
-                 f"Собрать: {stage['label']} ×{stage['count']}.",
+                 f"Собрать: {_amount(stage['label'], stage['count'])}.",
                  f"Зачем: {stage_reason(stage)}"]
         if stage.get("source_label"):
             facts.append(f"Где добывается: {stage['source_label']}.")
@@ -189,7 +199,8 @@ class Narrator:
 
     def done(self, campaign: Dict[str, Any], stage: Dict[str, Any]) -> Reply:
         """Этап пройден: похвала и вручение награды."""
-        facts = [f"Этап {stage['index']} из {stage['total']} пройден: {stage['label']} ×{stage['count']}."]
+        facts = [f"Этап {stage['index']} из {stage['total']} пройден: "
+                 f"{_amount(stage['label'], stage['count'])}."]
         essentials: List[str] = []
         if stage.get("reward"):
             facts.append(f"Награда выдана: {stage['reward_label']} ×{stage['reward_count']}.")
@@ -198,7 +209,8 @@ class Narrator:
         return self._say(campaign, facts, template, essentials=essentials)
 
     def outro(self, campaign: Dict[str, Any]) -> Reply:
-        facts = [f"Кампания пройдена, цель достигнута: {campaign['label']} ×{campaign['count']}."]
+        facts = [f"Кампания пройдена, цель достигнута: "
+                 f"{_amount(campaign['label'], campaign.get('count'))}."]
         template = campaign_outro(campaign)
         return self._say(campaign, facts, template, essentials=[campaign["label"]])
 
@@ -228,9 +240,15 @@ class Narrator:
 
     @staticmethod
     def _keeps_essentials(text: str, essentials: List[str]) -> bool:
-        """Названия этапа и награды обязаны прозвучать: без них поручение не исполнить."""
-        lowered = text.lower()
-        return all(item.lower() in lowered for item in essentials if item)
+        """Названия этапа и награды обязаны прозвучать: без них поручение не исполнить.
+
+        Сравниваются основы слов, а не буквы подряд: персонаж склоняет («смастери верстак»,
+        «за каменную кирку»), и точное вхождение отбраковывало бы верные реплики.
+        """
+        from resolver.text import name_stems
+
+        said = set(name_stems(text))
+        return all(set(name_stems(item)) <= said for item in essentials if item)
 
     @staticmethod
     def _summary(campaign: Dict[str, Any]) -> str:

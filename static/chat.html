@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Игровой чат — игровой ассистент</title>
+<style>
+  :root {
+    --bg: #11161d;
+    --panel: #1a2230;
+    --line: #2a3546;
+    --text: #e6edf6;
+    --muted: #8b9bb0;
+    --accent: #4ea8ff;
+    --bad: #ff5f56;
+    --good: #45c76a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  header h1 { font-size: 21px; margin: 0; font-weight: 600; }
+  header .model { color: var(--muted); font-size: 15px; }
+  header a { color: var(--accent); margin-left: auto; font-size: 15px; }
+  main { padding: 20px 28px 40px; max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+  .ask { display: flex; gap: 12px; margin-bottom: 14px; }
+  .ask input { flex: 1; padding: 14px 18px; font-size: 20px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; }
+  .ask button { padding: 14px 22px; font-size: 18px; background: var(--accent); color: #0b1220; border: 0; border-radius: 10px; cursor: pointer; }
+  .ask button:disabled { opacity: .5; cursor: default; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .presets button { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 15px; cursor: pointer; }
+  .presets button:hover { color: var(--text); border-color: var(--accent); }
+  .log { display: flex; flex-direction: column; gap: 12px; }
+  .msg { padding: 12px 16px; border-radius: 12px; max-width: 92%; white-space: pre-wrap; }
+  .msg.player { align-self: flex-end; background: #243249; }
+  .msg.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
+  .msg .meta { display: block; color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .msg .cmd { font-family: Consolas, monospace; color: var(--good); }
+  .msg .err { color: var(--bad); }
+  aside { display: flex; flex-direction: column; gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .card h2 { margin: 0 0 8px; font-size: 16px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .card pre { margin: 0; white-space: pre-wrap; font: 15px/1.45 Consolas, monospace; }
+  .stage { display: flex; gap: 10px; padding: 4px 0; }
+  .stage .n { color: var(--muted); width: 28px; }
+  .stage.completed { color: var(--good); }
+  .stage.active { color: var(--accent); font-weight: 600; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Игровой чат</h1>
+  <span class="model" id="model">модель: …</span>
+  <a href="/compare">сравнение конфигураций →</a>
+</header>
+
+<main>
+  <section>
+    <div class="ask">
+      <input id="utterance" placeholder="Напиши реплику игрока" autocomplete="off">
+      <button id="send">Отправить</button>
+    </div>
+    <div class="presets" id="presets"></div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>Кампания</h2>
+      <div id="campaign"><span class="muted">нет</span></div>
+    </div>
+    <div class="card">
+      <h2>План</h2>
+      <pre id="plan" class="muted">—</pre>
+    </div>
+    <div class="card">
+      <h2>Объяснение решателя</h2>
+      <pre id="explanation" class="muted">—</pre>
+    </div>
+  </aside>
+</main>
+
+<script>
+// Та же точка входа, что у мода: POST /api/rp/chat. Страница нужна, чтобы показать диалог
+// без игрового клиента: ответ, команду, дерево плана, кампанию и цепочку правил.
+const PRESETS = [
+  "дай меч", "алмазный", "дай 1000 алмазов", "призови дракона края",
+  "как сделать алмазную кирку", "режим выживания", "веди меня к каменной кирке",
+  "дай цель", "персонаж: старейшина", "отмени кампанию", "режим творческий", "дай задание"
+];
+const node = (id) => document.getElementById(id);
+
+function escapeHtml(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function add(kind, html) {
+  const div = document.createElement("div");
+  div.className = "msg " + kind;
+  div.innerHTML = html;
+  node("log").appendChild(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+  return div;
+}
+
+function renderCampaign(c) {
+  if (!c) { node("campaign").innerHTML = '<span class="muted">нет</span>'; return; }
+  let html = "<div><b>" + escapeHtml(c.title) + "</b> — " + escapeHtml(c.persona_name || "") + "</div>";
+  html += '<div class="muted">этап ' + c.current + " из " + c.total + ", награда: " +
+    escapeHtml(c.reward_label || "—") + " ×" + (c.reward_count || "") + "</div>";
+  for (const s of c.stages || []) {
+    html += '<div class="stage ' + s.status + '"><span class="n">' + s.index + "</span>" +
+      "<span>" + escapeHtml(s.label) + " ×" + s.count +
+      (s.status === "active" ? " · " + s.progress_count + "/" + s.count : "") + "</span></div>";
+  }
+  node("campaign").innerHTML = html;
+}
+
+async function ask(text) {
+  if (!text) return;
+  node("send").disabled = true;
+  add("player", escapeHtml(text));
+  const pending = add("bot", '<span class="muted">…</span>');
+  try {
+    const resp = await fetch("/api/rp/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+    const d = await resp.json();
+    let html = escapeHtml(d.response);
+    let meta = [];
+    if (d.outcome) meta.push("исход: " + d.outcome);
+    if (d.source) meta.push("ответ: " + d.source);
+    if (d.command) html += '<span class="meta cmd">' + escapeHtml(d.command) + "</span>";
+    if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
+    html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
+    pending.innerHTML = html;
+    if (d.plan_tree) node("plan").textContent = d.plan_tree;
+    if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");
+    if (d.campaign !== undefined && d.campaign !== null) renderCampaign(d.campaign);
+    else if (/кампани/i.test(text)) refreshCampaign();
+  } catch (e) {
+    pending.innerHTML = '<span class="err">' + escapeHtml(e) + "</span>";
+  }
+  node("send").disabled = false;
+  node("utterance").value = "";
+  node("utterance").focus();
+}
+
+async function refreshCampaign() {
+  try {
+    const d = await (await fetch("/api/campaign/active")).json();
+    const c = d.active;
+    if (!c) { renderCampaign(null); return; }
+    const stage = (c.stages || [])[(c.current || 1) - 1] || {};
+    renderCampaign({ title: c.title, persona_name: c.persona, current: c.current,
+      total: (c.stages || []).length, reward_label: stage.reward_label,
+      reward_count: stage.reward_count, stages: c.stages });
+  } catch (e) { /* страница не обязана знать о кампании */ }
+}
+
+node("send").onclick = () => ask(node("utterance").value.trim());
+node("utterance").addEventListener("keydown", (e) => { if (e.key === "Enter") ask(node("utterance").value.trim()); });
+for (const text of PRESETS) {
+  const button = document.createElement("button");
+  button.textContent = text;
+  button.onclick = () => { node("utterance").value = text; ask(text); };
+  node("presets").appendChild(button);
+}
+fetch("/api/compare/model").then(r => r.json()).then(m => {
+  node("model").textContent = "модель: " + (m.name || m.model || "?") + (m.provider ? " (" + m.provider + ")" : "");
+}).catch(() => {});
+refreshCampaign();
+</script>
+</body>
+</html>

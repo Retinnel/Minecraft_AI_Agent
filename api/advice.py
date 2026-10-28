@@ -939,7 +939,12 @@ def _persist_campaign(turn):
 
     from orchestrator.narrator import Reply
     source = "model" if all(item == "model" for item in sources) else "template"
-    return turn, Reply(" ".join(parts), source)
+    text = " ".join(parts)
+    # Вступление и поручение вместе могут не уместиться в строку чата; поручение важнее:
+    # без него игроку нечего делать, а вступление остаётся в оверлее.
+    if len(text) > CHAT_REPLY_LIMIT and stage is not None:
+        text = brief.text
+    return turn, Reply(text, source)
 
 
 def _unsigned(text: str, name: str) -> str:
