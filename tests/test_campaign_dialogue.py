@@ -163,10 +163,17 @@ class NarratorTests(unittest.TestCase):
         self.assertIn("без кирки никуда", intro.text)
 
     def test_model_text_is_used_when_it_keeps_the_essentials(self):
-        narrator = Narrator(ask_text=lambda messages: "Ну что, ученик, деревянная кирка — и камень твой.")
+        narrator = Narrator(ask_text=lambda messages: "Ну что, ученик, деревянная кирка — и камень твой. Хлеба за это дам.")
         brief = narrator.brief(CAMPAIGN, STAGE)
         self.assertEqual(brief.source, MODEL)
         self.assertTrue(brief.text.startswith("Кузнец Торвальд:"))
+
+    def test_model_text_with_a_renamed_reward_is_replaced_by_the_template(self):
+        # «Стейк» вместо жареной говядины обещает не то, что выдаст сервер.
+        narrator = Narrator(ask_text=lambda messages: "Сделай деревянную кирку, ученик, получишь стейк.")
+        brief = narrator.brief(CAMPAIGN, STAGE)
+        self.assertEqual(brief.source, TEMPLATE)
+        self.assertIn("Хлеб", brief.text)
 
     def test_model_text_without_the_essentials_is_replaced_by_the_template(self):
         narrator = Narrator(ask_text=lambda messages: "Иди и сделай что-нибудь полезное.")

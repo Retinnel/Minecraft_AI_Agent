@@ -91,8 +91,10 @@ def stage_brief(stage: Dict[str, Any]) -> str:
     text = (stage.get("texts") or {}).get("brief")
     if text:
         return text
+    reward = (f" Награда — {stage['reward_label']} ×{stage['reward_count']}."
+              if stage.get("reward") else "")
     return (f"Этап {stage['index']} из {stage['total']}: собери {stage['count']} × "
-            f"{stage['label']}. {stage_reason(stage)}")
+            f"{stage['label']}. {stage_reason(stage)}{reward}")
 
 
 def stage_done(stage: Dict[str, Any]) -> str:
@@ -195,7 +197,10 @@ class Narrator:
         if stage.get("reward"):
             facts.append(f"Награда за этап: {stage['reward_label']} ×{stage['reward_count']}.")
         template = stage_brief(stage)
-        return self._say(campaign, facts, template, essentials=[stage["label"]])
+        # Награда — тоже обязательный факт: «стейк» вместо жареной говядины обещает игроку
+        # не то, что выдаст сервер.
+        essentials = [stage["label"]] + ([stage["reward_label"]] if stage.get("reward") else [])
+        return self._say(campaign, facts, template, essentials=essentials)
 
     def done(self, campaign: Dict[str, Any], stage: Dict[str, Any]) -> Reply:
         """Этап пройден: похвала и вручение награды."""
