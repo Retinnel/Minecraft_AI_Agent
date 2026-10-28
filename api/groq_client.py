@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+# DeepSeek совместим с API OpenAI. Ключ — платный баланс, поэтому провайдер не по умолчанию:
+# подключается выбором модели в llm_config.json, когда квоты Groq не хватает.
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 
 # Separate passive RP polling from interactive chat/tool requests so a slow tip
 # request cannot monopolize the workers needed for /api/rp/chat.
@@ -128,6 +131,8 @@ class GroqClient:
     def __init__(self, llm_config=None):
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        # Переменная в .env заведена как DEEPSEEK_API; принимается и привычное имя с суффиксом.
+        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API")
         self.provider_api_key = None
         self.client = None
         self.llm_config = llm_config
@@ -170,6 +175,19 @@ class GroqClient:
             else:
                 print(make_console_safe("[LLM] WARNING: OPENROUTER_API_KEY not set — OpenRouter unavailable"))
                 logger.warning("OPENROUTER_API_KEY not set")
+        elif self.provider == "deepseek":
+            if self.deepseek_api_key:
+                try:
+                    self.provider_api_key = self.deepseek_api_key
+                    self.client = OllamaClient(base_url=DEEPSEEK_BASE_URL, api_key=self.deepseek_api_key)
+                    print(make_console_safe(f"[LLM] Using DeepSeek | model: {self.model} | url: {DEEPSEEK_BASE_URL}"))
+                    logger.info(make_console_safe(f"Initialized DeepSeek client with model: {self.model}"))
+                except Exception as e:
+                    logger.error(f"Failed to initialize DeepSeek client: {e}")
+                    self.client = None
+            else:
+                print(make_console_safe("[LLM] WARNING: DEEPSEEK_API_KEY not set — DeepSeek unavailable"))
+                logger.warning("DEEPSEEK_API_KEY not set")
         else:
             if self.groq_api_key:
                 try:

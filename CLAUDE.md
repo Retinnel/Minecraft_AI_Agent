@@ -151,7 +151,7 @@ orchestrator.Pipeline:
 |---|---|
 | `main.py` | FastAPI-приложение, подключение роутеров, отдача админки |
 | `api/advice.py` | HTTP-слой: `/api/rp/` (пассивный поллинг), `/api/rp/chat` (диалог через `orchestrator`), `/api/rp/mode`, история, WebSocket |
-| `api/groq_client.py` | Клиент LLM, мультипровайдерный: Groq, Ollama, OpenRouter |
+| `api/groq_client.py` | Клиент LLM, мультипровайдерный: Groq, Ollama, OpenRouter, DeepSeek |
 | `api/tool_service.py` | Реестр инструментов, серверная валидация и исполнение tool-вызовов |
 | `api/minecraft_catalog.py` | Резолв текста в `minecraft:item_id` (стоп-слова, стемминг, `SequenceMatcher`) |
 | `api/entity_catalog.py` | То же для мобов |
@@ -296,8 +296,10 @@ cd mod/minecraft-mod && ./gradlew.bat runClient
   `org.gradle.java.home` в `~/.gradle/gradle.properties` — файл пользовательский, вне репозитория,
   на другой машине его нужно создать заново. `PATH` не трогали, поэтому `java -version` в консоли
   по-прежнему показывает 8; это нормально.
-- **Ключи в `.env`** (`GROQ_API_KEY`, `OPENROUTER_API_KEY`). Файл не отслеживается git —
-  так и оставить, в коммиты не добавлять.
+- **Ключи в `.env`** (`GROQ_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API`). Файл не
+  отслеживается git — так и оставить, в коммиты не добавлять. DeepSeek (`deepseek-chat` в
+  `llm_config.json`) — платный баланс около 10 $, запасной провайдер, когда квоты Groq не
+  хватает; на полные прогоны золотого набора без нужды не тратить.
 - Без ключа сервер поднимается и работает, но чат уходит в rule-based fallback
   (`source: "fallback"` вместо `"chat"`).
 - **`data/challenge_state.json` — рантайм-состояние, снято с отслеживания** и внесено в

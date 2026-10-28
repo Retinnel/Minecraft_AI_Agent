@@ -75,6 +75,15 @@
         "temperature": 0.7,
         "reasoning_effort": "low"
       }
+    },
+    "deepseek-chat": {
+      "name": "deepseek-chat",
+      "provider": "deepseek",
+      "description": "DeepSeek V3 (deepseek-chat) — платный баланс, запасной провайдер при исчерпании квоты Groq",
+      "parameters": {
+        "max_tokens": 200,
+        "temperature": 0.7
+      }
     }
   }
 }

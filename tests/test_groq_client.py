@@ -75,6 +75,8 @@ def _build_config(provider: str = "ollama") -> LLMConfig:
         model_name = "llama-3.1-8b-instant"
     elif provider == "openrouter":
         model_name = "inclusionai/ling-2.6-1t:free"
+    elif provider == "deepseek":
+        model_name = "deepseek-chat"
 
     return LLMConfig(
         model_type="test-model",
@@ -150,6 +152,27 @@ class GroqClientTests(unittest.TestCase):
         self.assertEqual(client.model, "inclusionai/ling-2.6-1t:free")
         self.assertEqual(client.get_source_name(), "openrouter")
         self.assertTrue(client.is_available())
+
+    def test_deepseek_provider_reads_the_short_env_name(self):
+        # В .env ключ заведён как DEEPSEEK_API; клиент принимает его наравне с DEEPSEEK_API_KEY.
+        fake_client = _FakeClient('{"mode":"chat","spoken_response":"ok","action_type":null,"item_id":null,"count":1,"execute":false,"error":null}')
+
+        def _getenv(key, default=None):
+            if key == "DEEPSEEK_API":
+                return "deepseek-test-key"
+            return default
+
+        with patch("api.groq_client.OllamaClient", return_value=fake_client), patch("api.groq_client.os.getenv", side_effect=_getenv):
+            client = GroqClient(llm_config=_build_config(provider="deepseek"))
+
+        self.assertEqual(client.provider, "deepseek")
+        self.assertEqual(client.model, "deepseek-chat")
+        self.assertTrue(client.is_available())
+
+    def test_deepseek_without_key_is_unavailable(self):
+        with patch("api.groq_client.os.getenv", return_value=None):
+            client = GroqClient(llm_config=_build_config(provider="deepseek"))
+        self.assertFalse(client.is_available())
 
     def test_generate_chat_action_parses_mock_llm_output_for_russian_command(self):
         fake_client = _FakeClient(
