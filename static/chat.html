@@ -50,8 +50,7 @@
 <body>
 <header>
   <h1>Игровой чат</h1>
-  <span class="model" id="model">модель: …</span>
-  <a href="/compare">сравнение конфигураций →</a>
+  <div id="topbar"></div>
 </header>
 
 <main>
@@ -168,10 +167,18 @@ for (const text of PRESETS) {
   button.onclick = () => { node("utterance").value = text; ask(text); };
   node("presets").appendChild(button);
 }
-fetch("/api/compare/model").then(r => r.json()).then(m => {
-  node("model").textContent = "модель: " + (m.name || m.model || "?") + (m.provider ? " (" + m.provider + ")" : "");
-}).catch(() => {});
+// Переключатель режима в шапке меняет сессию на сервере; в журнале это отмечается, как
+// если бы игрок сказал «режим выживания» в чате.
+let knownMode = null;
+document.addEventListener("assistant-mode", (e) => {
+  const mode = e.detail.mode;
+  if (knownMode && knownMode !== mode) {
+    add("bot", "Режим: " + (mode === "survival" ? "выживание" : "творческий") + '<span class="meta">переключено в шапке</span>');
+  }
+  knownMode = mode;
+});
 refreshCampaign();
 </script>
+<script src="/frontend/js/topbar.js"></script>
 </body>
 </html>

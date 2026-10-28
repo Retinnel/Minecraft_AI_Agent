@@ -106,7 +106,7 @@
 <body>
 <header>
   <h1>Одна реплика — две конфигурации</h1>
-  <span class="model" id="model">модель: …</span>
+  <div id="topbar"></div>
 </header>
 
 <main>
@@ -278,12 +278,9 @@ node("utterance").addEventListener("keydown", function (event) {
   if (event.key === "Enter") ask(node("utterance").value);
 });
 
-fetch("/api/compare/model")
-  .then(function (response) { return response.json(); })
-  .then(function (info) {
-    node("model").textContent =
-      "одна и та же модель в обеих панелях: " + info.name + " (" + info.provider + ")";
-  });
+// Модель и режим показывает общая шапка (frontend/js/topbar.js): одна и та же модель в
+// обеих панелях.
 </script>
+<script src="/frontend/js/topbar.js"></script>
 </body>
 </html>
