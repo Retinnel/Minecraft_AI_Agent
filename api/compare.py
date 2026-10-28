@@ -28,11 +28,22 @@ class CompareRequest(BaseModel):
     utterance: str
 
 
-def _judge(prediction) -> Dict[str, Any]:
+def _session_context() -> Dict[str, Any]:
+    """Режим и инвентарь текущей сессии: те же, что действуют в игровом чате.
+
+    Без этого страница сравнения отвечала бы в творческом режиме, какой бы режим ни был
+    включён переключателем, и «дай алмазную кирку» в выживании выдавалось бы.
+    """
+    from api.advice import _assistant_session, _inventory_counts
+
+    return {"mode": _assistant_session().mode, "inventory": _inventory_counts()}
+
+
+def _judge(prediction, mode: str) -> Dict[str, Any]:
     """Был бы допустим результат конфигурации A по правилам базы знаний.
 
-    Проверка идёт тем же валидатором, что и в гибриде: сравнивается не качество
-    формулировок, а то, прошло ли бы действие контроль.
+    Проверка идёт тем же валидатором, что и в гибриде, в том же режиме: сравнивается не
+    качество формулировок, а то, прошло ли бы действие контроль.
     """
     from kb.graph import KnowledgeBase
     from solver.validator import Validator
@@ -42,7 +53,8 @@ def _judge(prediction) -> Dict[str, Any]:
 
     validator = Validator(KnowledgeBase.shared())
     target = prediction.item_id or prediction.entity_id
-    verdict = validator.validate(prediction.intent or "give_item", target, prediction.count or 1)
+    verdict = validator.validate(prediction.intent or "give_item", target, prediction.count or 1,
+                                 mode=mode)
     if verdict.allowed and verdict.count == (prediction.count or 1):
         return {"allowed": True, "reason": None}
     # Обрезание количества тоже считается расхождением: команда ушла бы с числом,
@@ -51,11 +63,13 @@ def _judge(prediction) -> Dict[str, Any]:
             f"количество {prediction.count} превышает предел {verdict.count}"}
 
 
-def _run_llm_only(utterance: str) -> Dict[str, Any]:
+def _run_llm_only(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
     from eval.configs import llm_only
 
+    # Конфигурация A режима не знает — в этом и её слабость: действие оценивается по
+    # правилам, действующим в сессии.
     prediction = llm_only.predict(utterance)
-    judgement = _judge(prediction)
+    judgement = _judge(prediction, context["mode"])
     return {
         "outcome": prediction.outcome,
         "intent": prediction.intent,
@@ -67,10 +81,10 @@ def _run_llm_only(utterance: str) -> Dict[str, Any]:
     }
 
 
-def _run_hybrid(utterance: str) -> Dict[str, Any]:
+def _run_hybrid(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
     from eval.configs import hybrid
 
-    prediction = hybrid.predict(utterance)
+    prediction = hybrid.predict(utterance, mode=context["mode"], inventory=context["inventory"])
     details = prediction.details or {}
     stages = details.get("stages") or {}
 
@@ -100,7 +114,7 @@ def _run_hybrid(utterance: str) -> Dict[str, Any]:
         # Проверяется той же меркой, что и конфигурация A. Нулевая доля недопустимых
         # действий у гибрида — следствие устройства системы, но на защите она должна
         # быть видна как результат проверки, а не как утверждение докладчика.
-        "verdict": _judge(prediction),
+        "verdict": _judge(prediction, context["mode"]),
     }
 
 
@@ -111,12 +125,14 @@ async def compare(request: CompareRequest) -> Dict[str, Any]:
     if not utterance:
         return {"utterance": "", "error": "пустая реплика"}
 
+    context = _session_context()
     left, right = await asyncio.gather(
-        asyncio.to_thread(_run_llm_only, utterance),
-        asyncio.to_thread(_run_hybrid, utterance),
+        asyncio.to_thread(_run_llm_only, utterance, context),
+        asyncio.to_thread(_run_hybrid, utterance, context),
     )
     return {
         "utterance": utterance,
+        "mode": context["mode"],
         "llm_only": left,
         "hybrid": right,
         "illegal": {"llm_only": not left["verdict"]["allowed"],

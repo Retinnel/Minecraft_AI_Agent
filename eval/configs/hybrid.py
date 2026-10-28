@@ -47,10 +47,13 @@ def _get_pipeline() -> Pipeline:
     return _pipeline
 
 
-def predict(utterance: str) -> Prediction:
+def predict(utterance: str, *, mode: Optional[str] = None,
+            inventory: Optional[Dict[str, int]] = None) -> Prediction:
+    """Золотой набор прогоняется в творческом режиме с пустым инвентарём (значения по
+    умолчанию); страница сравнения передаёт режим и инвентарь текущей сессии."""
     started = time.perf_counter()
     try:
-        turn = _get_pipeline().handle(utterance)
+        turn = _get_pipeline().handle(utterance, mode=mode, inventory=inventory)
     except ModelUnavailable as error:
         # Сбой канала связи — не решение системы, поэтому и не отказ.
         return Prediction(outcome="error", details={"error": str(error)},
