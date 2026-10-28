@@ -47,7 +47,8 @@ EVENT_STAGE_COMPLETED = "stage_completed"
 EVENT_CAMPAIGN_COMPLETED = "campaign_completed"
 EVENT_CAMPAIGN_CANCELLED = "campaign_cancelled"
 
-_campaign_state: Dict[str, Any] = {"active": None, "history": [], "events": [], "updated_at": None}
+_campaign_state: Dict[str, Any] = {"active": None, "history": [], "events": [],
+                                   "announcements": [], "updated_at": None}
 _builder_instance = None
 
 
@@ -112,7 +113,7 @@ def _now_iso() -> str:
 
 
 def _default_state() -> Dict[str, Any]:
-    return {"active": None, "history": [], "events": [], "updated_at": None}
+    return {"active": None, "history": [], "events": [], "announcements": [], "updated_at": None}
 
 
 def save_campaign_state() -> None:
@@ -136,6 +137,8 @@ def load_campaign_state() -> None:
         "active": payload.get("active") if isinstance(payload.get("active"), dict) else None,
         "history": payload.get("history") if isinstance(payload.get("history"), list) else [],
         "events": payload.get("events") if isinstance(payload.get("events"), list) else [],
+        "announcements": payload.get("announcements")
+        if isinstance(payload.get("announcements"), list) else [],
         "updated_at": payload.get("updated_at"),
     }
 
@@ -223,6 +226,80 @@ def consume_campaign_events() -> List[Dict[str, Any]]:
     _touch()
     save_campaign_state()
     return taken
+
+
+def _record_by_id(campaign_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Кампания по идентификатору: активная либо из истории (этап мог быть последним)."""
+    active = _campaign_state.get("active")
+    if isinstance(active, dict) and active.get("id") == campaign_id:
+        return active
+    for record in reversed(_campaign_state.get("history") or []):
+        if isinstance(record, dict) and record.get("id") == campaign_id:
+            return record
+    return None
+
+
+def narrate_events(narrator) -> int:
+    """Даёт персонажу слово по накопленным событиям — для канала опроса.
+
+    Завершённый этап: реплика персонажа подменяет текст награды, которая ещё не доставлена.
+    Начатый этап и пройденная кампания: реплика встаёт в очередь объявлений, которую канал
+    опроса отдаёт моду по одному за запрос. Отмену не объявляют: её попросил сам игрок.
+    Без модели персонаж говорит шаблонами — объявления уходят в любом случае.
+    """
+    queued = 0
+    for event in consume_campaign_events():
+        record = _record_by_id(event.get("campaign_id"))
+        if record is None:
+            continue
+        kind = event.get("type")
+        stages = record.get("stages") or []
+        index = int(event.get("stage") or 0)
+        stage = stages[index - 1] if 0 < index <= len(stages) else None
+
+        if kind == EVENT_STAGE_COMPLETED and stage is not None:
+            reply = narrator.done(record, stage)
+            stage.setdefault("texts", {})["done"] = reply.text
+            challenges.update_pending_reward_response(stage.get("challenge_id"), reply.text)
+        elif kind == EVENT_STAGE_STARTED and stage is not None:
+            reply = narrator.brief(record, stage)
+            stage.setdefault("texts", {})["brief"] = reply.text
+            _queue_announcement(kind, record, reply, stage)
+            queued += 1
+        elif kind == EVENT_CAMPAIGN_COMPLETED:
+            reply = narrator.outro(record)
+            record.setdefault("texts", {})["outro"] = reply.text
+            _queue_announcement(kind, record, reply, None)
+            queued += 1
+    if queued or _campaign_state.get("events") == []:
+        _touch()
+        save_campaign_state()
+    return queued
+
+
+def _queue_announcement(kind: str, record: Dict[str, Any], reply, stage: Optional[Dict[str, Any]]) -> None:
+    announcement: Dict[str, Any] = {
+        "type": kind,
+        "campaign_id": record.get("id"),
+        "response": reply.text,
+        "source": "campaign" if reply.source == "model" else "campaign-template",
+        "stage": stage["index"] if stage else None,
+        "plan_tree": stage.get("plan_tree") if stage else None,
+        "plan_summary": stage.get("plan_summary") if stage else None,
+        "queued_at": _now_iso(),
+    }
+    _campaign_state.setdefault("announcements", []).append(announcement)
+
+
+def consume_announcement() -> Optional[Dict[str, Any]]:
+    """Следующее объявление для мода; очередь отдаётся по одному, как награды у заданий."""
+    announcements = _campaign_state.get("announcements") or []
+    if not announcements:
+        return None
+    announcement = announcements.pop(0)
+    _touch()
+    save_campaign_state()
+    return deepcopy(announcement)
 
 
 def _push_event(kind: str, campaign: Dict[str, Any], stage: Optional[Dict[str, Any]] = None,

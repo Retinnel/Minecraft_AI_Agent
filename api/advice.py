@@ -730,9 +730,28 @@ async def get_rp_response() -> GroqAdvice:
     """
     global _last_rp_response_time, _last_rp_response, _processed_log_ids
 
+    # Кампания продвигается по снимкам инвентаря здесь же, в опросе: закрытый этап даёт
+    # награду с репликой персонажа, следующее поручение объявляется без обращения игрока.
+    from api import campaign as campaigns
+    campaigns.refresh_campaign_progress()
+    campaigns.narrate_events(_assistant_narrator())
+
     pending_reward = consume_pending_reward_action()
     if isinstance(pending_reward, dict):
         return GroqAdvice(**pending_reward)
+
+    announcement = campaigns.consume_announcement()
+    if isinstance(announcement, dict):
+        session = _assistant_session()
+        if announcement.get("type") == campaigns.EVENT_CAMPAIGN_COMPLETED:
+            session.campaign = None
+        return GroqAdvice(
+            response=_clip(announcement.get("response") or ""),
+            confidence=0.9, level="INFO", threats=[], source=announcement.get("source") or "campaign",
+            mode="chat", execute=False, outcome="act", assistant_mode=session.mode,
+            plan_tree=announcement.get("plan_tree"), plan_summary=announcement.get("plan_summary"),
+            campaign=_campaign_brief(),
+        )
 
     last = _safe_last_log()
     if last is None:
