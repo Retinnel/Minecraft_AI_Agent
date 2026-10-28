@@ -24,6 +24,9 @@ STATION_RU = {
 }
 
 TOOL_KIND_RU = {"pickaxe": "кирка", "axe": "топор", "shovel": "лопата", "hoe": "мотыга"}
+# Где искать, если не в обычном Верхнем мире: игроку важно знать, что путь лежит в Незер.
+REMOTE_RU = {"nether": "в Незере", "end": "в Крае", "rare_biome": "в редком биоме", "unnatural": "только построенное",
+             "deep": "на глубине"}
 TIER_RU = {"wood": "деревянная", "gold": "золотая", "stone": "каменная",
            "iron": "железная", "diamond": "алмазная", "netherite": "незеритовая"}
 
@@ -44,13 +47,18 @@ def _describe(step: Step, kb: KnowledgeBase) -> str:
             tool = TOOL_KIND_RU.get(step.tool_kind, step.tool_kind)
             tier = TIER_RU.get(step.tool_tier or "")
             suffix = f" ({tier + ' ' + tool if tier else tool} и выше)" if tier else f" ({tool})"
-        return f"{head} — добыть из «{source}»{suffix}"
+        return f"{head} — добыть из «{source}»{suffix}{_where(step, kb)}"
     if step.kind == HUNT:
         source = kb.label(step.source) or step.source
-        return f"{head} — выбить из «{source}»"
+        return f"{head} — выбить из «{source}»{_where(step, kb)}"
     if step.kind == MISSING:
         return f"{head} — НЕ ПОЛУЧИТЬ: {step.reason}"
     return head
+
+
+def _where(step: Step, kb: KnowledgeBase) -> str:
+    place = REMOTE_RU.get(kb.accessibility(step.source) or "") if step.source else None
+    return f", {place}" if place else ""
 
 
 def render_tree(plan: Plan, kb: KnowledgeBase) -> str:

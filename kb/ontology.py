@@ -79,11 +79,19 @@ CATEGORY = GA.category                # Restriction -> literal: boss | service |
 # строку нельзя поместить в URI, но именно её нужно подставлять в игровую команду.
 GAME_ID = GA.gameId                   # Thing -> literal
 
+# Где источник добычи находится, если не в обычном Верхнем мире: nether | end |
+# rare_biome | deep. Рукописный слой (kb/accessibility.json): в данных игры измерений и
+# биомов нет, а без этого чернит равноценен булыжнику.
+ACCESSIBILITY = GA.accessibility      # Block | Creature -> literal
+
 OBJECT_PROPERTIES = (PRODUCES, REQUIRES, AT_STATION, ALTERNATIVE, HAS_MEMBER, YIELDS,
                      RARE_YIELD, REQUIRES_TOOL_TIER, REQUIRES_TOOL_KIND, IS_TOOL_KIND,
                      HAS_TOOL_TIER, FORBIDS)
 DATA_PROPERTIES = (PRODUCES_COUNT, METHOD, QUANTITY, TIER_RANK, FORBIDDEN_ACTION,
-                   REASON, CATEGORY, GAME_ID, TOOL_REQUIRED)
+                   REASON, CATEGORY, GAME_ID, TOOL_REQUIRED, ACCESSIBILITY)
+
+# Группы доступности в порядке возрастания удалённости; планировщик назначает им веса.
+ACCESSIBILITY_GROUPS = ("deep", "rare_biome", "unnatural", "nether", "end")
 
 # Порядок уровней инструмента. Нужен решателю, чтобы отвечать на вопрос «этого хватит?»:
 # требование `iron` удовлетворяется железом, алмазом и незеритом, но не камнем.

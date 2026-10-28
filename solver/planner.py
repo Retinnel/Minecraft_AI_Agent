@@ -74,6 +74,9 @@ WEIGHT_STEP = 1          # любое действие само по себе
 WEIGHT_TOOL_TIER = 2     # за каждый уровень инструмента, нужного для добычи
 WEIGHT_HUNT = 20         # охота: существо нужно найти и одолеть, это не то же, что копать
 WEIGHT_UNRELIABLE = 30   # выпадение может не случиться, планировать на нём нельзя
+# Источник не в обычном Верхнем мире (рукописный слой kb/accessibility.json). Без этого
+# чернит из Незера и бамбук из джунглей равноценны булыжнику и доскам, и выбор решает алфавит.
+WEIGHT_REMOTE = {"deep": 1, "rare_biome": 3, "unnatural": 5, "nether": 8, "end": 12}
 
 
 @dataclass(frozen=True)
@@ -373,6 +376,8 @@ class Planner:
             weight += WEIGHT_HUNT
         if source.rare:
             weight += WEIGHT_UNRELIABLE
+        if source.remote:
+            weight += WEIGHT_REMOTE.get(source.remote, 0)
         return weight
 
     def _ensure_tool(self, source: Source, stock: Counter,
@@ -440,8 +445,12 @@ class Planner:
         return (total / max(recipe.produces_count, 1) + station_cost,
                 len(recipe.inputs), recipe.id)
 
-    def _item_cost(self, item: str, stack: frozenset = frozenset()) -> int:
-        """Оценка трудоёмкости предмета: во что он обойдётся от подручных ресурсов."""
+    def _item_cost(self, item: str, stack: frozenset = frozenset()) -> float:
+        """Оценка трудоёмкости предмета: во что он обойдётся от подручных ресурсов.
+
+        Оценка дробная: округление до целых уравнивало доски из берёзы и из акации, и выбор
+        между ними снова доставался алфавиту.
+        """
         if not self._cost_cache:
             self._compute_costs()
         return self._cost_cache.get(item, COST_GUARD)
@@ -462,7 +471,7 @@ class Planner:
         sources_by_item = self.kb.index_sources()
 
         # Начальное приближение: то, что просто лежит в мире.
-        cost: Dict[str, int] = {}
+        cost: Dict[str, float] = {}
         for item, sources in sources_by_item.items():
             # Источник может быть не опознан, если у него нет записи в базе знаний:
             # часть лут-таблиц описывает сущности, которых нет среди именованных.
@@ -483,7 +492,8 @@ class Planner:
                              for alternative in ingredient.alternatives),
                             default=COST_GUARD)
                         total += ingredient.quantity * cheapest
-                    value = max(int(total / max(recipe.produces_count, 1)), 1)
+                    # Нижняя граница страхует от вырождения оценки в ноль на циклах.
+                    value = max(total / max(recipe.produces_count, 1), 0.25)
                     if value < cost.get(item, COST_GUARD):
                         cost[item] = value
                         changed = True

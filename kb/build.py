@@ -31,6 +31,7 @@ GAME_DIR = ROOT / "data" / "game"
 KB_DIR = ROOT / "data" / "kb"
 RESTRICTIONS_PATH = Path(__file__).resolve().parent / "restrictions.json"
 ALIASES_PATH = Path(__file__).resolve().parent / "aliases.json"
+ACCESSIBILITY_PATH = Path(__file__).resolve().parent / "accessibility.json"
 LEGACY_ITEM_CATALOG = ROOT / "data" / "minecraft_catalog.json"
 LEGACY_ENTITY_CATALOG = ROOT / "data" / "entity_catalog.json"
 
@@ -214,6 +215,29 @@ def _add_restrictions(graph: Graph, restrictions: Dict[str, Any]) -> int:
     return added
 
 
+def _add_accessibility(graph: Graph, layer: Dict[str, Any], known: set) -> int:
+    """Пометки «где это находится» для источников добычи. Неизвестные идентификаторы
+    пропускаются: рукописный слой не должен заводить сущностей, которых нет в игре."""
+    added = 0
+    marked: set = set()
+    for group in ont.ACCESSIBILITY_GROUPS:
+        for thing_id in layer.get(group, []):
+            if thing_id not in known or thing_id in marked:
+                continue
+            graph.add((ont.thing_uri(thing_id), ont.ACCESSIBILITY, Literal(group)))
+            marked.add(thing_id)
+            added += 1
+    # Целые классы блоков, которых в мире не бывает (ошкуренные брёвна, растения в горшках),
+    # задаются приставкой: перечислять десятки идентификаторов руками незачем.
+    prefixes = tuple(layer.get("unnatural_prefixes", []))
+    for thing_id in sorted(known):
+        if prefixes and thing_id.startswith(prefixes) and thing_id not in marked:
+            graph.add((ont.thing_uri(thing_id), ont.ACCESSIBILITY, Literal("unnatural")))
+            marked.add(thing_id)
+            added += 1
+    return added
+
+
 def _add_manual_aliases(graph: Graph, known: set) -> int:
     """Разговорные названия из рукописного слоя.
 
@@ -303,6 +327,9 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     _add_tool_requirements(graph, tools)
     tool_items = _add_tool_items(graph, tags["items"])
     restriction_count = _add_restrictions(graph, restrictions)
+    accessibility_count = _add_accessibility(
+        graph, _load(ACCESSIBILITY_PATH),
+        {str(value) for value in graph.objects(None, ont.GAME_ID)})
     legacy = _add_legacy_aliases(graph, set(items))
     # Рукописные названия добавляются последними: они относятся ко всем заведённым
     # сущностям, включая существ и варианты предметов из каталогов прошлого семестра.
@@ -325,6 +352,7 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
         "  из них редких": rare_yields,
         "инструментов размечено": tool_items,
         "запретов": restriction_count,
+        "пометок доступности": accessibility_count,
         "разговорных алиасов": legacy["aliases"],
         "  из рукописного слоя": manual_aliases,
         "  вариантов с NBT заведено": legacy["variants"],

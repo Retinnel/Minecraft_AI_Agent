@@ -65,6 +65,12 @@ class Source:
     tool_required: bool = False
     # Выпадение случайное и редкое: связь есть, но план на ней строить нельзя.
     rare: bool = False
+    # Где источник находится, если не в обычном Верхнем мире: deep | rare_biome | nether | end.
+    remote: Optional[str] = None
+
+    @property
+    def remote_rank(self) -> int:
+        return ont.ACCESSIBILITY_GROUPS.index(self.remote) + 1 if self.remote else 0
 
 
 @dataclass(frozen=True)
@@ -322,14 +328,21 @@ class KnowledgeBase:
             required = next(iter(self.graph.objects(source_uri, ont.TOOL_REQUIRED)), None)
 
             rare = (source_uri, ont.RARE_YIELD, target) in self.graph
+            remote = next((str(value) for value in self.graph.objects(source_uri, ont.ACCESSIBILITY)),
+                          None)
 
             sources.append(Source(id=source_id, kind=kind, tool_kind=tool_kind,
                                   tool_tier=tool_tier, tool_tier_rank=rank,
                                   tool_required=bool(required) if required is not None else False,
-                                  rare=rare))
+                                  rare=rare, remote=remote))
 
-        # Сначала надёжные источники, затем то, что добыть проще.
-        return sorted(sources, key=lambda s: (s.rare, s.tool_tier_rank, s.id))
+        # Сначала надёжные источники, затем то, что добыть проще, затем то, что ближе.
+        return sorted(sources, key=lambda s: (s.rare, s.tool_tier_rank, s.remote_rank, s.id))
+
+    def accessibility(self, thing_id: str) -> Optional[str]:
+        """Где сущность находится, если не в обычном Верхнем мире; None для обычного мира."""
+        return next((str(value) for value in
+                     self.graph.objects(ont.thing_uri(thing_id), ont.ACCESSIBILITY)), None)
 
     def tool_profile(self, item_id: str) -> Optional[Tool]:
         """Если предмет — инструмент, возвращает его вид и уровень."""
