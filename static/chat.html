@@ -45,6 +45,11 @@
   .stage.completed { color: var(--good); }
   .stage.active { color: var(--accent); font-weight: 600; }
   .muted { color: var(--muted); }
+  .inventory { font: 15px/1.5 Consolas, monospace; margin-bottom: 10px; }
+  .card .presets { margin-bottom: 8px; }
+  .card .presets button { font-size: 13px; padding: 4px 10px; }
+  .autopoll { font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .msg.bot.proactive { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -64,6 +69,14 @@
   </section>
 
   <aside>
+    <div class="card">
+      <h2>Игрок — симуляция мода</h2>
+      <div id="inventory" class="inventory"><span class="muted">инвентарь пуст</span></div>
+      <div class="presets" id="sim-inventory"></div>
+      <div class="presets" id="sim-death"></div>
+      <label class="muted autopoll"><input type="checkbox" id="autopoll" checked>
+        опрос сервера каждые 3 с, как у мода</label>
+    </div>
     <div class="card">
       <h2>Кампания</h2>
       <div id="campaign"><span class="muted">нет</span></div>
@@ -167,6 +180,107 @@ for (const text of PRESETS) {
   button.onclick = () => { node("utterance").value = text; ask(text); };
   node("presets").appendChild(button);
 }
+// --- симуляция мода ---
+// Мод шлёт на сервер снимки инвентаря и событие смерти и опрашивает GET /api/rp/. Панель
+// делает то же из браузера: так кампанию и разбор смерти видно без игрового клиента.
+const INVENTORY_PRESETS = [
+  ["очистить", null],
+  ["+ дубовые брёвна ×4", { "minecraft:oak_log": 4 }],
+  ["+ верстак", { "minecraft:crafting_table": 1 }],
+  ["+ деревянная кирка", { "minecraft:wooden_pickaxe": 1 }],
+  ["+ каменная кирка", { "minecraft:stone_pickaxe": 1 }],
+  ["+ печь", { "minecraft:furnace": 1 }],
+  ["+ железные слитки ×8", { "minecraft:iron_ingot": 8 }],
+  ["+ алмазы ×3", { "minecraft:diamond": 3 }],
+  ["+ железный нагрудник", { "minecraft:iron_chestplate": 1 }],
+  ["+ хлеб ×3", { "minecraft:bread": 3 }]
+];
+const DEATHS = [
+  ["смерть: взрыв", "explosion.player"], ["смерть: моб", "mob_attack"],
+  ["смерть: падение", "fall"], ["смерть: голод", "starve"]
+];
+const PROACTIVE = ["challenge", "campaign", "postmortem"];
+let inventory = {};
+let lastProactive = "";
+
+async function postLog(eventType, eventData, message) {
+  await fetch("/api/logs/", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ level: "INFO", event_type: eventType, event_data: eventData, message })
+  });
+}
+
+function renderInventory() {
+  const names = Object.keys(inventory);
+  node("inventory").innerHTML = names.length
+    ? names.map(id => escapeHtml(id.replace("minecraft:", "")) + " ×" + inventory[id]).join("<br>")
+    : '<span class="muted">инвентарь пуст</span>';
+}
+
+async function sendInventory() {
+  renderInventory();
+  await postLog("inventory_snapshot",
+    { counts: inventory, hotbar: [], armor: [], offhand: [] },
+    "inventory_snapshot: unique_items=" + Object.keys(inventory).length);
+  poll();
+}
+
+async function die(cause) {
+  // Как в игре: событие смерти застаёт инвентарь на месте, следующий снимок уже пуст.
+  await postLog("death", { cause }, "death: cause=" + cause);
+  inventory = {};
+  await sendInventory();
+}
+
+async function poll() {
+  try {
+    const d = await (await fetch("/api/rp/")).json();
+    const source = d.source || "";
+    if (!PROACTIVE.some(prefix => source.startsWith(prefix))) return;
+    if (!d.response || d.response === lastProactive) return;
+    lastProactive = d.response;
+    let html = escapeHtml(d.response);
+    if (d.command) html += '<span class="meta cmd">' + escapeHtml(d.command) + "</span>";
+    html += '<span class="meta">без обращения игрока · ' + escapeHtml(source) + "</span>";
+    add("bot proactive", html);
+    if (d.plan_tree) node("plan").textContent = d.plan_tree;
+    if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");
+    if (d.execute && d.item_id) {
+      // Награда попадает в инвентарь, как после /give в игре.
+      inventory[d.item_id] = (inventory[d.item_id] || 0) + (d.item_count || 1);
+      renderInventory();
+      postLog("inventory_snapshot", { counts: inventory, hotbar: [], armor: [], offhand: [] },
+        "inventory_snapshot: reward");
+    }
+    refreshCampaign();
+  } catch (e) { /* сервер недоступен — опрос продолжится */ }
+}
+
+for (const [title, items] of INVENTORY_PRESETS) {
+  const button = document.createElement("button");
+  button.textContent = title;
+  button.onclick = () => {
+    if (items === null) inventory = {};
+    else for (const id in items) inventory[id] = (inventory[id] || 0) + items[id];
+    sendInventory();
+  };
+  node("sim-inventory").appendChild(button);
+}
+for (const [title, cause] of DEATHS) {
+  const button = document.createElement("button");
+  button.textContent = title;
+  button.onclick = () => die(cause);
+  node("sim-death").appendChild(button);
+}
+fetch("/api/player-state/").then(r => r.json()).then(state => {
+  const counts = (state.inventory || {}).counts;
+  if (counts && typeof counts === "object" && !Array.isArray(counts)) {
+    for (const id in counts) inventory[id] = Number(counts[id]) || 0;
+    renderInventory();
+  }
+}).catch(() => {});
+setInterval(() => { if (node("autopoll").checked) poll(); }, 3000);
+
 // Переключатель режима в шапке меняет сессию на сервере; в журнале это отмечается, как
 // если бы игрок сказал «режим выживания» в чате.
 let knownMode = null;

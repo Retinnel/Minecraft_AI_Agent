@@ -156,6 +156,7 @@ class DeathAnalyzer:
                 reach = self._reachable(item, stock)
                 if reach is not None:
                     steps, plan = reach
+                    self._spend(stock, plan)
                     result.craftable.append(Measure(item, ARMOR, CRAFTABLE,
                                                     points=self.armor_points[item],
                                                     steps=steps, plan=plan))
@@ -192,6 +193,7 @@ class DeathAnalyzer:
             reach = self._reachable(item, stock)
             if reach is not None:
                 steps, plan = reach
+                self._spend(stock, plan)
                 result.craftable.append(Measure(item, group, CRAFTABLE, steps=steps, plan=plan))
                 result.explanation.append(
                     f"«{self._label(item)}» собирался из инвентаря за {steps} действий")
@@ -218,6 +220,18 @@ class DeathAnalyzer:
                 return None
             steps += extra
         return steps, plan
+
+    @staticmethod
+    def _spend(stock: Counter, plan: Plan) -> None:
+        """Принятая мера расходует инвентарь: следующие меры считаются от остатка.
+
+        Иначе из одних и тех же восьми слитков «собирались» бы и нагрудник, и поножи,
+        и ботинки — каждое по отдельности верно, вместе — нет.
+        """
+        from solver.campaign import CampaignBuilder
+
+        for item, taken in CampaignBuilder._consumed(plan).items():
+            stock[item] = max(0, stock.get(item, 0) - taken)
 
     @staticmethod
     def _crafting_steps(plan: Plan) -> Optional[int]:

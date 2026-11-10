@@ -54,6 +54,17 @@ class DeathAnalyzerTests(unittest.TestCase):
         self.assertEqual(result.craftable[0].item, CHEST)
         self.assertIn("Железный нагрудник", essentials(result, self.kb))
 
+    def test_measures_share_one_inventory(self):
+        # Восьми слитков хватает на нагрудник — и только на него: поножи и ботинки из тех
+        # же слитков уже не собрать, и называть их достижимыми нельзя.
+        result = self.analyzer.analyze("mob_attack", {INGOT: 8, TABLE: 1})
+        armor = [m.item for m in result.craftable if m.group == ARMOR]
+        self.assertEqual(armor, [CHEST])
+        # Слитков больше — мер больше.
+        rich = self.analyzer.analyze("mob_attack", {INGOT: 15, TABLE: 1})
+        self.assertEqual([m.item for m in rich.craftable if m.group == ARMOR],
+                         [CHEST, "minecraft:iron_leggings"])
+
     def test_missing_station_counts_as_extra_steps_or_blocks(self):
         # Слитки есть, верстака нет, но есть брёвна: верстак собирается, это лишние действия.
         with_logs = self.analyzer.analyze("mob_attack", {INGOT: 8, "minecraft:oak_log": 1})
