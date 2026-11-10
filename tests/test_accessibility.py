@@ -76,6 +76,15 @@ class AccessibilityTests(unittest.TestCase):
         self.assertIn(source, {"minecraft:oak_log", "minecraft:birch_log", "minecraft:spruce_log"})
         self.assertNotIn("stripped", source)
 
+    def test_material_already_in_the_inventory_beats_the_globally_cheaper_one(self):
+        # Берёза «вообще» дешевле дуба по алфавиту, но у игрока лежит дуб: доски делаются
+        # из него, а не из берёзы, за которой нужно идти в мир.
+        plan = self.planner.plan("minecraft:crafting_table", 1, {"minecraft:oak_log": 1})
+        self.assertTrue(plan.feasible)
+        self.assertEqual(self.mined(plan), set())
+        crafted = {step.item for step in plan.root.walk() if step.kind == CRAFT}
+        self.assertIn("minecraft:oak_planks", crafted)
+
     def test_remote_source_is_still_used_when_it_is_the_only_one(self):
         # Незеритовый лом добывается только из древних обломков в Незере: штраф делает путь
         # дороже, но не закрывает его.

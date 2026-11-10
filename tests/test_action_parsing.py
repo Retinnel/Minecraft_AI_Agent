@@ -188,7 +188,10 @@ class ActionParsingTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.05)
             return "Новый медленный ответ"
 
+        # Смерть сначала разбирает решатель; совет модели по событиям — запасной путь, и
+        # проверяется он здесь: разбор недоступен, совет не успел, отдаётся кэш.
         with (
+            patch.object(advice, "_death_reply", side_effect=RuntimeError("разбор недоступен")),
             patch.object(advice.groq_client, "is_available", return_value=True),
             patch.object(advice.groq_client, "generate_tip_async", new=slow_tip),
             patch.object(advice.groq_client, "get_source_name", return_value="ollama"),

@@ -418,8 +418,24 @@ class Planner:
         if not alternatives:
             return None
         available = [item for item in alternatives if stock.get(item, 0) > 0]
-        pool = available or [item for item in alternatives if item not in stack] or list(alternatives)
+        # На шаг вперёд: вариант, который изготавливается прямо из инвентаря, лучше того,
+        # за которым нужно идти в мир. Иначе при дубовых брёвнах в инвентаре доски
+        # планировались бы из берёзы — она дешевле «вообще», но её у игрока нет.
+        makeable = [] if available else [item for item in alternatives
+                                         if item not in stack and self._makeable(item, stock)]
+        pool = (available or makeable
+                or [item for item in alternatives if item not in stack] or list(alternatives))
         return min(pool, key=lambda item: (self._item_cost(item, stack), item))
+
+    def _makeable(self, item: str, stock: Counter) -> bool:
+        """Есть ли рецепт предмета, все составляющие которого уже лежат в инвентаре."""
+        for recipe in self.kb.recipes_for(item):
+            if recipe.inputs and all(
+                    any(stock.get(alternative, 0) >= ingredient.quantity
+                        for alternative in ingredient.alternatives)
+                    for ingredient in recipe.inputs):
+                return True
+        return False
 
     def _recipe_cost(self, recipe: Recipe, stack: frozenset,
                      stock: Optional[Counter] = None) -> Tuple[float, int, str]:

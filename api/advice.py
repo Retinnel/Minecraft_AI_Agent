@@ -765,6 +765,14 @@ async def get_rp_response() -> GroqAdvice:
         # Mark this critical event as processed
         _processed_log_ids.add(id(critical_event))
 
+    # Смерть разбирает решатель: какая защита от этой угрозы была достижима из инвентаря.
+    # Старый путь ниже (совет модели по последним событиям) остаётся запасным.
+    if is_critical and getattr(critical_event, "event_type", None) == "death":
+        try:
+            return await asyncio.to_thread(_death_reply)
+        except Exception as error:
+            logger.warning(f"[RP] Разбор смерти не построен: {error}")
+
     # Routine passive polling should read cached/stateful responses cheaply.
     # Only critical events are allowed to invoke the LLM on this endpoint.
     if _should_use_llm_for_rp(is_critical=is_critical):
@@ -873,6 +881,58 @@ def _assistant_narrator():
 def _assistant_session():
     from orchestrator.session import shared
     return shared()
+
+
+_death_analyzer_instance = None
+
+
+def _death_analyzer():
+    global _death_analyzer_instance
+    if _death_analyzer_instance is None:
+        from solver.postmortem import DeathAnalyzer
+        pipeline = _assistant_pipeline()
+        _death_analyzer_instance = DeathAnalyzer(pipeline.kb, pipeline.planner)
+    return _death_analyzer_instance
+
+
+def _death_reply() -> GroqAdvice:
+    """Разбор последней смерти для канала опроса.
+
+    Инвентарь берётся тот, с которым игрок погиб: после смерти он пустеет, поэтому снимок
+    сохраняется в момент события. План главной упущенной меры уходит во вкладку «План».
+    """
+    from api.player_state import get_player_state
+    from solver.postmortem import essentials, focus_plan, render_postmortem
+    from solver.render import render_summary, render_tree
+
+    death = get_player_state().get("last_death") or {}
+    inventory = death.get("inventory") or {}
+    counts: Dict[str, int] = {}
+    for item_id, count in (inventory.get("counts") or {}).items():
+        try:
+            counts[str(item_id)] = int(count)
+        except (TypeError, ValueError):
+            continue
+    armor = [entry.get("item_id") for entry in inventory.get("armor") or [] if entry.get("item_id")]
+    held = [entry.get("item_id") for entry in
+            list(inventory.get("offhand") or []) + list(inventory.get("hotbar") or [])
+            if entry.get("item_id")]
+
+    analyzer = _death_analyzer()
+    result = analyzer.analyze(str(death.get("cause") or "unknown"), counts, armor=armor, held=held)
+    facts = render_postmortem(result, analyzer.kb)
+    reply = _assistant_responder().phrase(facts, essentials(result, analyzer.kb))
+    plan = focus_plan(result)
+    session = _assistant_session()
+    return GroqAdvice(
+        response=_clip(reply.text),
+        confidence=0.9, level="CRITICAL", threats=[],
+        source="postmortem" if reply.source == "model" else "postmortem-template",
+        mode="chat", execute=False, outcome="act", assistant_mode=session.mode,
+        plan_tree=render_tree(plan, analyzer.kb) if plan else None,
+        plan_summary=render_summary(plan, analyzer.kb) if plan else None,
+        explanation=list(result.explanation),
+    )
 
 
 def _persona_command(text: str) -> Optional[str]:

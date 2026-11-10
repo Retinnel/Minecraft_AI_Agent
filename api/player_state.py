@@ -22,6 +22,9 @@ _player_state: Dict[str, Any] = {
     "updated_at": None,
     "last_kill_at": None,
     "last_inventory_at": None,
+    # Причина последней смерти и инвентарь на её момент: после смерти он пустеет, а для
+    # разбора нужен именно тот, с которым игрок погиб.
+    "last_death": None,
 }
 
 
@@ -37,6 +40,7 @@ def reset_player_state() -> None:
     _player_state["updated_at"] = None
     _player_state["last_kill_at"] = None
     _player_state["last_inventory_at"] = None
+    _player_state["last_death"] = None
 
 
 def _now_iso() -> str:
@@ -128,6 +132,14 @@ def apply_log_to_player_state(entry: Any) -> None:
                 del _player_state["recent_kills"][:-MAX_RECENT_KILLS]
             _player_state["last_kill_at"] = timestamp_text
             _player_state["updated_at"] = timestamp_text
+
+    if event_type == "death":
+        _player_state["last_death"] = {
+            "cause": str(event_data.get("cause") or "unknown").strip(),
+            "inventory": deepcopy(_player_state.get("inventory") or {}),
+            "timestamp": timestamp_text,
+        }
+        _player_state["updated_at"] = timestamp_text
 
     if event_type == "inventory_snapshot":
         inventory = {

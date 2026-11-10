@@ -1,0 +1,63 @@
+{
+  "_comment": [
+    "Рукописный слой базы знаний: от чего игрок погибает и что от этого защищает.",
+    "В данных игры причина смерти — строка-идентификатор источника урона, а связи",
+    "«угроза → защита» нет вовсе. Здесь причины сведены к классам угроз, а классам",
+    "сопоставлены меры защиты; что из них было достижимо из инвентаря, выводит решатель.",
+    "armor_points — очки брони из игры: по ним меры упорядочиваются по пользе."
+  ],
+
+  "causes": {
+    "mob_attack": "combat", "mob_attack.no_aggro": "combat", "player": "combat", "sting": "combat",
+    "arrow": "ranged", "thrown": "ranged", "trident": "ranged", "fireball": "ranged",
+    "unattributed_fireball": "ranged", "mob_projectile": "ranged",
+    "explosion": "explosion", "explosion.player": "explosion", "fireworks": "explosion",
+    "fall": "fall", "flyIntoWall": "fall", "stalagmite": "fall",
+    "lava": "fire", "inFire": "fire", "onFire": "fire", "hotFloor": "fire",
+    "starve": "hunger",
+    "drown": "drown",
+    "magic": "magic", "indirectMagic": "magic", "wither": "magic", "dragonBreath": "magic",
+    "freeze": "freeze",
+    "outOfWorld": "void", "genericKill": "void"
+  },
+
+  "threats": {
+    "combat":    {"label": "ближний бой с существом", "measures": ["armor", "shield", "weapon"]},
+    "ranged":    {"label": "выстрел или бросок",      "measures": ["shield", "armor"]},
+    "explosion": {"label": "взрыв",                    "measures": ["shield", "armor"]},
+    "fall":      {"label": "падение с высоты",         "measures": ["water"]},
+    "fire":      {"label": "огонь или лава",           "measures": ["water"]},
+    "hunger":    {"label": "голод",                    "measures": ["food"]},
+    "drown":     {"label": "утопление",                "measures": []},
+    "magic":     {"label": "магический урон",          "measures": []},
+    "freeze":    {"label": "замерзание",               "measures": []},
+    "void":      {"label": "падение в пустоту",        "measures": []},
+    "other":     {"label": "неизвестная причина",      "measures": []}
+  },
+
+  "measures": {
+    "shield": {"label": "щит", "items": ["minecraft:shield"]},
+    "weapon": {"label": "оружие",
+               "items": ["minecraft:iron_sword", "minecraft:stone_sword", "minecraft:wooden_sword"]},
+    "water":  {"label": "ведро воды", "items": ["minecraft:water_bucket", "minecraft:bucket"]},
+    "food":   {"label": "еда",
+               "items": ["minecraft:bread", "minecraft:cooked_beef", "minecraft:cooked_porkchop",
+                         "minecraft:baked_potato", "minecraft:cooked_chicken", "minecraft:apple"]}
+  },
+
+  "armor_points": {
+    "minecraft:leather_helmet": 1, "minecraft:leather_chestplate": 3,
+    "minecraft:leather_leggings": 2, "minecraft:leather_boots": 1,
+    "minecraft:golden_helmet": 2, "minecraft:golden_chestplate": 5,
+    "minecraft:golden_leggings": 3, "minecraft:golden_boots": 1,
+    "minecraft:chainmail_helmet": 2, "minecraft:chainmail_chestplate": 5,
+    "minecraft:chainmail_leggings": 4, "minecraft:chainmail_boots": 1,
+    "minecraft:iron_helmet": 2, "minecraft:iron_chestplate": 6,
+    "minecraft:iron_leggings": 5, "minecraft:iron_boots": 2,
+    "minecraft:diamond_helmet": 3, "minecraft:diamond_chestplate": 8,
+    "minecraft:diamond_leggings": 6, "minecraft:diamond_boots": 3,
+    "minecraft:netherite_helmet": 3, "minecraft:netherite_chestplate": 8,
+    "minecraft:netherite_leggings": 6, "minecraft:netherite_boots": 3,
+    "minecraft:turtle_helmet": 2
+  }
+}

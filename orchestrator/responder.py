@@ -128,6 +128,29 @@ class Responder:
             return Reply(template, TEMPLATE)
         return Reply(text, MODEL)
 
+    def phrase(self, facts: str, essentials: Optional[List[str]] = None) -> Reply:
+        """Пересказ готового вывода решателя, не связанного с репликой игрока.
+
+        Так озвучивается разбор смерти: факты уже собраны текстом, модели остаётся сказать
+        их короче и живее. Названия из `essentials` обязаны прозвучать (сверка по основам
+        слов), иначе в ответ уходит сам текст фактов.
+        """
+        try:
+            text = self._ask([
+                {"role": "system", "content": PHRASING_PROMPT.format(facts=facts)},
+                {"role": "user", "content": "Сообщи это игроку."},
+            ])
+        except Exception:
+            return Reply(facts, TEMPLATE)
+        if not text:
+            return Reply(facts, TEMPLATE)
+        if essentials:
+            from resolver.text import name_stems
+            said = set(name_stems(text))
+            if not all(set(name_stems(item)) <= said for item in essentials if item):
+                return Reply(facts, TEMPLATE)
+        return Reply(text, MODEL)
+
     @staticmethod
     def _keeps_essentials(turn: Turn, text: str) -> bool:
         """Сохранила ли модель то, без чего ответ становится неверным.
