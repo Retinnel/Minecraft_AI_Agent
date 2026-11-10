@@ -1261,7 +1261,11 @@ async def get_compact_status() -> Dict[str, Any]:
     last = _safe_last_log()
     refresh_challenge_progress()
     active = get_active_challenge()
-    
+    # Кампания для вкладки оверлея: персонаж, этапы с отметками, прогресс текущего.
+    from api import campaign as campaigns
+    campaigns.refresh_campaign_progress()
+    campaign_brief = _campaign_brief()
+
     # Получаем последний совет из кэша
     advice_text = None
     advice_level = "INFO"
@@ -1281,6 +1285,8 @@ async def get_compact_status() -> Dict[str, Any]:
             "goal_type": active.get("goal_type") if active else None,
             "reward": active.get("reward_item_name") or active.get("reward_item_id") if active else None,
         } if active else None,
+        "campaign": campaign_brief,
+        "assistant_mode": _assistant_session().mode,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

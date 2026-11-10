@@ -28,6 +28,8 @@ public class AssistantOverlayScreen extends Screen {
     private Button statusTabButton;
     private Button recipesTabButton;
     private Button planTabButton;
+    private Button campaignTabButton;
+    private Button cancelCampaignButton;
     private Button whyButton;
     private Button modeButton;
 
@@ -43,7 +45,8 @@ public class AssistantOverlayScreen extends Screen {
     private enum Tab {
         STATUS,
         RECIPES,
-        PLAN
+        PLAN,
+        CAMPAIGN
     }
 
     private Tab activeTab = Tab.STATUS;
@@ -193,7 +196,7 @@ public class AssistantOverlayScreen extends Screen {
 
         // Вкладки
         int tabY = top - 24;
-        int tabW = (panelW - 8) / 3;
+        int tabW = (panelW - 12) / 4;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
         }).bounds(left, tabY, tabW, 20).build();
@@ -206,9 +209,22 @@ public class AssistantOverlayScreen extends Screen {
             setActiveTab(Tab.PLAN);
         }).bounds(left + (tabW + 4) * 2, tabY, tabW, 20).build();
 
+        campaignTabButton = Button.builder(Component.literal("§fКампания"), btn -> {
+            setActiveTab(Tab.CAMPAIGN);
+            fetchCompactData();
+        }).bounds(left + (tabW + 4) * 3, tabY, tabW, 20).build();
+
         addRenderableWidget(statusTabButton);
         addRenderableWidget(recipesTabButton);
         addRenderableWidget(planTabButton);
+        addRenderableWidget(campaignTabButton);
+
+        // Отмена кампании — та же команда, что фраза в чате: решает сервер, не мод.
+        cancelCampaignButton = Button.builder(Component.literal("§cОтменить кампанию"), btn -> {
+            runtime.sendChatMessage("отмени кампанию");
+            lastDataFetchTime = 0;
+        }).bounds(left + panelW - 135, top + 30, 120, 18).build();
+        addRenderableWidget(cancelCampaignButton);
 
         whyButton = Button.builder(Component.literal(whyLabel()), btn -> {
             showWhy = !showWhy;
@@ -281,9 +297,18 @@ public class AssistantOverlayScreen extends Screen {
         boolean isStatus = activeTab == Tab.STATUS;
         boolean isPlan = activeTab == Tab.PLAN;
         boolean isRecipes = activeTab == Tab.RECIPES;
+        boolean isCampaign = activeTab == Tab.CAMPAIGN;
         if (whyButton != null) {
             whyButton.visible = isPlan;
             whyButton.active = isPlan;
+        }
+        if (campaignTabButton != null) {
+            campaignTabButton.setMessage(Component.literal(isCampaign ? "§b§lКампания" : "§fКампания"));
+        }
+        if (cancelCampaignButton != null) {
+            boolean running = isCampaign && lastCompactData != null && lastCompactData.campaign != null;
+            cancelCampaignButton.visible = running;
+            cancelCampaignButton.active = running;
         }
         if (planTabButton != null) {
             planTabButton.setMessage(Component.literal(isPlan ? "§b§lПлан" : "§fПлан"));
@@ -346,6 +371,8 @@ public class AssistantOverlayScreen extends Screen {
             renderStatusTab(graphics, left, top, panelW, panelH);
         } else if (activeTab == Tab.PLAN) {
             renderPlanTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.CAMPAIGN) {
+            renderCampaignTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
@@ -629,6 +656,77 @@ public class AssistantOverlayScreen extends Screen {
         }
     }
 
+    // --- вкладка кампании ---
+
+    private void applyCampaignControls() {
+        if (cancelCampaignButton == null) {
+            return;
+        }
+        boolean running = activeTab == Tab.CAMPAIGN && lastCompactData != null
+                && lastCompactData.campaign != null;
+        cancelCampaignButton.visible = running;
+        cancelCampaignButton.active = running;
+    }
+
+    /**
+     * Кампания: цель, персонаж и цепочка этапов с отметками. Этапы и их порядок вывел
+     * решатель на сервере; здесь они только показываются.
+     */
+    private void renderCampaignTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        int textLeft = left + 15;
+        int maxWidth = panelW - 30;
+        int y = top + 34;
+        graphics.drawString(font, "§l🧭 Кампания", textLeft, y, COLOR_HEADER);
+        y += 20;
+
+        HttpAssistantClient.CompactResponse.CampaignInfo campaign =
+                lastCompactData != null ? lastCompactData.campaign : null;
+        if (campaign == null) {
+            graphics.drawString(font, "§7Кампании нет. Скажи в чате:", textLeft, y, COLOR_MUTED);
+            graphics.drawString(font, "§f«веди меня к каменной кирке» §7или §f«дай цель»", textLeft,
+                    y + font.lineHeight + 3, COLOR_TEXT);
+            return;
+        }
+
+        String title = campaign.title != null ? campaign.title : "Кампания";
+        graphics.drawString(font, font.plainSubstrByWidth("§l" + title, maxWidth - 130), textLeft, y,
+                COLOR_GOLD);
+        y += font.lineHeight + 3;
+        String persona = campaign.persona_name != null ? campaign.persona_name : "—";
+        String stageOf = campaign.current != null && campaign.total != null
+                ? "этап " + campaign.current + " из " + campaign.total : "";
+        graphics.drawString(font, "§7Ведёт: §f" + persona + "  §7" + stageOf, textLeft, y, COLOR_MUTED);
+        y += font.lineHeight + 6;
+        graphics.hLine(left + 10, left + panelW - 10, y - 3, 0xFF444466);
+
+        if (campaign.stages != null) {
+            for (HttpAssistantClient.CompactResponse.StageInfo stage : campaign.stages) {
+                if (y > top + panelH - 40) {
+                    break;
+                }
+                boolean done = "completed".equals(stage.status);
+                boolean active = "active".equals(stage.status);
+                String mark = done ? "§a✔" : active ? "§b▶" : "§8·";
+                String line = mark + " §r" + stage.index + ". " + stage.label + " ×" + stage.count;
+                if (active) {
+                    line += "  §7" + stage.progress_count + "/" + stage.count;
+                }
+                int color = done ? COLOR_HEALTH_HIGH : active ? COLOR_TEXT : COLOR_MUTED;
+                graphics.drawString(font, font.plainSubstrByWidth(line, maxWidth), textLeft, y, color);
+                y += font.lineHeight + 3;
+            }
+        }
+
+        if (campaign.reward_label != null) {
+            int rewardY = top + panelH - 26;
+            graphics.hLine(left + 10, left + panelW - 10, rewardY - 5, 0xFF444466);
+            String reward = "§7Награда за этап: §e" + campaign.reward_label
+                    + (campaign.reward_count != null ? " ×" + campaign.reward_count : "");
+            graphics.drawString(font, font.plainSubstrByWidth(reward, maxWidth), textLeft, rewardY,
+                    COLOR_GOLD);
+        }
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (activeTab == Tab.PLAN) {
@@ -732,6 +830,8 @@ public class AssistantOverlayScreen extends Screen {
             Minecraft.getInstance().execute(() -> {
                 lastCompactData = data;
                 lastDataFetchTime = System.currentTimeMillis();
+                // Кнопка отмены видна, только пока кампания идёт.
+                applyCampaignControls();
             });
         });
     }
@@ -748,7 +848,7 @@ public class AssistantOverlayScreen extends Screen {
                 fetchCompactData();
                 return true;
             }
-        } else {
+        } else if (activeTab == Tab.RECIPES) {
             // Если фокус в поле ввода — отдаём ввод EditBox'у (чтобы можно было печатать букву "o")
             boolean editBoxFocused = recipeQueryBox != null && recipeQueryBox.isFocused();
             if (!editBoxFocused && keyCode == 79) { // O — поиск, только когда поле НЕ в фокусе
@@ -771,9 +871,11 @@ public class AssistantOverlayScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
-        if (activeTab == Tab.STATUS) {
-            // Автообновление каждые 5 секунд если окно открыто
-            if (System.currentTimeMillis() - lastDataFetchTime > 5000) {
+        if (activeTab == Tab.STATUS || activeTab == Tab.CAMPAIGN) {
+            // Автообновление если окно открыто: статус раз в 5 секунд, кампания чаще —
+            // прогресс этапа меняется, пока игрок смотрит на экран.
+            long period = activeTab == Tab.CAMPAIGN ? 2000 : 5000;
+            if (System.currentTimeMillis() - lastDataFetchTime > period) {
                 fetchCompactData();
             }
         }

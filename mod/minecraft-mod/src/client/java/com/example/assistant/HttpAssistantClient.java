@@ -338,6 +338,7 @@ public final class HttpAssistantClient {
         public Double health;
         public String last_event;
         public ChallengeInfo challenge;
+        public CampaignInfo campaign;
         public String timestamp;
 
         public static final class ChallengeInfo {
@@ -346,6 +347,30 @@ public final class HttpAssistantClient {
             public String progress;
             public String goal_type;
             public String reward;
+        }
+
+        /** Кампания: цель, персонаж и этапы с отметками — для вкладки оверлея. */
+        public static final class CampaignInfo {
+            public String title;
+            public String persona_name;
+            public String label;
+            public String status;
+            public Integer current;
+            public Integer total;
+            public String stage_label;
+            public Integer stage_count;
+            public Integer progress_count;
+            public String reward_label;
+            public Integer reward_count;
+            public java.util.List<StageInfo> stages;
+        }
+
+        public static final class StageInfo {
+            public int index;
+            public String label;
+            public int count;
+            public String status;
+            public int progress_count;
         }
     }
 

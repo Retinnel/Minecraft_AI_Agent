@@ -428,6 +428,9 @@ public final class AssistantRuntime {
                             return;
                         }
 
+                        // Объявление этапа кампании приходит опросом и несёт план этапа:
+                        // он должен попасть во вкладку «План» так же, как ответ на реплику.
+                        rememberForOverlay(rpResponse);
                         String msg = handleChatResponse(client, rpResponse);
                         if (msg == null || msg.isBlank()) {
                             rpPollingPausedUntilTick = localTick + 100;
