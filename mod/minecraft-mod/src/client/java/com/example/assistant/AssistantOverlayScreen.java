@@ -397,6 +397,16 @@ public class AssistantOverlayScreen extends Screen {
                 : "—";
         graphics.drawString(font, "   " + event, col1X, contentY + 47, COLOR_TEXT);
 
+        // Ступень развития: по лучшей кирке, и что дальше.
+        if (lastCompactData != null && lastCompactData.progression != null
+                && lastCompactData.progression.label != null) {
+            HttpAssistantClient.CompactResponse.ProgressInfo stage = lastCompactData.progression;
+            String line = "§7Ступень: §f" + stage.label
+                    + (stage.next_label != null ? " §7→ " + stage.next_label : "");
+            graphics.drawString(font, font.plainSubstrByWidth(line, 150), col1X, contentY + 60,
+                    COLOR_TEXT);
+        }
+
         // === КОЛОНКА 2: Челлендж ===
         graphics.drawString(font, "§l🎯 Челлендж", col2X, contentY, COLOR_GOLD);
         if (lastCompactData != null && lastCompactData.challenge != null) {

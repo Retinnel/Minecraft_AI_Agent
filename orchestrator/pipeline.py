@@ -25,6 +25,7 @@ from resolver.lexical import Candidate
 from resolver.resolve import AMBIGUOUS, NOT_FOUND, Resolver
 from solver.campaign import Campaign, CampaignBuilder, GoalCandidate
 from solver.planner import Plan, Planner
+from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
@@ -34,11 +35,12 @@ PLAN_GOAL = "plan_goal"
 CREATE_QUEST = "create_quest"
 START_CAMPAIGN = "start_campaign"
 PROPOSE_GOAL = "propose_goal"
+SHOW_PROGRESS = "show_progress"
 
 # Действия, которые может предложить модель. Остальные действия реестра (например, получение
 # награды за задание) выполняются системой сами и модели не предъявляются.
 PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
-              START_CAMPAIGN, PROPOSE_GOAL)
+              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS)
 
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
@@ -120,6 +122,9 @@ class Turn:
     # Цель выбрана ассистентом из кандидатов решателя, а не названа игроком.
     proposed: bool = False
     candidates: Sequence[GoalCandidate] = ()
+    # Заполняется только для show_progress: ступень развития и путь к следующей.
+    progress: Optional[ProgressReport] = None
+    progress_summary: Optional[str] = None
 
 
 class Pipeline:
@@ -188,6 +193,9 @@ class Pipeline:
 
         if proposal.action == PROPOSE_GOAL and PROPOSE_GOAL in actions:
             return self._propose_goal(mode, inventory, state, stages)
+
+        if proposal.action == SHOW_PROGRESS and SHOW_PROGRESS in actions:
+            return self._show_progress(inventory, stages)
 
         count = self._reconcile_count(utterance, proposal.count)
         stages["count"] = count
@@ -503,6 +511,26 @@ class Pipeline:
             plan_summary=render_summary(first.plan, self.kb),
             proposed=proposed,
             candidates=tuple(candidates),
+        )
+
+    def _show_progress(self, inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:
+        """Ступень развития игрока — целиком вывод решателя, модель его только озвучит.
+
+        Ступень определяется по лучшей кирке в инвентаре, открытое ею — по требованиям
+        источников добычи из онтологии, путь к следующей — планировщиком.
+        """
+        report = Progression(self.kb, self.planner).assess(inventory or {})
+        stages["progress"] = {"rank": report.rank, "tool": report.tool,
+                              "next_tool": report.next_tool}
+        plan = report.next_plan
+        return Turn(
+            outcome=ACT, action=SHOW_PROGRESS,
+            target=report.next_tool, label=self.kb.label(report.next_tool) if report.next_tool else None,
+            explanation=list(report.explanation), stages=stages,
+            progress=report, progress_summary=render_progress(report, self.kb),
+            plan=plan,
+            plan_tree=render_tree(plan, self.kb) if plan else None,
+            plan_summary=render_summary(plan, self.kb) if plan else None,
         )
 
     def _propose_goal(self, mode: str, inventory: Optional[Dict[str, int]],

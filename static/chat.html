@@ -72,6 +72,7 @@
     <div class="card">
       <h2>Игрок — симуляция мода</h2>
       <div id="inventory" class="inventory"><span class="muted">инвентарь пуст</span></div>
+      <div id="progression" class="muted" style="font-size:14px;margin-bottom:10px">ступень: —</div>
       <div class="presets" id="sim-inventory"></div>
       <div class="presets" id="sim-death"></div>
       <label class="muted autopoll"><input type="checkbox" id="autopoll" checked>
@@ -98,7 +99,8 @@
 const PRESETS = [
   "дай меч", "алмазный", "дай 1000 алмазов", "призови дракона края",
   "как сделать алмазную кирку", "режим выживания", "веди меня к каменной кирке",
-  "дай цель", "персонаж: старейшина", "отмени кампанию", "режим творческий", "дай задание"
+  "дай цель", "персонаж: старейшина", "отмени кампанию", "режим творческий", "дай задание",
+  "на каком я этапе"
 ];
 const node = (id) => document.getElementById(id);
 
@@ -223,6 +225,18 @@ async function sendInventory() {
     { counts: inventory, hotbar: [], armor: [], offhand: [] },
     "inventory_snapshot: unique_items=" + Object.keys(inventory).length);
   poll();
+  refreshProgression();
+}
+
+// Ступень развития выводит решатель по лучшей кирке в инвентаре.
+async function refreshProgression() {
+  try {
+    const p = (await (await fetch("/api/rp/compact")).json()).progression;
+    if (!p) return;
+    let text = "ступень: " + p.label;
+    if (p.next_label) text += " → дальше " + p.next_label.toLowerCase() + " (" + p.next_steps + " действ.)";
+    node("progression").textContent = text;
+  } catch (e) { /* сводка необязательна */ }
 }
 
 async function die(cause) {
@@ -280,6 +294,7 @@ fetch("/api/player-state/").then(r => r.json()).then(state => {
   }
 }).catch(() => {});
 setInterval(() => { if (node("autopoll").checked) poll(); }, 3000);
+refreshProgression();
 
 // Переключатель режима в шапке меняет сессию на сервере; в журнале это отмечается, как
 // если бы игрок сказал «режим выживания» в чате.

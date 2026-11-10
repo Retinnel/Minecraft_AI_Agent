@@ -16,7 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
-from orchestrator.pipeline import CREATE_QUEST, NONE, PLAN_GOAL, START_CAMPAIGN, Turn
+from orchestrator.pipeline import (CREATE_QUEST, NONE, PLAN_GOAL, SHOW_PROGRESS, START_CAMPAIGN,
+                                   Turn)
 from solver.validator import ACT, CLARIFY, MAX_ITEM_COUNT, MAX_SUMMON_COUNT, REJECT
 
 TEMPLATE = "template"
@@ -76,6 +77,8 @@ class Responder:
         if turn.outcome == ACT:
             if turn.action == PLAN_GOAL:
                 return turn.plan_summary or "План построен."
+            if turn.action == SHOW_PROGRESS:
+                return turn.progress_summary or "Ступень определить не удалось."
             if turn.action == START_CAMPAIGN and turn.campaign:
                 # Обычно кампанию озвучивает рассказчик; шаблон — на случай, если его нет.
                 return (f"Кампания к цели «{turn.label or turn.target}»: "
@@ -161,6 +164,10 @@ class Responder:
         """
         if turn.outcome == ACT and turn.action in ACTION_VERBS:
             return str(turn.count) in text
+        if turn.outcome == ACT and turn.action == SHOW_PROGRESS and turn.label:
+            # Отчёт о ступени без названия следующей кирки теряет смысл «что дальше».
+            from resolver.text import name_stems
+            return set(name_stems(turn.label)) <= set(name_stems(text))
         if turn.outcome == CLARIFY and turn.options:
             lowered = text.lower()
             return any(option.label.lower() in lowered for option in turn.options)

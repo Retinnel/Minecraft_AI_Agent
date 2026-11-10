@@ -883,6 +883,26 @@ def _assistant_session():
     return shared()
 
 
+def _progress_brief() -> Optional[Dict[str, Any]]:
+    """Ступень развития игрока для оверлея и страницы чата; без базы знаний — None."""
+    try:
+        from solver.progression import Progression
+        pipeline = _assistant_pipeline()
+        report = Progression(pipeline.kb, pipeline.planner).assess(_inventory_counts())
+        kb = pipeline.kb
+        return {
+            "rank": report.rank,
+            "label": report.label,
+            "tool_label": kb.label(report.tool) if report.tool else None,
+            "next_label": kb.label(report.next_tool) if report.next_tool else None,
+            "next_steps": len(report.next_plan.actions()) if report.next_plan else None,
+            "unlocks": [kb.label(item) or item for item in report.unlocks],
+        }
+    except Exception as error:
+        logger.warning(f"[RP] Ступень развития не определена: {error}")
+        return None
+
+
 _death_analyzer_instance = None
 
 
@@ -1346,6 +1366,7 @@ async def get_compact_status() -> Dict[str, Any]:
             "reward": active.get("reward_item_name") or active.get("reward_item_id") if active else None,
         } if active else None,
         "campaign": campaign_brief,
+        "progression": _progress_brief(),
         "assistant_mode": _assistant_session().mode,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

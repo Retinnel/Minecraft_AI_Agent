@@ -339,7 +339,16 @@ public final class HttpAssistantClient {
         public String last_event;
         public ChallengeInfo challenge;
         public CampaignInfo campaign;
+        public ProgressInfo progression;
         public String timestamp;
+
+        /** Ступень развития: выводится решателем по лучшей кирке в инвентаре. */
+        public static final class ProgressInfo {
+            public String label;
+            public String tool_label;
+            public String next_label;
+            public Integer next_steps;
+        }
 
         public static final class ChallengeInfo {
             public String title;

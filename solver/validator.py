@@ -26,9 +26,10 @@ MODES = (CREATIVE, SURVIVAL)
 # инструмента ей не показывают. Валидатор повторяет ту же проверку на своей стороне.
 MODE_ACTIONS = {
     CREATIVE: ("give_item", "remove_item", "summon_entity", "plan_goal",
-               "create_quest", "claim_quest_reward", "start_campaign", "propose_goal"),
+               "create_quest", "claim_quest_reward", "start_campaign", "propose_goal",
+               "show_progress"),
     SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward",
-               "start_campaign", "propose_goal"),
+               "start_campaign", "propose_goal", "show_progress"),
 }
 
 # Действие требует, чтобы целью был предмет либо существо.
