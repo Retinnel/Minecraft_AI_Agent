@@ -1,0 +1,5559 @@
+{
+  "summary": {
+    "config": "hybrid",
+    "title": "C — гибрид",
+    "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+    "timestamp": "2026-11-11T19:57:25",
+    "repeat": 3,
+    "total": 61,
+    "failed": 0,
+    "passed": 56,
+    "passed_range": [
+      56,
+      56
+    ],
+    "accuracy": 0.918,
+    "unsafe": 0,
+    "unsafe_range": [
+      0,
+      0
+    ],
+    "unsafe_rate": 0.0,
+    "verdicts": {
+      "pass": 56,
+      "intent_missed": 2,
+      "planned_instead": 1,
+      "over_clarify": 1,
+      "under_reject": 1
+    },
+    "by_group": {
+      "typical": {
+        "total": 38,
+        "pass": 35,
+        "pass_range": [
+          35,
+          35
+        ]
+      },
+      "boundary": {
+        "total": 16,
+        "pass": 15,
+        "pass_range": [
+          15,
+          15
+        ]
+      },
+      "negative": {
+        "total": 7,
+        "pass": 6,
+        "pass_range": [
+          6,
+          6
+        ]
+      }
+    },
+    "latency_ms": {
+      "median": 1035.098,
+      "max": 2464.998
+    },
+    "unstable": {},
+    "runs": [
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-11T19:55:12",
+        "total": 61,
+        "failed": 0,
+        "passed": 56,
+        "accuracy": 0.918,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 56,
+          "intent_missed": 2,
+          "planned_instead": 1,
+          "over_clarify": 1,
+          "under_reject": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 38,
+            "pass": 35
+          },
+          "boundary": {
+            "total": 16,
+            "pass": 15
+          },
+          "negative": {
+            "total": 7,
+            "pass": 6
+          }
+        },
+        "latency_ms": {
+          "median": 1054.141,
+          "max": 2464.998
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-11T19:56:19",
+        "total": 61,
+        "failed": 0,
+        "passed": 56,
+        "accuracy": 0.918,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 56,
+          "intent_missed": 2,
+          "planned_instead": 1,
+          "over_clarify": 1,
+          "under_reject": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 38,
+            "pass": 35
+          },
+          "boundary": {
+            "total": 16,
+            "pass": 15
+          },
+          "negative": {
+            "total": 7,
+            "pass": 6
+          }
+        },
+        "latency_ms": {
+          "median": 995.901,
+          "max": 2246.195
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-11T19:57:25",
+        "total": 61,
+        "failed": 0,
+        "passed": 56,
+        "accuracy": 0.918,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 56,
+          "intent_missed": 2,
+          "planned_instead": 1,
+          "over_clarify": 1,
+          "under_reject": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 38,
+            "pass": 35
+          },
+          "boundary": {
+            "total": 16,
+            "pass": 15
+          },
+          "negative": {
+            "total": 7,
+            "pass": 6
+          }
+        },
+        "latency_ms": {
+          "median": 1041.534,
+          "max": 2243.459
+        }
+      }
+    ]
+  },
+  "model": {
+    "ключ": "deepseek-chat",
+    "модель": "deepseek-chat",
+    "провайдер": "deepseek",
+    "температура": 0.0,
+    "max_tokens": 200
+  },
+  "rows": [
+    {
+      "id": "give-t-001",
+      "utterance": "дай алмаз",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 1,
+        "command": "/give @s minecraft:diamond 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 901.076,
+      "note": ""
+    },
+    {
+      "id": "give-t-002",
+      "utterance": "дай мне 5 алмазов",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 5
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 5,
+        "command": "/give @s minecraft:diamond 5"
+      },
+      "verdict": "pass",
+      "latency_ms": 1225.001,
+      "note": "известный промах: резолвится в diamond_block"
+    },
+    {
+      "id": "give-t-003",
+      "utterance": "выдай 32 факела",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:torch",
+        "count": 32
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:torch",
+        "count": 32,
+        "command": "/give @s minecraft:torch 32"
+      },
+      "verdict": "pass",
+      "latency_ms": 846.856,
+      "note": ""
+    },
+    {
+      "id": "give-t-004",
+      "utterance": "нужен хлеб",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bread",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bread",
+        "count": 1,
+        "command": "/give @s minecraft:bread 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1111.88,
+      "note": ""
+    },
+    {
+      "id": "give-t-005",
+      "utterance": "дай сундук",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:chest",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:chest",
+        "count": 1,
+        "command": "/give @s minecraft:chest 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 940.306,
+      "note": ""
+    },
+    {
+      "id": "give-t-006",
+      "utterance": "мне нужен верстак",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:crafting_table",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:crafting_table",
+        "count": 1,
+        "command": "/give @s minecraft:crafting_table 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1011.573,
+      "note": ""
+    },
+    {
+      "id": "give-t-007",
+      "utterance": "дай 64 булыжника",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:cobblestone",
+        "count": 64
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:cobblestone",
+        "count": 64,
+        "command": "/give @s minecraft:cobblestone 64"
+      },
+      "verdict": "pass",
+      "latency_ms": 832.345,
+      "note": ""
+    },
+    {
+      "id": "give-t-008",
+      "utterance": "хочу железный слиток",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:iron_ingot",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:iron_ingot",
+        "count": 1,
+        "command": "/give @s minecraft:iron_ingot 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1032.022,
+      "note": ""
+    },
+    {
+      "id": "give-t-009",
+      "utterance": "дай печку",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:furnace",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:furnace",
+        "count": 1,
+        "command": "/give @s minecraft:furnace 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 965.397,
+      "note": ""
+    },
+    {
+      "id": "give-t-010",
+      "utterance": "выдай лук",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bow",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bow",
+        "count": 1,
+        "command": "/give @s minecraft:bow 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 766.663,
+      "note": "омонимия с растением; в каталоге только оружие"
+    },
+    {
+      "id": "give-t-011",
+      "utterance": "дай мне 10 стрел",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:arrow",
+        "count": 10
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:arrow",
+        "count": 10,
+        "command": "/give @s minecraft:arrow 10"
+      },
+      "verdict": "pass",
+      "latency_ms": 679.295,
+      "note": ""
+    },
+    {
+      "id": "give-t-012",
+      "utterance": "нужна наковальня",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:anvil",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:anvil",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "planned_instead",
+      "latency_ms": 804.654,
+      "note": ""
+    },
+    {
+      "id": "give-t-013",
+      "utterance": "дай обсидиан",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:obsidian",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:obsidian",
+        "count": 1,
+        "command": "/give @s minecraft:obsidian 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 979.412,
+      "note": ""
+    },
+    {
+      "id": "give-t-014",
+      "utterance": "выдай щит",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:shield",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:shield",
+        "count": 1,
+        "command": "/give @s minecraft:shield 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1131.85,
+      "note": ""
+    },
+    {
+      "id": "give-t-015",
+      "utterance": "дай 16 палок",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:stick",
+        "count": 16
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:stick",
+        "count": 16,
+        "command": "/give @s minecraft:stick 16"
+      },
+      "verdict": "pass",
+      "latency_ms": 1288.122,
+      "note": ""
+    },
+    {
+      "id": "give-s-001",
+      "utterance": "дай гэпл",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:golden_apple",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:golden_apple",
+        "count": 1,
+        "command": "/give @s minecraft:golden_apple 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 995.455,
+      "note": ""
+    },
+    {
+      "id": "give-s-002",
+      "utterance": "закинь тотем",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:totem_of_undying",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:totem_of_undying",
+        "count": 1,
+        "command": "/give @s minecraft:totem_of_undying 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 948.65,
+      "note": ""
+    },
+    {
+      "id": "give-s-003",
+      "utterance": "нужна реда",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:redstone",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "intent_missed",
+      "latency_ms": 935.602,
+      "note": ""
+    },
+    {
+      "id": "give-s-004",
+      "utterance": "дай слаймбол",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:slime_ball",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:slime_ball",
+        "count": 1,
+        "command": "/give @s minecraft:slime_ball 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 893.296,
+      "note": ""
+    },
+    {
+      "id": "give-s-005",
+      "utterance": "хочу стейк",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:cooked_beef",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:cooked_beef",
+        "count": 1,
+        "command": "/give @s minecraft:cooked_beef 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 635.048,
+      "note": ""
+    },
+    {
+      "id": "give-s-006",
+      "utterance": "дай незерит",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:netherite_ingot",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:netherite_ingot",
+        "count": 1,
+        "command": "/give @s minecraft:netherite_ingot 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 897.491,
+      "note": ""
+    },
+    {
+      "id": "give-s-007",
+      "utterance": "мне бы дебрис",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:ancient_debris",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:ancient_debris",
+        "count": 1,
+        "command": "/give @s minecraft:ancient_debris 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 898.382,
+      "note": ""
+    },
+    {
+      "id": "give-s-008",
+      "utterance": "дай крылья",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:elytra",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:elytra",
+        "count": 1,
+        "command": "/give @s minecraft:elytra 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1123.917,
+      "note": ""
+    },
+    {
+      "id": "give-s-009",
+      "utterance": "я бы не отказался от пузырька",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:glass_bottle",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "over_clarify",
+      "latency_ms": 1089.221,
+      "note": ""
+    },
+    {
+      "id": "give-s-010",
+      "utterance": "мне бы 10 наковален",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:anvil",
+        "count": 10
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:anvil",
+        "count": 10,
+        "command": "/give @s minecraft:anvil 10"
+      },
+      "verdict": "pass",
+      "latency_ms": 1101.744,
+      "note": ""
+    },
+    {
+      "id": "give-b-001",
+      "utterance": "дай доски",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1270.683,
+      "note": "несколько пород дерева"
+    },
+    {
+      "id": "give-b-002",
+      "utterance": "дай меч",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1080.323,
+      "note": "шесть видов мечей; захардкоженное умолчание diamond_sword подлежит удалению"
+    },
+    {
+      "id": "give-b-003",
+      "utterance": "нужна кирка",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1137.551,
+      "note": "алмазная и железная; алиас 'кирка' висит на обеих"
+    },
+    {
+      "id": "give-b-004",
+      "utterance": "дай бревно",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 979.294,
+      "note": "несколько пород дерева"
+    },
+    {
+      "id": "give-b-005",
+      "utterance": "дай лодку",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1132.982,
+      "note": "несколько пород дерева"
+    },
+    {
+      "id": "give-b-006",
+      "utterance": "дай 1000 алмазов",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 64
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond",
+        "count": 64,
+        "command": "/give @s minecraft:diamond 64"
+      },
+      "verdict": "pass",
+      "latency_ms": 976.127,
+      "note": "обрезание по лимиту MAX_ITEM_COUNT"
+    },
+    {
+      "id": "give-b-007",
+      "utterance": "дай 0 алмазов",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 875.656,
+      "note": "некорректное количество: отказ с объяснением вместо нормализации в 1"
+    },
+    {
+      "id": "give-b-008",
+      "utterance": "дай -5 алмазов",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "remove_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "under_reject",
+      "latency_ms": 1107.993,
+      "note": "некорректное количество: минус сейчас игнорируется регуляркой и выдаётся 5"
+    },
+    {
+      "id": "give-b-009",
+      "utterance": "дай пузырьков",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:glass_bottle",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:glass_bottle",
+        "count": 1,
+        "command": "/give @s minecraft:glass_bottle 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1563.948,
+      "note": ""
+    },
+    {
+      "id": "give-b-010",
+      "utterance": "дай бутылёк",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:glass_bottle",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:glass_bottle",
+        "count": 1,
+        "command": "/give @s minecraft:glass_bottle 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 871.228,
+      "note": "разговорная форма, сейчас держится на захардкоженном стемминге по префиксу"
+    },
+    {
+      "id": "give-b-011",
+      "utterance": "выдай косточку",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bone",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:bone",
+        "count": 1,
+        "command": "/give @s minecraft:bone 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1088.589,
+      "note": ""
+    },
+    {
+      "id": "give-b-012",
+      "utterance": "дай зелье лечения",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+        "count": 1,
+        "command": "/give @s minecraft:potion{Potion:\"minecraft:healing\"} 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 860.435,
+      "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"
+    },
+    {
+      "id": "give-b-013",
+      "utterance": "дай пузырёк воды",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+        "count": 1,
+        "command": "/give @s minecraft:potion{Potion:\"minecraft:water\"} 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1143.588,
+      "note": "тот же дефект"
+    },
+    {
+      "id": "give-n-001",
+      "utterance": "дай мне звёздный меч",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 2243.459,
+      "note": "предмета не существует"
+    },
+    {
+      "id": "give-n-002",
+      "utterance": "выдай сто алмазных драконов",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "summon_entity",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1874.727,
+      "note": "предмета не существует"
+    },
+    {
+      "id": "give-n-003",
+      "utterance": "дай командный блок",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "give_item",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 671.226,
+      "note": "служебный блок: запрет правилом онтологии, а не отсутствием записи в каталоге"
+    },
+    {
+      "id": "give-n-004",
+      "utterance": "дай",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "give_item",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "intent_missed",
+      "latency_ms": 854.351,
+      "note": "запрос без предмета — недоопределён, значит уточнение"
+    },
+    {
+      "id": "summon-t-001",
+      "utterance": "призови зомби",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:zombie",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:zombie",
+        "count": 1,
+        "command": "/summon minecraft:zombie ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 939.631,
+      "note": ""
+    },
+    {
+      "id": "summon-t-002",
+      "utterance": "заспавни крипера",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:creeper",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:creeper",
+        "count": 1,
+        "command": "/summon minecraft:creeper ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 948.587,
+      "note": ""
+    },
+    {
+      "id": "summon-t-003",
+      "utterance": "призови 5 скелетов",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:skeleton",
+        "count": 5
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:skeleton",
+        "count": 5,
+        "command": "/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 1167.809,
+      "note": ""
+    },
+    {
+      "id": "summon-t-004",
+      "utterance": "спавни корову",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:cow",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:cow",
+        "count": 1,
+        "command": "/summon minecraft:cow ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 816.029,
+      "note": ""
+    },
+    {
+      "id": "summon-t-005",
+      "utterance": "призови слайма",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:slime",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:slime",
+        "count": 1,
+        "command": "/summon minecraft:slime ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 1075.99,
+      "note": ""
+    },
+    {
+      "id": "summon-b-001",
+      "utterance": "призови 100 зомби",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:zombie",
+        "count": 16
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "summon_entity",
+        "target": "minecraft:zombie",
+        "count": 16,
+        "command": "/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~"
+      },
+      "verdict": "pass",
+      "latency_ms": 1396.203,
+      "note": "обрезание по лимиту MAX_SUMMON_COUNT"
+    },
+    {
+      "id": "summon-n-001",
+      "utterance": "призови дракона края",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "summon_entity",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "summon_entity",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1151.707,
+      "note": "босс: запрет правилом онтологии; сейчас ошибочно резолвится в enderman по слову «края»"
+    },
+    {
+      "id": "summon-n-002",
+      "utterance": "призови кракена",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "summon_entity",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "summon_entity",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1979.862,
+      "note": "существа не существует"
+    },
+    {
+      "id": "remove-t-001",
+      "utterance": "забери гнилую плоть",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "remove_item",
+        "target": "minecraft:rotten_flesh",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "remove_item",
+        "target": "minecraft:rotten_flesh",
+        "count": 1,
+        "command": "/clear @s minecraft:rotten_flesh 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 965.64,
+      "note": ""
+    },
+    {
+      "id": "remove-t-002",
+      "utterance": "убери 10 булыжника",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "remove_item",
+        "target": "minecraft:cobblestone",
+        "count": 10
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "remove_item",
+        "target": "minecraft:cobblestone",
+        "count": 10,
+        "command": "/clear @s minecraft:cobblestone 10"
+      },
+      "verdict": "pass",
+      "latency_ms": 1350.26,
+      "note": ""
+    },
+    {
+      "id": "plan-t-001",
+      "utterance": "как скрафтить факел?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:torch",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:torch",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1061.907,
+      "note": ""
+    },
+    {
+      "id": "plan-t-002",
+      "utterance": "как сделать алмазную кирку",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:diamond_pickaxe",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:diamond_pickaxe",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1094.617,
+      "note": ""
+    },
+    {
+      "id": "plan-b-002",
+      "utterance": "хочу алмазную кирку",
+      "group": "boundary",
+      "policy": true,
+      "expected": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond_pickaxe",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "give_item",
+        "target": "minecraft:diamond_pickaxe",
+        "count": 1,
+        "command": "/give @s minecraft:diamond_pickaxe 1"
+      },
+      "verdict": "pass",
+      "latency_ms": 1041.534,
+      "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"
+    },
+    {
+      "id": "plan-t-003",
+      "utterance": "как получить обсидиан",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:obsidian",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:obsidian",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 982.998,
+      "note": ""
+    },
+    {
+      "id": "plan-b-001",
+      "utterance": "как добыть незеритовый слиток",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:netherite_ingot",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:netherite_ingot",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1254.706,
+      "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"
+    },
+    {
+      "id": "plan-n-001",
+      "utterance": "как скрафтить звёздный меч",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "plan_goal",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "plan_goal",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1963.862,
+      "note": "предмета не существует: отказ, а не выдуманный план"
+    },
+    {
+      "id": "chat-t-001",
+      "utterance": "привет",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1291.882,
+      "note": ""
+    },
+    {
+      "id": "chat-t-002",
+      "utterance": "что делать ночью?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1084.324,
+      "note": ""
+    },
+    {
+      "id": "chat-t-004",
+      "utterance": "спасибо",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1369.815,
+      "note": ""
+    }
+  ],
+  "all_rows": [
+    [
+      {
+        "id": "give-t-001",
+        "utterance": "дай алмаз",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1,
+          "command": "/give @s minecraft:diamond 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 2464.998,
+        "note": ""
+      },
+      {
+        "id": "give-t-002",
+        "utterance": "дай мне 5 алмазов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5,
+          "command": "/give @s minecraft:diamond 5"
+        },
+        "verdict": "pass",
+        "latency_ms": 1143.338,
+        "note": "известный промах: резолвится в diamond_block"
+      },
+      {
+        "id": "give-t-003",
+        "utterance": "выдай 32 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32,
+          "command": "/give @s minecraft:torch 32"
+        },
+        "verdict": "pass",
+        "latency_ms": 1185.906,
+        "note": ""
+      },
+      {
+        "id": "give-t-004",
+        "utterance": "нужен хлеб",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1,
+          "command": "/give @s minecraft:bread 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 940.78,
+        "note": ""
+      },
+      {
+        "id": "give-t-005",
+        "utterance": "дай сундук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1,
+          "command": "/give @s minecraft:chest 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 864.444,
+        "note": ""
+      },
+      {
+        "id": "give-t-006",
+        "utterance": "мне нужен верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": "/give @s minecraft:crafting_table 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 948.819,
+        "note": ""
+      },
+      {
+        "id": "give-t-007",
+        "utterance": "дай 64 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64,
+          "command": "/give @s minecraft:cobblestone 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 1021.045,
+        "note": ""
+      },
+      {
+        "id": "give-t-008",
+        "utterance": "хочу железный слиток",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:iron_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 952.025,
+        "note": ""
+      },
+      {
+        "id": "give-t-009",
+        "utterance": "дай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": "/give @s minecraft:furnace 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1183.945,
+        "note": ""
+      },
+      {
+        "id": "give-t-010",
+        "utterance": "выдай лук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1,
+          "command": "/give @s minecraft:bow 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 811.717,
+        "note": "омонимия с растением; в каталоге только оружие"
+      },
+      {
+        "id": "give-t-011",
+        "utterance": "дай мне 10 стрел",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10,
+          "command": "/give @s minecraft:arrow 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1118.467,
+        "note": ""
+      },
+      {
+        "id": "give-t-012",
+        "utterance": "нужна наковальня",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:anvil",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "planned_instead",
+        "latency_ms": 830.57,
+        "note": ""
+      },
+      {
+        "id": "give-t-013",
+        "utterance": "дай обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": "/give @s minecraft:obsidian 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1215.699,
+        "note": ""
+      },
+      {
+        "id": "give-t-014",
+        "utterance": "выдай щит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1,
+          "command": "/give @s minecraft:shield 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1116.038,
+        "note": ""
+      },
+      {
+        "id": "give-t-015",
+        "utterance": "дай 16 палок",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16,
+          "command": "/give @s minecraft:stick 16"
+        },
+        "verdict": "pass",
+        "latency_ms": 870.948,
+        "note": ""
+      },
+      {
+        "id": "give-s-001",
+        "utterance": "дай гэпл",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1,
+          "command": "/give @s minecraft:golden_apple 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 705.959,
+        "note": ""
+      },
+      {
+        "id": "give-s-002",
+        "utterance": "закинь тотем",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1,
+          "command": "/give @s minecraft:totem_of_undying 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1054.141,
+        "note": ""
+      },
+      {
+        "id": "give-s-003",
+        "utterance": "нужна реда",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:redstone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 994.042,
+        "note": ""
+      },
+      {
+        "id": "give-s-004",
+        "utterance": "дай слаймбол",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1,
+          "command": "/give @s minecraft:slime_ball 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1221.599,
+        "note": ""
+      },
+      {
+        "id": "give-s-005",
+        "utterance": "хочу стейк",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1,
+          "command": "/give @s minecraft:cooked_beef 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 836.344,
+        "note": ""
+      },
+      {
+        "id": "give-s-006",
+        "utterance": "дай незерит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:netherite_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 975.871,
+        "note": ""
+      },
+      {
+        "id": "give-s-007",
+        "utterance": "мне бы дебрис",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1,
+          "command": "/give @s minecraft:ancient_debris 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1054.011,
+        "note": ""
+      },
+      {
+        "id": "give-s-008",
+        "utterance": "дай крылья",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1,
+          "command": "/give @s minecraft:elytra 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1007.135,
+        "note": ""
+      },
+      {
+        "id": "give-s-009",
+        "utterance": "я бы не отказался от пузырька",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "over_clarify",
+        "latency_ms": 1253.554,
+        "note": ""
+      },
+      {
+        "id": "give-s-010",
+        "utterance": "мне бы 10 наковален",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10,
+          "command": "/give @s minecraft:anvil 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1313.054,
+        "note": ""
+      },
+      {
+        "id": "give-b-001",
+        "utterance": "дай доски",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1175.939,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-002",
+        "utterance": "дай меч",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1122.992,
+        "note": "шесть видов мечей; захардкоженное умолчание diamond_sword подлежит удалению"
+      },
+      {
+        "id": "give-b-003",
+        "utterance": "нужна кирка",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1261.073,
+        "note": "алмазная и железная; алиас 'кирка' висит на обеих"
+      },
+      {
+        "id": "give-b-004",
+        "utterance": "дай бревно",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 881.439,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-005",
+        "utterance": "дай лодку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 978.493,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-006",
+        "utterance": "дай 1000 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64,
+          "command": "/give @s minecraft:diamond 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 1083.558,
+        "note": "обрезание по лимиту MAX_ITEM_COUNT"
+      },
+      {
+        "id": "give-b-007",
+        "utterance": "дай 0 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1316.415,
+        "note": "некорректное количество: отказ с объяснением вместо нормализации в 1"
+      },
+      {
+        "id": "give-b-008",
+        "utterance": "дай -5 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remove_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "under_reject",
+        "latency_ms": 1231.599,
+        "note": "некорректное количество: минус сейчас игнорируется регуляркой и выдаётся 5"
+      },
+      {
+        "id": "give-b-009",
+        "utterance": "дай пузырьков",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1252.586,
+        "note": ""
+      },
+      {
+        "id": "give-b-010",
+        "utterance": "дай бутылёк",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 971.648,
+        "note": "разговорная форма, сейчас держится на захардкоженном стемминге по префиксу"
+      },
+      {
+        "id": "give-b-011",
+        "utterance": "выдай косточку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1,
+          "command": "/give @s minecraft:bone 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 900.346,
+        "note": ""
+      },
+      {
+        "id": "give-b-012",
+        "utterance": "дай зелье лечения",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:healing\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1333.117,
+        "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"
+      },
+      {
+        "id": "give-b-013",
+        "utterance": "дай пузырёк воды",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:water\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1169.091,
+        "note": "тот же дефект"
+      },
+      {
+        "id": "give-n-001",
+        "utterance": "дай мне звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1979.584,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-002",
+        "utterance": "выдай сто алмазных драконов",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1889.247,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-003",
+        "utterance": "дай командный блок",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 891.841,
+        "note": "служебный блок: запрет правилом онтологии, а не отсутствием записи в каталоге"
+      },
+      {
+        "id": "give-n-004",
+        "utterance": "дай",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 860.281,
+        "note": "запрос без предмета — недоопределён, значит уточнение"
+      },
+      {
+        "id": "summon-t-001",
+        "utterance": "призови зомби",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1,
+          "command": "/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 742.678,
+        "note": ""
+      },
+      {
+        "id": "summon-t-002",
+        "utterance": "заспавни крипера",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1,
+          "command": "/summon minecraft:creeper ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1217.641,
+        "note": ""
+      },
+      {
+        "id": "summon-t-003",
+        "utterance": "призови 5 скелетов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5,
+          "command": "/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1324.037,
+        "note": ""
+      },
+      {
+        "id": "summon-t-004",
+        "utterance": "спавни корову",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1,
+          "command": "/summon minecraft:cow ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 857.682,
+        "note": ""
+      },
+      {
+        "id": "summon-t-005",
+        "utterance": "призови слайма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1,
+          "command": "/summon minecraft:slime ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 942.096,
+        "note": ""
+      },
+      {
+        "id": "summon-b-001",
+        "utterance": "призови 100 зомби",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16,
+          "command": "/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 932.106,
+        "note": "обрезание по лимиту MAX_SUMMON_COUNT"
+      },
+      {
+        "id": "summon-n-001",
+        "utterance": "призови дракона края",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 967.822,
+        "note": "босс: запрет правилом онтологии; сейчас ошибочно резолвится в enderman по слову «края»"
+      },
+      {
+        "id": "summon-n-002",
+        "utterance": "призови кракена",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1761.408,
+        "note": "существа не существует"
+      },
+      {
+        "id": "remove-t-001",
+        "utterance": "забери гнилую плоть",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1,
+          "command": "/clear @s minecraft:rotten_flesh 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1027.915,
+        "note": ""
+      },
+      {
+        "id": "remove-t-002",
+        "utterance": "убери 10 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10,
+          "command": "/clear @s minecraft:cobblestone 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 982.489,
+        "note": ""
+      },
+      {
+        "id": "plan-t-001",
+        "utterance": "как скрафтить факел?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 959.825,
+        "note": ""
+      },
+      {
+        "id": "plan-t-002",
+        "utterance": "как сделать алмазную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1065.548,
+        "note": ""
+      },
+      {
+        "id": "plan-b-002",
+        "utterance": "хочу алмазную кирку",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": "/give @s minecraft:diamond_pickaxe 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1390.598,
+        "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"
+      },
+      {
+        "id": "plan-t-003",
+        "utterance": "как получить обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1180.63,
+        "note": ""
+      },
+      {
+        "id": "plan-b-001",
+        "utterance": "как добыть незеритовый слиток",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1037.443,
+        "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"
+      },
+      {
+        "id": "plan-n-001",
+        "utterance": "как скрафтить звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1608.294,
+        "note": "предмета не существует: отказ, а не выдуманный план"
+      },
+      {
+        "id": "chat-t-001",
+        "utterance": "привет",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1274.512,
+        "note": ""
+      },
+      {
+        "id": "chat-t-002",
+        "utterance": "что делать ночью?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 998.825,
+        "note": ""
+      },
+      {
+        "id": "chat-t-004",
+        "utterance": "спасибо",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1111.698,
+        "note": ""
+      }
+    ],
+    [
+      {
+        "id": "give-t-001",
+        "utterance": "дай алмаз",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1,
+          "command": "/give @s minecraft:diamond 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1294.06,
+        "note": ""
+      },
+      {
+        "id": "give-t-002",
+        "utterance": "дай мне 5 алмазов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5,
+          "command": "/give @s minecraft:diamond 5"
+        },
+        "verdict": "pass",
+        "latency_ms": 950.068,
+        "note": "известный промах: резолвится в diamond_block"
+      },
+      {
+        "id": "give-t-003",
+        "utterance": "выдай 32 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32,
+          "command": "/give @s minecraft:torch 32"
+        },
+        "verdict": "pass",
+        "latency_ms": 790.609,
+        "note": ""
+      },
+      {
+        "id": "give-t-004",
+        "utterance": "нужен хлеб",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1,
+          "command": "/give @s minecraft:bread 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1182.578,
+        "note": ""
+      },
+      {
+        "id": "give-t-005",
+        "utterance": "дай сундук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1,
+          "command": "/give @s minecraft:chest 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1035.098,
+        "note": ""
+      },
+      {
+        "id": "give-t-006",
+        "utterance": "мне нужен верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": "/give @s minecraft:crafting_table 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 875.763,
+        "note": ""
+      },
+      {
+        "id": "give-t-007",
+        "utterance": "дай 64 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64,
+          "command": "/give @s minecraft:cobblestone 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 964.041,
+        "note": ""
+      },
+      {
+        "id": "give-t-008",
+        "utterance": "хочу железный слиток",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:iron_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1393.8,
+        "note": ""
+      },
+      {
+        "id": "give-t-009",
+        "utterance": "дай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": "/give @s minecraft:furnace 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 993.902,
+        "note": ""
+      },
+      {
+        "id": "give-t-010",
+        "utterance": "выдай лук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1,
+          "command": "/give @s minecraft:bow 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1255.774,
+        "note": "омонимия с растением; в каталоге только оружие"
+      },
+      {
+        "id": "give-t-011",
+        "utterance": "дай мне 10 стрел",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10,
+          "command": "/give @s minecraft:arrow 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 892.225,
+        "note": ""
+      },
+      {
+        "id": "give-t-012",
+        "utterance": "нужна наковальня",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:anvil",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "planned_instead",
+        "latency_ms": 1006.527,
+        "note": ""
+      },
+      {
+        "id": "give-t-013",
+        "utterance": "дай обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": "/give @s minecraft:obsidian 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 892.545,
+        "note": ""
+      },
+      {
+        "id": "give-t-014",
+        "utterance": "выдай щит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1,
+          "command": "/give @s minecraft:shield 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1216.707,
+        "note": ""
+      },
+      {
+        "id": "give-t-015",
+        "utterance": "дай 16 палок",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16,
+          "command": "/give @s minecraft:stick 16"
+        },
+        "verdict": "pass",
+        "latency_ms": 908.064,
+        "note": ""
+      },
+      {
+        "id": "give-s-001",
+        "utterance": "дай гэпл",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1,
+          "command": "/give @s minecraft:golden_apple 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1044.077,
+        "note": ""
+      },
+      {
+        "id": "give-s-002",
+        "utterance": "закинь тотем",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1,
+          "command": "/give @s minecraft:totem_of_undying 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1291.7,
+        "note": ""
+      },
+      {
+        "id": "give-s-003",
+        "utterance": "нужна реда",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:redstone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 983.548,
+        "note": ""
+      },
+      {
+        "id": "give-s-004",
+        "utterance": "дай слаймбол",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1,
+          "command": "/give @s minecraft:slime_ball 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1313.179,
+        "note": ""
+      },
+      {
+        "id": "give-s-005",
+        "utterance": "хочу стейк",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1,
+          "command": "/give @s minecraft:cooked_beef 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1323.324,
+        "note": ""
+      },
+      {
+        "id": "give-s-006",
+        "utterance": "дай незерит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:netherite_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 833.059,
+        "note": ""
+      },
+      {
+        "id": "give-s-007",
+        "utterance": "мне бы дебрис",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1,
+          "command": "/give @s minecraft:ancient_debris 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1065.36,
+        "note": ""
+      },
+      {
+        "id": "give-s-008",
+        "utterance": "дай крылья",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1,
+          "command": "/give @s minecraft:elytra 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 997.665,
+        "note": ""
+      },
+      {
+        "id": "give-s-009",
+        "utterance": "я бы не отказался от пузырька",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "over_clarify",
+        "latency_ms": 975.808,
+        "note": ""
+      },
+      {
+        "id": "give-s-010",
+        "utterance": "мне бы 10 наковален",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10,
+          "command": "/give @s minecraft:anvil 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1382.275,
+        "note": ""
+      },
+      {
+        "id": "give-b-001",
+        "utterance": "дай доски",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 985.533,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-002",
+        "utterance": "дай меч",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1103.795,
+        "note": "шесть видов мечей; захардкоженное умолчание diamond_sword подлежит удалению"
+      },
+      {
+        "id": "give-b-003",
+        "utterance": "нужна кирка",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 732.171,
+        "note": "алмазная и железная; алиас 'кирка' висит на обеих"
+      },
+      {
+        "id": "give-b-004",
+        "utterance": "дай бревно",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1226.805,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-005",
+        "utterance": "дай лодку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 706.669,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-006",
+        "utterance": "дай 1000 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64,
+          "command": "/give @s minecraft:diamond 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 1190.554,
+        "note": "обрезание по лимиту MAX_ITEM_COUNT"
+      },
+      {
+        "id": "give-b-007",
+        "utterance": "дай 0 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 796.476,
+        "note": "некорректное количество: отказ с объяснением вместо нормализации в 1"
+      },
+      {
+        "id": "give-b-008",
+        "utterance": "дай -5 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remove_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "under_reject",
+        "latency_ms": 1123.676,
+        "note": "некорректное количество: минус сейчас игнорируется регуляркой и выдаётся 5"
+      },
+      {
+        "id": "give-b-009",
+        "utterance": "дай пузырьков",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 995.901,
+        "note": ""
+      },
+      {
+        "id": "give-b-010",
+        "utterance": "дай бутылёк",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1321.724,
+        "note": "разговорная форма, сейчас держится на захардкоженном стемминге по префиксу"
+      },
+      {
+        "id": "give-b-011",
+        "utterance": "выдай косточку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1,
+          "command": "/give @s minecraft:bone 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1101.124,
+        "note": ""
+      },
+      {
+        "id": "give-b-012",
+        "utterance": "дай зелье лечения",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:healing\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 636.677,
+        "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"
+      },
+      {
+        "id": "give-b-013",
+        "utterance": "дай пузырёк воды",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:water\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 981.639,
+        "note": "тот же дефект"
+      },
+      {
+        "id": "give-n-001",
+        "utterance": "дай мне звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2246.195,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-002",
+        "utterance": "выдай сто алмазных драконов",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2115.338,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-003",
+        "utterance": "дай командный блок",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 741.21,
+        "note": "служебный блок: запрет правилом онтологии, а не отсутствием записи в каталоге"
+      },
+      {
+        "id": "give-n-004",
+        "utterance": "дай",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 749.849,
+        "note": "запрос без предмета — недоопределён, значит уточнение"
+      },
+      {
+        "id": "summon-t-001",
+        "utterance": "призови зомби",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1,
+          "command": "/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 956.785,
+        "note": ""
+      },
+      {
+        "id": "summon-t-002",
+        "utterance": "заспавни крипера",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1,
+          "command": "/summon minecraft:creeper ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1248.667,
+        "note": ""
+      },
+      {
+        "id": "summon-t-003",
+        "utterance": "призови 5 скелетов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5,
+          "command": "/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 994.331,
+        "note": ""
+      },
+      {
+        "id": "summon-t-004",
+        "utterance": "спавни корову",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1,
+          "command": "/summon minecraft:cow ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1276.211,
+        "note": ""
+      },
+      {
+        "id": "summon-t-005",
+        "utterance": "призови слайма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1,
+          "command": "/summon minecraft:slime ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 753.45,
+        "note": ""
+      },
+      {
+        "id": "summon-b-001",
+        "utterance": "призови 100 зомби",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16,
+          "command": "/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 967.652,
+        "note": "обрезание по лимиту MAX_SUMMON_COUNT"
+      },
+      {
+        "id": "summon-n-001",
+        "utterance": "призови дракона края",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1308.642,
+        "note": "босс: запрет правилом онтологии; сейчас ошибочно резолвится в enderman по слову «края»"
+      },
+      {
+        "id": "summon-n-002",
+        "utterance": "призови кракена",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2063.62,
+        "note": "существа не существует"
+      },
+      {
+        "id": "remove-t-001",
+        "utterance": "забери гнилую плоть",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1,
+          "command": "/clear @s minecraft:rotten_flesh 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 888.148,
+        "note": ""
+      },
+      {
+        "id": "remove-t-002",
+        "utterance": "убери 10 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10,
+          "command": "/clear @s minecraft:cobblestone 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1258.782,
+        "note": ""
+      },
+      {
+        "id": "plan-t-001",
+        "utterance": "как скрафтить факел?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 713.946,
+        "note": ""
+      },
+      {
+        "id": "plan-t-002",
+        "utterance": "как сделать алмазную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1166.247,
+        "note": ""
+      },
+      {
+        "id": "plan-b-002",
+        "utterance": "хочу алмазную кирку",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": "/give @s minecraft:diamond_pickaxe 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 989.041,
+        "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"
+      },
+      {
+        "id": "plan-t-003",
+        "utterance": "как получить обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 845.177,
+        "note": ""
+      },
+      {
+        "id": "plan-b-001",
+        "utterance": "как добыть незеритовый слиток",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1177.676,
+        "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"
+      },
+      {
+        "id": "plan-n-001",
+        "utterance": "как скрафтить звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1887.122,
+        "note": "предмета не существует: отказ, а не выдуманный план"
+      },
+      {
+        "id": "chat-t-001",
+        "utterance": "привет",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 961.299,
+        "note": ""
+      },
+      {
+        "id": "chat-t-002",
+        "utterance": "что делать ночью?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 620.172,
+        "note": ""
+      },
+      {
+        "id": "chat-t-004",
+        "utterance": "спасибо",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 923.079,
+        "note": ""
+      }
+    ],
+    [
+      {
+        "id": "give-t-001",
+        "utterance": "дай алмаз",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 1,
+          "command": "/give @s minecraft:diamond 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 901.076,
+        "note": ""
+      },
+      {
+        "id": "give-t-002",
+        "utterance": "дай мне 5 алмазов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 5,
+          "command": "/give @s minecraft:diamond 5"
+        },
+        "verdict": "pass",
+        "latency_ms": 1225.001,
+        "note": "известный промах: резолвится в diamond_block"
+      },
+      {
+        "id": "give-t-003",
+        "utterance": "выдай 32 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:torch",
+          "count": 32,
+          "command": "/give @s minecraft:torch 32"
+        },
+        "verdict": "pass",
+        "latency_ms": 846.856,
+        "note": ""
+      },
+      {
+        "id": "give-t-004",
+        "utterance": "нужен хлеб",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bread",
+          "count": 1,
+          "command": "/give @s minecraft:bread 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1111.88,
+        "note": ""
+      },
+      {
+        "id": "give-t-005",
+        "utterance": "дай сундук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:chest",
+          "count": 1,
+          "command": "/give @s minecraft:chest 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 940.306,
+        "note": ""
+      },
+      {
+        "id": "give-t-006",
+        "utterance": "мне нужен верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": "/give @s minecraft:crafting_table 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1011.573,
+        "note": ""
+      },
+      {
+        "id": "give-t-007",
+        "utterance": "дай 64 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cobblestone",
+          "count": 64,
+          "command": "/give @s minecraft:cobblestone 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 832.345,
+        "note": ""
+      },
+      {
+        "id": "give-t-008",
+        "utterance": "хочу железный слиток",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:iron_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:iron_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1032.022,
+        "note": ""
+      },
+      {
+        "id": "give-t-009",
+        "utterance": "дай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": "/give @s minecraft:furnace 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 965.397,
+        "note": ""
+      },
+      {
+        "id": "give-t-010",
+        "utterance": "выдай лук",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bow",
+          "count": 1,
+          "command": "/give @s minecraft:bow 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 766.663,
+        "note": "омонимия с растением; в каталоге только оружие"
+      },
+      {
+        "id": "give-t-011",
+        "utterance": "дай мне 10 стрел",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:arrow",
+          "count": 10,
+          "command": "/give @s minecraft:arrow 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 679.295,
+        "note": ""
+      },
+      {
+        "id": "give-t-012",
+        "utterance": "нужна наковальня",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:anvil",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "planned_instead",
+        "latency_ms": 804.654,
+        "note": ""
+      },
+      {
+        "id": "give-t-013",
+        "utterance": "дай обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": "/give @s minecraft:obsidian 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 979.412,
+        "note": ""
+      },
+      {
+        "id": "give-t-014",
+        "utterance": "выдай щит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:shield",
+          "count": 1,
+          "command": "/give @s minecraft:shield 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1131.85,
+        "note": ""
+      },
+      {
+        "id": "give-t-015",
+        "utterance": "дай 16 палок",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:stick",
+          "count": 16,
+          "command": "/give @s minecraft:stick 16"
+        },
+        "verdict": "pass",
+        "latency_ms": 1288.122,
+        "note": ""
+      },
+      {
+        "id": "give-s-001",
+        "utterance": "дай гэпл",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:golden_apple",
+          "count": 1,
+          "command": "/give @s minecraft:golden_apple 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 995.455,
+        "note": ""
+      },
+      {
+        "id": "give-s-002",
+        "utterance": "закинь тотем",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:totem_of_undying",
+          "count": 1,
+          "command": "/give @s minecraft:totem_of_undying 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 948.65,
+        "note": ""
+      },
+      {
+        "id": "give-s-003",
+        "utterance": "нужна реда",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:redstone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 935.602,
+        "note": ""
+      },
+      {
+        "id": "give-s-004",
+        "utterance": "дай слаймбол",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:slime_ball",
+          "count": 1,
+          "command": "/give @s minecraft:slime_ball 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 893.296,
+        "note": ""
+      },
+      {
+        "id": "give-s-005",
+        "utterance": "хочу стейк",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:cooked_beef",
+          "count": 1,
+          "command": "/give @s minecraft:cooked_beef 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 635.048,
+        "note": ""
+      },
+      {
+        "id": "give-s-006",
+        "utterance": "дай незерит",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": "/give @s minecraft:netherite_ingot 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 897.491,
+        "note": ""
+      },
+      {
+        "id": "give-s-007",
+        "utterance": "мне бы дебрис",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:ancient_debris",
+          "count": 1,
+          "command": "/give @s minecraft:ancient_debris 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 898.382,
+        "note": ""
+      },
+      {
+        "id": "give-s-008",
+        "utterance": "дай крылья",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:elytra",
+          "count": 1,
+          "command": "/give @s minecraft:elytra 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1123.917,
+        "note": ""
+      },
+      {
+        "id": "give-s-009",
+        "utterance": "я бы не отказался от пузырька",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "over_clarify",
+        "latency_ms": 1089.221,
+        "note": ""
+      },
+      {
+        "id": "give-s-010",
+        "utterance": "мне бы 10 наковален",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:anvil",
+          "count": 10,
+          "command": "/give @s minecraft:anvil 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1101.744,
+        "note": ""
+      },
+      {
+        "id": "give-b-001",
+        "utterance": "дай доски",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1270.683,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-002",
+        "utterance": "дай меч",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1080.323,
+        "note": "шесть видов мечей; захардкоженное умолчание diamond_sword подлежит удалению"
+      },
+      {
+        "id": "give-b-003",
+        "utterance": "нужна кирка",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1137.551,
+        "note": "алмазная и железная; алиас 'кирка' висит на обеих"
+      },
+      {
+        "id": "give-b-004",
+        "utterance": "дай бревно",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 979.294,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-005",
+        "utterance": "дай лодку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1132.982,
+        "note": "несколько пород дерева"
+      },
+      {
+        "id": "give-b-006",
+        "utterance": "дай 1000 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond",
+          "count": 64,
+          "command": "/give @s minecraft:diamond 64"
+        },
+        "verdict": "pass",
+        "latency_ms": 976.127,
+        "note": "обрезание по лимиту MAX_ITEM_COUNT"
+      },
+      {
+        "id": "give-b-007",
+        "utterance": "дай 0 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 875.656,
+        "note": "некорректное количество: отказ с объяснением вместо нормализации в 1"
+      },
+      {
+        "id": "give-b-008",
+        "utterance": "дай -5 алмазов",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remove_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "under_reject",
+        "latency_ms": 1107.993,
+        "note": "некорректное количество: минус сейчас игнорируется регуляркой и выдаётся 5"
+      },
+      {
+        "id": "give-b-009",
+        "utterance": "дай пузырьков",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1563.948,
+        "note": ""
+      },
+      {
+        "id": "give-b-010",
+        "utterance": "дай бутылёк",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:glass_bottle",
+          "count": 1,
+          "command": "/give @s minecraft:glass_bottle 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 871.228,
+        "note": "разговорная форма, сейчас держится на захардкоженном стемминге по префиксу"
+      },
+      {
+        "id": "give-b-011",
+        "utterance": "выдай косточку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:bone",
+          "count": 1,
+          "command": "/give @s minecraft:bone 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1088.589,
+        "note": ""
+      },
+      {
+        "id": "give-b-012",
+        "utterance": "дай зелье лечения",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:healing\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:healing\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 860.435,
+        "note": "ДЕФЕКТ: id с NBT не проходит RESOURCE_ID_PATTERN в tool_service.py, зелья невыдаваемы"
+      },
+      {
+        "id": "give-b-013",
+        "utterance": "дай пузырёк воды",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:potion{Potion:\"minecraft:water\"}",
+          "count": 1,
+          "command": "/give @s minecraft:potion{Potion:\"minecraft:water\"} 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1143.588,
+        "note": "тот же дефект"
+      },
+      {
+        "id": "give-n-001",
+        "utterance": "дай мне звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2243.459,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-002",
+        "utterance": "выдай сто алмазных драконов",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1874.727,
+        "note": "предмета не существует"
+      },
+      {
+        "id": "give-n-003",
+        "utterance": "дай командный блок",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "give_item",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 671.226,
+        "note": "служебный блок: запрет правилом онтологии, а не отсутствием записи в каталоге"
+      },
+      {
+        "id": "give-n-004",
+        "utterance": "дай",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "give_item",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 854.351,
+        "note": "запрос без предмета — недоопределён, значит уточнение"
+      },
+      {
+        "id": "summon-t-001",
+        "utterance": "призови зомби",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 1,
+          "command": "/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 939.631,
+        "note": ""
+      },
+      {
+        "id": "summon-t-002",
+        "utterance": "заспавни крипера",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:creeper",
+          "count": 1,
+          "command": "/summon minecraft:creeper ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 948.587,
+        "note": ""
+      },
+      {
+        "id": "summon-t-003",
+        "utterance": "призови 5 скелетов",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:skeleton",
+          "count": 5,
+          "command": "/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~\n/summon minecraft:skeleton ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1167.809,
+        "note": ""
+      },
+      {
+        "id": "summon-t-004",
+        "utterance": "спавни корову",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:cow",
+          "count": 1,
+          "command": "/summon minecraft:cow ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 816.029,
+        "note": ""
+      },
+      {
+        "id": "summon-t-005",
+        "utterance": "призови слайма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:slime",
+          "count": 1,
+          "command": "/summon minecraft:slime ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1075.99,
+        "note": ""
+      },
+      {
+        "id": "summon-b-001",
+        "utterance": "призови 100 зомби",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "summon_entity",
+          "target": "minecraft:zombie",
+          "count": 16,
+          "command": "/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~\n/summon minecraft:zombie ~ ~ ~"
+        },
+        "verdict": "pass",
+        "latency_ms": 1396.203,
+        "note": "обрезание по лимиту MAX_SUMMON_COUNT"
+      },
+      {
+        "id": "summon-n-001",
+        "utterance": "призови дракона края",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1151.707,
+        "note": "босс: запрет правилом онтологии; сейчас ошибочно резолвится в enderman по слову «края»"
+      },
+      {
+        "id": "summon-n-002",
+        "utterance": "призови кракена",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "summon_entity",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1979.862,
+        "note": "существа не существует"
+      },
+      {
+        "id": "remove-t-001",
+        "utterance": "забери гнилую плоть",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:rotten_flesh",
+          "count": 1,
+          "command": "/clear @s minecraft:rotten_flesh 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 965.64,
+        "note": ""
+      },
+      {
+        "id": "remove-t-002",
+        "utterance": "убери 10 булыжника",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remove_item",
+          "target": "minecraft:cobblestone",
+          "count": 10,
+          "command": "/clear @s minecraft:cobblestone 10"
+        },
+        "verdict": "pass",
+        "latency_ms": 1350.26,
+        "note": ""
+      },
+      {
+        "id": "plan-t-001",
+        "utterance": "как скрафтить факел?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:torch",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1061.907,
+        "note": ""
+      },
+      {
+        "id": "plan-t-002",
+        "utterance": "как сделать алмазную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1094.617,
+        "note": ""
+      },
+      {
+        "id": "plan-b-002",
+        "utterance": "хочу алмазную кирку",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "give_item",
+          "target": "minecraft:diamond_pickaxe",
+          "count": 1,
+          "command": "/give @s minecraft:diamond_pickaxe 1"
+        },
+        "verdict": "pass",
+        "latency_ms": 1041.534,
+        "note": "фраза двусмысленна: в творческом режиме читается как просьба выдать, в выживании выдача недоступна и остаётся план"
+      },
+      {
+        "id": "plan-t-003",
+        "utterance": "как получить обсидиан",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:obsidian",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 982.998,
+        "note": ""
+      },
+      {
+        "id": "plan-b-001",
+        "utterance": "как добыть незеритовый слиток",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:netherite_ingot",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1254.706,
+        "note": "глубокая цепочка: древние обломки, переплавка, объединение на кузнечном столе"
+      },
+      {
+        "id": "plan-n-001",
+        "utterance": "как скрафтить звёздный меч",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "plan_goal",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1963.862,
+        "note": "предмета не существует: отказ, а не выдуманный план"
+      },
+      {
+        "id": "chat-t-001",
+        "utterance": "привет",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1291.882,
+        "note": ""
+      },
+      {
+        "id": "chat-t-002",
+        "utterance": "что делать ночью?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1084.324,
+        "note": ""
+      },
+      {
+        "id": "chat-t-004",
+        "utterance": "спасибо",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1369.815,
+        "note": ""
+      }
+    ]
+  ]
+}
