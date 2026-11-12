@@ -95,13 +95,25 @@ class DeathAnalyzer:
         inventory — количества предметов, включая надетое; armor — надетая броня;
         held — то, что было в руках (вторая рука и панель быстрого доступа).
         """
+        threat = self._threat(cause)
+        result = self.assess(threat, inventory, armor=armor, held=held, cause=cause)
+        result.explanation.insert(
+            0, f"причина «{cause}» отнесена к угрозе «{result.threat_label}»")
+        return result
+
+    def assess(self, threat: str, inventory: Optional[Dict[str, int]] = None,
+               armor: Sequence[str] = (), held: Sequence[str] = (),
+               cause: str = "") -> PostMortem:
+        """Состояние защиты от класса угрозы — тот же вывод, что в разборе смерти.
+
+        Вынесен отдельно, потому что нужен и до смерти: по угрозе, которая рядом, а не
+        по причине, от которой игрок уже погиб (`solver.forewarn`).
+        """
         stock = Counter({item: int(count) for item, count in (inventory or {}).items()
                          if int(count or 0) > 0})
-        threat = self._threat(cause)
         spec = (self.layer.get("threats") or {}).get(threat) or {}
         result = PostMortem(cause=cause, threat=threat,
                             threat_label=spec.get("label") or "неизвестная причина")
-        result.explanation.append(f"причина «{cause}» отнесена к угрозе «{result.threat_label}»")
 
         groups = list(spec.get("measures") or [])
         if not groups:

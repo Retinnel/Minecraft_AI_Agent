@@ -21,6 +21,20 @@
     "outOfWorld": "void", "genericKill": "void"
   },
 
+  "_comment_mobs": [
+    "Существо → класс угрозы, для предупреждения до смерти. Не названное здесь враждебное",
+    "существо дерётся врукопашную (combat). threat_priority — что называть первым, когда",
+    "рядом несколько существ: сначала то, что убивает быстрее."
+  ],
+  "mobs": {
+    "minecraft:creeper": "explosion",
+    "minecraft:skeleton": "ranged", "minecraft:stray": "ranged", "minecraft:pillager": "ranged",
+    "minecraft:blaze": "ranged", "minecraft:ghast": "ranged", "minecraft:shulker": "ranged",
+    "minecraft:witch": "magic", "minecraft:evoker": "magic", "minecraft:guardian": "magic",
+    "minecraft:elder_guardian": "magic"
+  },
+  "threat_priority": ["explosion", "ranged", "combat"],
+
   "threats": {
     "combat":    {"label": "ближний бой с существом", "measures": ["armor", "shield", "weapon"]},
     "ranged":    {"label": "выстрел или бросок",      "measures": ["shield", "armor"]},

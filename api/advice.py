@@ -768,10 +768,27 @@ async def get_rp_response() -> GroqAdvice:
     # Смерть разбирает решатель: какая защита от этой угрозы была достижима из инвентаря.
     # Старый путь ниже (совет модели по последним событиям) остаётся запасным.
     if is_critical and getattr(critical_event, "event_type", None) == "death":
+        # Существа, замеченные до смерти, предупреждения уже не заслуживают.
+        stale = _find_last_event("near_hostile", limit=10)
+        if stale is not None:
+            _processed_log_ids.add(id(stale))
         try:
             return await asyncio.to_thread(_death_reply)
         except Exception as error:
             logger.warning(f"[RP] Разбор смерти не построен: {error}")
+
+    # Рядом враждебное существо: тот же вывод, что в разборе смерти, но заранее. Модель
+    # не вызывается, ассистент говорит только тогда, когда защита есть под рукой.
+    hostile = _find_last_event("near_hostile", limit=10)
+    if hostile is not None and id(hostile) not in _processed_log_ids:
+        _processed_log_ids.add(id(hostile))
+        try:
+            warning = _forewarn_reply(hostile)
+        except Exception as error:
+            logger.warning(f"[RP] Предупреждение об угрозе не построено: {error}")
+            warning = None
+        if warning is not None:
+            return warning
 
     # Routine passive polling should read cached/stateful responses cheaply.
     # Only critical events are allowed to invoke the LLM on this endpoint.
@@ -926,21 +943,20 @@ def _death_reply() -> GroqAdvice:
     from solver.render import render_summary, render_tree
 
     death = get_player_state().get("last_death") or {}
-    inventory = death.get("inventory") or {}
-    counts: Dict[str, int] = {}
-    for item_id, count in (inventory.get("counts") or {}).items():
-        try:
-            counts[str(item_id)] = int(count)
-        except (TypeError, ValueError):
-            continue
-    armor = [entry.get("item_id") for entry in inventory.get("armor") or [] if entry.get("item_id")]
-    held = [entry.get("item_id") for entry in
-            list(inventory.get("offhand") or []) + list(inventory.get("hotbar") or [])
-            if entry.get("item_id")]
+    counts, armor, held = _equipment(death.get("inventory") or {})
 
     analyzer = _death_analyzer()
     result = analyzer.analyze(str(death.get("cause") or "unknown"), counts, armor=armor, held=held)
     facts = render_postmortem(result, analyzer.kb)
+    # Если об этой же угрозе ассистент предупреждал незадолго до смерти, разбор об этом
+    # напоминает: совет был, им не воспользовались.
+    warned = _last_forewarning
+    if warned and warned["threat"] == result.threat:
+        ago = int(time.time() - warned["time"])
+        if 0 <= ago <= FOREWARN_MEMORY_SECONDS:
+            facts = f"Предупреждение об этой угрозе было за {ago} с до смерти. " + facts
+            result.explanation.append(
+                f"предупреждение об угрозе «{result.threat_label}» было за {ago} с до смерти")
     reply = _assistant_responder().phrase(facts, essentials(result, analyzer.kb))
     plan = focus_plan(result)
     session = _assistant_session()
@@ -952,6 +968,66 @@ def _death_reply() -> GroqAdvice:
         plan_tree=render_tree(plan, analyzer.kb) if plan else None,
         plan_summary=render_summary(plan, analyzer.kb) if plan else None,
         explanation=list(result.explanation),
+    )
+
+
+def _equipment(inventory: Dict[str, Any]):
+    """Количества, надетая броня и то, что в руках, — из снимка инвентаря."""
+    counts: Dict[str, int] = {}
+    for item_id, count in (inventory.get("counts") or {}).items():
+        try:
+            counts[str(item_id)] = int(count)
+        except (TypeError, ValueError):
+            continue
+    armor = [entry.get("item_id") for entry in inventory.get("armor") or [] if entry.get("item_id")]
+    held = [entry.get("item_id") for entry in
+            list(inventory.get("offhand") or []) + list(inventory.get("hotbar") or [])
+            if entry.get("item_id")]
+    return counts, armor, held
+
+
+# Одно и то же предупреждение повторять незачем: существо рядом мод замечает каждые пять
+# секунд. Новое содержание (другая угроза, другая мера) проходит сразу.
+FOREWARN_REPEAT_SECONDS = 60.0
+# Сколько предупреждение «помнится» разбору смерти.
+FOREWARN_MEMORY_SECONDS = 180.0
+_last_forewarning: Optional[Dict[str, Any]] = None
+
+
+def _forewarn_reply(event: Any) -> Optional[GroqAdvice]:
+    """Предупреждение по событию «рядом враждебное существо»; None — сказать нечего."""
+    global _last_forewarning
+    from api.player_state import get_player_state
+    from solver.forewarn import ThreatAdvisor, render_forewarning
+    from solver.postmortem import focus_plan
+    from solver.render import render_summary, render_tree
+
+    mobs = (getattr(event, "event_data", None) or {}).get("types") or []
+    counts, armor, held = _equipment(get_player_state().get("inventory") or {})
+    analyzer = _death_analyzer()
+    warning = ThreatAdvisor(analyzer).assess(mobs, counts, armor=armor, held=held)
+    if warning is None or not warning.actionable:
+        return None
+
+    now = time.time()
+    previous = _last_forewarning
+    if previous and previous["key"] == warning.key and (
+            now - previous["time"] < FOREWARN_REPEAT_SECONDS):
+        return None
+    _last_forewarning = {"key": warning.key, "threat": warning.threat, "time": now}
+
+    kb = analyzer.kb
+    plan = focus_plan(warning.state)
+    session = _assistant_session()
+    return GroqAdvice(
+        response=_clip(render_forewarning(warning, kb)),
+        confidence=0.9, level="WARNING",
+        threats=[kb.label(mob) or mob for mob in warning.mobs],
+        source="forewarn", mode="chat", execute=False, outcome="act",
+        assistant_mode=session.mode,
+        plan_tree=render_tree(plan, kb) if plan else None,
+        plan_summary=render_summary(plan, kb) if plan else None,
+        explanation=list(warning.state.explanation),
     )
 
 

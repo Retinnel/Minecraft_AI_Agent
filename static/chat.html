@@ -74,6 +74,7 @@
       <div id="inventory" class="inventory"><span class="muted">инвентарь пуст</span></div>
       <div id="progression" class="muted" style="font-size:14px;margin-bottom:10px">ступень: —</div>
       <div class="presets" id="sim-inventory"></div>
+      <div class="presets" id="sim-hostile"></div>
       <div class="presets" id="sim-death"></div>
       <label class="muted autopoll"><input type="checkbox" id="autopoll" checked>
         опрос сервера каждые 3 с, как у мода</label>
@@ -193,6 +194,7 @@ const INVENTORY_PRESETS = [
   ["+ каменная кирка", { "minecraft:stone_pickaxe": 1 }],
   ["+ печь", { "minecraft:furnace": 1 }],
   ["+ железные слитки ×8", { "minecraft:iron_ingot": 8 }],
+  ["+ доски ×6", { "minecraft:oak_planks": 6 }],
   ["+ алмазы ×3", { "minecraft:diamond": 3 }],
   ["+ железный нагрудник", { "minecraft:iron_chestplate": 1 }],
   ["+ хлеб ×3", { "minecraft:bread": 3 }]
@@ -201,7 +203,12 @@ const DEATHS = [
   ["смерть: взрыв", "explosion.player"], ["смерть: моб", "mob_attack"],
   ["смерть: падение", "fall"], ["смерть: голод", "starve"]
 ];
-const PROACTIVE = ["challenge", "campaign", "postmortem"];
+// Событие «рядом враждебное существо» мод шлёт раз в пять секунд, пока существо в радиусе.
+const HOSTILES = [
+  ["рядом: крипер", "entity.minecraft.creeper"], ["рядом: скелет", "entity.minecraft.skeleton"],
+  ["рядом: зомби", "entity.minecraft.zombie"]
+];
+const PROACTIVE = ["challenge", "campaign", "postmortem", "forewarn"];
 let inventory = {};
 let lastProactive = "";
 
@@ -279,6 +286,15 @@ for (const [title, items] of INVENTORY_PRESETS) {
     sendInventory();
   };
   node("sim-inventory").appendChild(button);
+}
+for (const [title, mob] of HOSTILES) {
+  const button = document.createElement("button");
+  button.textContent = title;
+  button.onclick = async () => {
+    await postLog("near_hostile", { radius: 14, count: 1, types: [mob] }, "near_hostile: count=1");
+    poll();
+  };
+  node("sim-hostile").appendChild(button);
 }
 for (const [title, cause] of DEATHS) {
   const button = document.createElement("button");
