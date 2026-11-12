@@ -76,7 +76,12 @@ WEIGHT_HUNT = 20         # охота: существо нужно найти и
 WEIGHT_UNRELIABLE = 30   # выпадение может не случиться, планировать на нём нельзя
 # Источник не в обычном Верхнем мире (рукописный слой kb/accessibility.json). Без этого
 # чернит из Незера и бамбук из джунглей равноценны булыжнику и доскам, и выбор решает алфавит.
-WEIGHT_REMOTE = {"deep": 1, "rare_biome": 3, "unnatural": 5, "nether": 8, "end": 12}
+# Незер и Край стоят дорого не из-за расстояния: в Незер ведёт портал из обсидиана, а
+# обсидиан добывается алмазной киркой. Пока вес был сопоставим с обычной добычей, золото
+# планировалось из незерской руды деревянной киркой — формально дешевле, по сути недостижимо
+# раньше алмазной ступени.
+WEIGHT_REMOTE = {"deep": 1, "rare_biome": 3, "unnatural": 5, "nether": 13, "end": 16}
+UNNATURAL = "unnatural"
 
 
 @dataclass(frozen=True)
@@ -326,7 +331,7 @@ class Planner:
 
     def _try_sources(self, item: str, count: int, stock: Counter,
                      stack: frozenset, depth: int) -> Optional[Step]:
-        sources = self.kb.sources_of(item)
+        sources = self._usable_sources(item)
         if not sources:
             return None
 
@@ -344,6 +349,20 @@ class Planner:
         stock.clear()
         stock.update(best[1])
         return best[0]
+
+    def _usable_sources(self, item: str) -> List[Source]:
+        """Источники добычи, на которых можно строить план.
+
+        Блок, который в мире сам не встречается (эндер-сундук, книжная полка, проводка),
+        в данных игры связан с выпадающим из него предметом так же, как руда. Добывать его
+        неоткуда, поэтому такой источник берётся только тогда, когда другого пути у
+        предмета нет вовсе — ни настоящего источника, ни рецепта.
+        """
+        sources = self.kb.sources_of(item)
+        natural = [source for source in sources if source.remote != UNNATURAL]
+        if natural or self.kb.recipes_for(item):
+            return natural
+        return list(sources)
 
     def _expand_source(self, source: Source, item: str, count: int, stock: Counter,
                        stack: frozenset, depth: int) -> Step:
@@ -403,7 +422,12 @@ class Planner:
         # уровню она слабее каменной, хотя золото добыть куда сложнее.
         simplest = min(suitable,
                        key=lambda tool: (tool.tier_rank, self._item_cost(tool.id, stack), tool.id))
-        return self._resolve(simplest.id, 1, stock, stack, depth + 1)
+        step = self._resolve(simplest.id, 1, stock, stack, depth + 1)
+        if step.satisfied:
+            # Изготовленный инструмент остаётся у игрока: следующая добыча в том же плане
+            # его засчитывает. Без этого длинный план делал одну и ту же кирку дважды.
+            stock[simplest.id] += 1
+        return step
 
     # --- выбор вариантов ---
 
@@ -488,7 +512,8 @@ class Planner:
 
         # Начальное приближение: то, что просто лежит в мире.
         cost: Dict[str, float] = {}
-        for item, sources in sources_by_item.items():
+        for item in sources_by_item:
+            sources = self._usable_sources(item)
             # Источник может быть не опознан, если у него нет записи в базе знаний:
             # часть лут-таблиц описывает сущности, которых нет среди именованных.
             if sources:

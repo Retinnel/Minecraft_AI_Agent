@@ -54,6 +54,8 @@
     "minecraft:endermite"
   ],
   "rare_biome": [
+    "minecraft:red_sand",
+    "minecraft:sea_lantern",
     "minecraft:bamboo",
     "minecraft:cocoa",
     "minecraft:jungle_log",
@@ -88,6 +90,21 @@
     "minecraft:deepslate_lapis_ore",
     "minecraft:deepslate_diamond_ore",
     "minecraft:deepslate_emerald_ore"
+  ],
+  "_comment_unnatural": [
+    "unnatural — то же, что unnatural_prefixes, но поштучно: изделия и поставленные блоки,",
+    "из которых предмет выпадает при поломке. В данных игры это такая же связь добычи, как",
+    "у руды, и без пометки планировщик добывал редстоун из проводки, уголь из костра, книги",
+    "из книжной полки, обсидиан из эндер-сундука, нить из растяжки."
+  ],
+  "unnatural": [
+    "minecraft:redstone_wire",
+    "minecraft:tripwire",
+    "minecraft:campfire",
+    "minecraft:soul_campfire",
+    "minecraft:bookshelf",
+    "minecraft:ender_chest",
+    "minecraft:composter"
   ],
   "unnatural_prefixes": [
     "minecraft:stripped_",
