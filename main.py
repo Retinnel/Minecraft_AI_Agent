@@ -12,6 +12,7 @@ from api import campaign
 from api import player_state
 from api import wiki
 from api import compare
+from api import tree
 from api.llm_config_manager import get_llm_config
 
 app = FastAPI(title="AI Assistant Admin")
@@ -41,6 +42,7 @@ app.include_router(campaign.router)
 app.include_router(player_state.router)
 app.include_router(wiki.router)
 app.include_router(compare.router)
+app.include_router(tree.router)
 
 # Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -89,6 +91,12 @@ async def compare_page():
 async def chat_page():
     """Игровой чат без игрового клиента: та же точка входа /api/rp/chat, что у мода."""
     return FileResponse(BASE_DIR / "static" / "chat.html")
+
+
+@app.get("/tree")
+async def tree_page():
+    """Древо развития: граф зависимостей из онтологии и состояние игрока на нём."""
+    return FileResponse(BASE_DIR / "static" / "tree.html")
 
 
 @app.get("/dashboard")

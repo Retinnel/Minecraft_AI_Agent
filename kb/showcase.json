@@ -1,0 +1,48 @@
+{
+  "_comment": [
+    "Рукописный слой: витрина древа развития — какие предметы показывать на странице /tree.",
+    "Здесь только выбор, что показать. Промежуточные узлы (материалы, оборудование), связи",
+    "между узлами, ступень каждого узла и его состояние выводит решатель (solver/techtree.py)",
+    "из онтологии и инвентаря игрока. Предмет, для которого план не строится, в древо не",
+    "попадает и перечисляется в поле skipped ответа /api/tree/."
+  ],
+  "items": [
+    "minecraft:wooden_pickaxe",
+    "minecraft:stone_pickaxe",
+    "minecraft:iron_pickaxe",
+    "minecraft:diamond_pickaxe",
+    "minecraft:netherite_pickaxe",
+
+    "minecraft:crafting_table",
+    "minecraft:furnace",
+    "minecraft:blast_furnace",
+    "minecraft:smithing_table",
+    "minecraft:anvil",
+    "minecraft:enchanting_table",
+
+    "minecraft:stone_sword",
+    "minecraft:iron_sword",
+    "minecraft:diamond_sword",
+    "minecraft:shield",
+    "minecraft:iron_chestplate",
+    "minecraft:diamond_chestplate",
+    "minecraft:bow",
+
+    "minecraft:torch",
+    "minecraft:chest",
+    "minecraft:white_bed",
+    "minecraft:campfire",
+    "minecraft:cooked_beef",
+    "minecraft:bucket",
+    "minecraft:shears",
+    "minecraft:flint_and_steel",
+    "minecraft:lantern",
+
+    "minecraft:tnt",
+    "minecraft:rail",
+    "minecraft:piston",
+    "minecraft:compass",
+    "minecraft:bookshelf",
+    "minecraft:obsidian"
+  ]
+}

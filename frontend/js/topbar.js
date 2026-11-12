@@ -6,6 +6,7 @@
 (function () {
   const PAGES = [
     { href: "/chat", title: "Игровой чат" },
+    { href: "/tree", title: "Древо развития" },
     { href: "/compare", title: "Сравнение конфигураций" },
     { href: "/", title: "Панель" },
     { href: "/admin", title: "Логи" },
