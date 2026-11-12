@@ -6,7 +6,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -29,6 +31,7 @@ public class AssistantOverlayScreen extends Screen {
     private Button recipesTabButton;
     private Button planTabButton;
     private Button campaignTabButton;
+    private Button treeTabButton;
     private Button cancelCampaignButton;
     private Button whyButton;
     private Button modeButton;
@@ -42,11 +45,23 @@ public class AssistantOverlayScreen extends Screen {
     private HttpAssistantClient.CraftRecipeResponse lastRecipeResponse;
     private String lastRecipeQuery;
 
+    // Вкладка древа развития: данные с сервера и области узлов под курсором и щелчком.
+    private HttpAssistantClient.TreeResponse lastTree;
+    private long lastTreeFetchTime = 0;
+    private final java.util.List<TreeHit> treeHits = new java.util.ArrayList<>();
+
+    private record TreeHit(int x, int y, HttpAssistantClient.TreeResponse.NodeInfo node) {
+        boolean contains(double mx, double my) {
+            return mx >= x && mx < x + 20 && my >= y && my < y + 20;
+        }
+    }
+
     private enum Tab {
         STATUS,
         RECIPES,
         PLAN,
-        CAMPAIGN
+        CAMPAIGN,
+        TREE
     }
 
     private Tab activeTab = Tab.STATUS;
@@ -196,7 +211,7 @@ public class AssistantOverlayScreen extends Screen {
 
         // Вкладки
         int tabY = top - 24;
-        int tabW = (panelW - 12) / 4;
+        int tabW = (panelW - 16) / 5;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
         }).bounds(left, tabY, tabW, 20).build();
@@ -218,6 +233,12 @@ public class AssistantOverlayScreen extends Screen {
         addRenderableWidget(recipesTabButton);
         addRenderableWidget(planTabButton);
         addRenderableWidget(campaignTabButton);
+
+        treeTabButton = Button.builder(Component.literal("§fДрево"), btn -> {
+            setActiveTab(Tab.TREE);
+            fetchTree();
+        }).bounds(left + (tabW + 4) * 4, tabY, tabW, 20).build();
+        addRenderableWidget(treeTabButton);
 
         // Отмена кампании — та же команда, что фраза в чате: решает сервер, не мод.
         cancelCampaignButton = Button.builder(Component.literal("§cОтменить кампанию"), btn -> {
@@ -298,6 +319,9 @@ public class AssistantOverlayScreen extends Screen {
         boolean isPlan = activeTab == Tab.PLAN;
         boolean isRecipes = activeTab == Tab.RECIPES;
         boolean isCampaign = activeTab == Tab.CAMPAIGN;
+        if (treeTabButton != null) {
+            treeTabButton.setMessage(Component.literal(activeTab == Tab.TREE ? "§b§lДрево" : "§fДрево"));
+        }
         if (whyButton != null) {
             whyButton.visible = isPlan;
             whyButton.active = isPlan;
@@ -373,12 +397,18 @@ public class AssistantOverlayScreen extends Screen {
             renderPlanTab(graphics, left, top, panelW, panelH);
         } else if (activeTab == Tab.CAMPAIGN) {
             renderCampaignTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.TREE) {
+            renderTreeTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
         
         // Кнопки
         super.render(graphics, mouseX, mouseY, partialTick);
+
+        if (activeTab == Tab.TREE) {
+            renderTreeTooltip(graphics, mouseX, mouseY);
+        }
     }
 
     private void renderStatusTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
@@ -737,6 +767,167 @@ public class AssistantOverlayScreen extends Screen {
         }
     }
 
+    // --- вкладка древа развития ---
+
+    private static final int TREE_HAVE = 0xFF45c76a;
+    private static final int TREE_READY = 0xFFffcf5c;
+    private static final int TREE_OPEN = 0xFF5b6b82;
+    private static final int TREE_LOCKED = 0xFF2a3140;
+
+    private void fetchTree() {
+        lastTreeFetchTime = System.currentTimeMillis();
+        runtime.getHttpClient().getTree().thenAccept(data -> {
+            Minecraft.getInstance().execute(() -> {
+                if (data != null) {
+                    lastTree = data;
+                }
+            });
+        });
+    }
+
+    private static int treeColor(String status) {
+        if ("have".equals(status)) {
+            return TREE_HAVE;
+        }
+        if ("ready".equals(status)) {
+            return TREE_READY;
+        }
+        if ("open".equals(status)) {
+            return TREE_OPEN;
+        }
+        return TREE_LOCKED;
+    }
+
+    private static String treeStatusLabel(HttpAssistantClient.TreeResponse.NodeInfo node) {
+        if ("have".equals(node.status)) {
+            return "§aесть в инвентаре";
+        }
+        if ("ready".equals(node.status)) {
+            return "§eполучается прямо сейчас, действий: " + node.steps;
+        }
+        if ("open".equals(node.status)) {
+            return "§7ступень открыта, действий: " + node.steps;
+        }
+        if ("locked".equals(node.status)) {
+            return "§8нужна кирка следующей ступени, действий: " + node.steps;
+        }
+        return "§8план не строится";
+    }
+
+    /**
+     * Древо развития: ступени строками, в строке — предметы витрины с рамкой по состоянию.
+     * Что на какой ступени и что доступно сейчас, вывел решатель на сервере; здесь рисуются
+     * только значки. Щелчок по предмету строит план до него и открывает вкладку «План».
+     */
+    private void renderTreeTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        int textLeft = left + 15;
+        treeHits.clear();
+        graphics.drawString(font, "§lДрево развития", textLeft, top + 34, COLOR_HEADER);
+
+        if (lastTree == null || lastTree.tiers == null) {
+            graphics.drawString(font, "§7Загрузка… Нужен запущенный сервер ассистента.", textLeft,
+                    top + 56, COLOR_MUTED);
+            return;
+        }
+        if (lastTree.counts != null) {
+            String counts = "§a" + lastTree.counts.getOrDefault("have", 0) + " есть  §e"
+                    + lastTree.counts.getOrDefault("ready", 0) + " сейчас  §7"
+                    + lastTree.counts.getOrDefault("open", 0) + " открыто  §8"
+                    + lastTree.counts.getOrDefault("locked", 0) + " закрыто";
+            graphics.drawString(font, counts, left + panelW - 15 - font.width(counts), top + 34, COLOR_TEXT);
+        }
+
+        int labelW = 112;
+        int iconsLeft = left + 15 + labelW;
+        int iconsRight = left + panelW - 12;
+        int y = top + 52;
+        for (HttpAssistantClient.TreeResponse.TierInfo tier : lastTree.tiers) {
+            if (tier.nodes == null || y + 22 > top + panelH - 14) {
+                continue;
+            }
+            String label = (tier.open ? "§f" : "§8") + tier.label;
+            graphics.drawString(font, font.plainSubstrByWidth(label, labelW - 4), textLeft, y + 6,
+                    tier.open ? COLOR_TEXT : COLOR_MUTED);
+            int x = iconsLeft;
+            for (HttpAssistantClient.TreeResponse.NodeInfo node : tier.nodes) {
+                if (x + 20 > iconsRight) {
+                    break;
+                }
+                graphics.fill(x, y, x + 20, y + 20, treeColor(node.status));
+                graphics.fill(x + 1, y + 1, x + 19, y + 19, 0xFF141a24);
+                Item item = treeItem(node.id);
+                if (item != null) {
+                    graphics.renderItem(new ItemStack(item), x + 2, y + 2);
+                }
+                if ("locked".equals(node.status) || "unknown".equals(node.status)) {
+                    // Затемнение поверх значка: предмет виден, но читается как закрытый.
+                    graphics.pose().pushPose();
+                    graphics.pose().translate(0, 0, 300);
+                    graphics.fill(x + 1, y + 1, x + 19, y + 19, 0xB0101018);
+                    graphics.pose().popPose();
+                }
+                treeHits.add(new TreeHit(x, y, node));
+                x += 22;
+            }
+            y += 26;
+        }
+        graphics.drawString(font, "§7Наведи — состояние, щёлкни — план до предмета от твоего инвентаря",
+                textLeft, top + panelH - 12, COLOR_MUTED);
+    }
+
+    private static Item treeItem(String id) {
+        if (id == null) {
+            return null;
+        }
+        ResourceLocation location = ResourceLocation.tryParse(id);
+        if (location == null || !BuiltInRegistries.ITEM.containsKey(location)) {
+            return null;
+        }
+        return BuiltInRegistries.ITEM.get(location);
+    }
+
+    private void renderTreeTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        for (TreeHit hit : treeHits) {
+            if (hit.contains(mouseX, mouseY)) {
+                graphics.renderComponentTooltip(font, java.util.List.of(
+                        Component.literal(hit.node().label),
+                        Component.literal(treeStatusLabel(hit.node()))), mouseX, mouseY);
+                return;
+            }
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (activeTab == Tab.TREE && button == 0) {
+            for (TreeHit hit : treeHits) {
+                if (hit.contains(mouseX, mouseY)) {
+                    openTreePlan(hit.node());
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /** План до узла строит решатель на сервере; модель в этом не участвует. */
+    private void openTreePlan(HttpAssistantClient.TreeResponse.NodeInfo node) {
+        runtime.getHttpClient().getTreePlan(node.id).thenAccept(plan -> {
+            Minecraft.getInstance().execute(() -> {
+                if (plan == null || plan.plan_tree == null || plan.plan_tree.isBlank()) {
+                    return;
+                }
+                runtime.showPlan(plan.plan_tree, plan.plan_summary, plan.alternatives);
+                showWhy = false;
+                planScroll = 0;
+                if (whyButton != null) {
+                    whyButton.setMessage(Component.literal(whyLabel()));
+                }
+                setActiveTab(Tab.PLAN);
+            });
+        });
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (activeTab == Tab.PLAN) {
@@ -888,6 +1079,10 @@ public class AssistantOverlayScreen extends Screen {
             if (System.currentTimeMillis() - lastDataFetchTime > period) {
                 fetchCompactData();
             }
+        }
+        // Древо перекрашивается по мере игры: инвентарь меняется, пока экран открыт.
+        if (activeTab == Tab.TREE && System.currentTimeMillis() - lastTreeFetchTime > 3000) {
+            fetchTree();
         }
     }
     

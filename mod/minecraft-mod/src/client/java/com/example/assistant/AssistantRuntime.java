@@ -122,6 +122,16 @@ public final class AssistantRuntime {
     /**
      * Запоминает то, что относится к оверлею: план, объяснение, режим.
      */
+    /** План, полученный не из чата, а по щелчку в древе развития: показывается той же вкладкой. */
+    public void showPlan(String tree, String summary, String alternatives) {
+        if (tree == null || tree.isBlank()) {
+            return;
+        }
+        lastPlanTree = tree;
+        lastPlanSummary = summary;
+        lastPlanAlternatives = alternatives;
+    }
+
     private void rememberForOverlay(HttpAssistantClient.RPResponse rpResponse) {
         setAssistantMode(rpResponse.assistant_mode);
         if (rpResponse.outcome == null) {

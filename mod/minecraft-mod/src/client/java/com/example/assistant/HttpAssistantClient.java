@@ -298,6 +298,76 @@ public final class HttpAssistantClient {
                 });
     }
 
+    /**
+     * Древо развития в сжатом виде: витрина по ступеням с состоянием узлов. Строение и
+     * состояние выводит решатель на сервере из онтологии и снимка инвентаря.
+     */
+    public CompletableFuture<TreeResponse> getTree() {
+        return getJson("/api/tree/compact", TreeResponse.class);
+    }
+
+    /** План до узла древа от текущего инвентаря — без обращения к языковой модели. */
+    public CompletableFuture<TreePlanResponse> getTreePlan(String itemId) {
+        String query = URLEncoder.encode(itemId == null ? "" : itemId, StandardCharsets.UTF_8);
+        return getJson("/api/tree/plan?item=" + query, TreePlanResponse.class);
+    }
+
+    private <T> CompletableFuture<T> getJson(String path, Class<T> type) {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .timeout(Duration.ofSeconds(5))
+                .GET()
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenApply(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] GET " + path + " failed: HTTP " + resp.statusCode());
+                        return (T) null;
+                    }
+                    try {
+                        return GSON.fromJson(resp.body(), type);
+                    } catch (Exception e) {
+                        System.out.println("[AI Assistant] GET " + path + " parse error: " + e);
+                        return (T) null;
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.out.println("[AI Assistant] GET " + path + " exception: " + ex);
+                    return null;
+                });
+    }
+
+    public static final class TreeResponse {
+        public Integer rank;
+        public java.util.Map<String, Integer> counts;
+        public java.util.List<TierInfo> tiers;
+
+        public static final class TierInfo {
+            public int index;
+            public String label;
+            public boolean open;
+            public java.util.List<NodeInfo> nodes;
+        }
+
+        public static final class NodeInfo {
+            public String id;
+            public String label;
+            public String status;   // have | ready | open | locked | unknown
+            public int steps;
+        }
+    }
+
+    public static final class TreePlanResponse {
+        public String item;
+        public String label;
+        public int have;
+        public boolean feasible;
+        public int steps;
+        public String plan_tree;
+        public String plan_summary;
+        public String alternatives;
+    }
+
     public static final class RPResponse {
         public String response;
         public double confidence;
