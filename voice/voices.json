@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "Голоса ассистента и персонажей кампании. VoxCPM2 создаёт голос по словесному описанию;",
+    "описание даётся по-английски, как в документации модели, реплика — по-русски.",
+    "По описанию один раз синтезируется образец (reference), и все дальнейшие реплики",
+    "персонажа озвучиваются по этому образцу: иначе тембр менялся бы от реплики к реплике.",
+    "Ключи совпадают с пресетами персонажей в llm_prompts.json (campaign_personas);",
+    "assistant — голос обычных ответов вне кампании."
+  ],
+  "sample_text": "Здравствуй. Я помогу тебе в этом мире: подскажу путь и предупрежу об опасности.",
+  "voices": {
+    "assistant": {
+      "description": "A young adult man, clear calm friendly voice, moderate pace",
+      "seed": 11
+    },
+    "smith": {
+      "description": "An old man, deep rough gravelly voice, slow and stern, a village blacksmith",
+      "seed": 23
+    },
+    "elder": {
+      "description": "An elderly woman, soft warm voice, calm and dignified, unhurried",
+      "seed": 37
+    },
+    "cartographer": {
+      "description": "A young man, bright energetic curious voice, lively pace",
+      "seed": 51
+    }
+  }
+}

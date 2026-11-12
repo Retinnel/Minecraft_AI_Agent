@@ -50,6 +50,10 @@
   .card .presets button { font-size: 13px; padding: 4px 10px; }
   .autopoll { font-size: 14px; display: flex; gap: 6px; align-items: center; }
   .msg.bot.proactive { border-color: var(--accent); }
+  .ask button.mic { background: var(--panel); color: var(--text); border: 1px solid var(--line); padding: 14px 16px; }
+  .ask button.mic.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .voicebar { display: flex; gap: 14px; align-items: center; margin: -4px 0 12px; font-size: 14px; color: var(--muted); }
+  .voicebar label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -61,8 +65,13 @@
 <main>
   <section>
     <div class="ask">
-      <input id="utterance" placeholder="Напиши реплику игрока" autocomplete="off">
+      <button id="mic" class="mic" title="Сказать голосом">Голос</button>
+      <input id="utterance" placeholder="Напиши реплику игрока или скажи её" autocomplete="off">
       <button id="send">Отправить</button>
+    </div>
+    <div class="voicebar">
+      <label><input type="checkbox" id="voice"> озвучивать ответы</label>
+      <span id="voice-engine"></span>
     </div>
     <div class="presets" id="presets"></div>
     <div class="log" id="log"></div>
@@ -151,6 +160,7 @@ async function ask(text) {
     if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
     html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
     pending.innerHTML = html;
+    speak(d.response, d.source);
     if (d.plan_tree) node("plan").textContent = d.plan_tree;
     if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");
     if (d.campaign !== undefined && d.campaign !== null) renderCampaign(d.campaign);
@@ -183,6 +193,82 @@ for (const text of PRESETS) {
   button.onclick = () => { node("utterance").value = text; ask(text); };
   node("presets").appendChild(button);
 }
+// --- голос ---
+// Речь распознаёт браузер (Web Speech API), ответ озвучивает сервер синтеза: у каждого
+// персонажа кампании свой голос. Если сервер синтеза не запущен, говорит встроенный
+// синтезатор браузера. На решение голос не влияет: озвучивается готовый текст ответа.
+let speechQueue = Promise.resolve();
+
+function speak(text, source) {
+  if (!node("voice").checked || !text) return;
+  speechQueue = speechQueue.then(() => speakNow(text, source)).catch(() => {});
+}
+
+async function speakNow(text, source) {
+  try {
+    const resp = await fetch("/api/voice/speak", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, source })
+    });
+    if (resp.ok) { await playBlob(await resp.blob()); return; }
+  } catch (e) { /* сервер синтеза недоступен — говорит браузер */ }
+  await speakBrowser(text);
+}
+
+function playBlob(blob) {
+  return new Promise(resolve => {
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.onended = audio.onerror = resolve;
+    audio.play().catch(resolve);
+  });
+}
+
+function speakBrowser(text) {
+  return new Promise(resolve => {
+    if (!("speechSynthesis" in window)) { resolve(); return; }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ru-RU";
+    utterance.onend = utterance.onerror = resolve;
+    speechSynthesis.speak(utterance);
+  });
+}
+
+async function detectVoice() {
+  let label = "";
+  try {
+    const status = await (await fetch("/api/voice/status")).json();
+    label = status.available ? "голоса персонажей: " + status.engine
+      : ("speechSynthesis" in window ? "сервер синтеза не запущен — голос браузера" : "синтез недоступен");
+  } catch (e) { label = ""; }
+  node("voice-engine").textContent = label;
+}
+node("voice").addEventListener("change", detectVoice);
+detectVoice();
+
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (Recognition) {
+  const recognition = new Recognition();
+  recognition.lang = "ru-RU";
+  recognition.interimResults = true;
+  let listening = false;
+  recognition.onresult = (event) => {
+    const result = event.results[event.results.length - 1];
+    node("utterance").value = result[0].transcript;
+    if (result.isFinal) ask(result[0].transcript.trim().replace(/[.!]$/, ""));
+  };
+  recognition.onend = () => { listening = false; node("mic").classList.remove("on"); };
+  recognition.onerror = () => { listening = false; node("mic").classList.remove("on"); };
+  node("mic").onclick = () => {
+    if (listening) { recognition.stop(); return; }
+    listening = true;
+    node("mic").classList.add("on");
+    recognition.start();
+  };
+} else {
+  node("mic").disabled = true;
+  node("mic").title = "Распознавание речи есть в Chrome и Edge";
+}
+
 // --- симуляция мода ---
 // Мод шлёт на сервер снимки инвентаря и событие смерти и опрашивает GET /api/rp/. Панель
 // делает то же из браузера: так кампанию и разбор смерти видно без игрового клиента.
@@ -264,6 +350,7 @@ async function poll() {
     if (d.command) html += '<span class="meta cmd">' + escapeHtml(d.command) + "</span>";
     html += '<span class="meta">без обращения игрока · ' + escapeHtml(source) + "</span>";
     add("bot proactive", html);
+    speak(d.response, source);
     if (d.plan_tree) node("plan").textContent = d.plan_tree;
     if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");
     if (d.execute && d.item_id) {

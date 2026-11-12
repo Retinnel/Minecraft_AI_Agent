@@ -13,6 +13,7 @@ from api import player_state
 from api import wiki
 from api import compare
 from api import tree
+from api import voice
 from api.llm_config_manager import get_llm_config
 
 app = FastAPI(title="AI Assistant Admin")
@@ -43,6 +44,7 @@ app.include_router(player_state.router)
 app.include_router(wiki.router)
 app.include_router(compare.router)
 app.include_router(tree.router)
+app.include_router(voice.router)
 
 # Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")

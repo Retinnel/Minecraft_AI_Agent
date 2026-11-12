@@ -1,0 +1,7 @@
+# Окружение синтеза речи (.venv-voice, Python 3.10–3.12). Основному серверу не нужно.
+# torch ставится отдельно, с индексом сборок CUDA:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+voxcpm
+soundfile
+fastapi
+uvicorn[standard]
