@@ -63,8 +63,10 @@ def _reference(voice: str) -> Path:
     if not path.exists():
         model = _load()
         text = f"({spec['description']}){config['sample_text']}"
-        wav = model.generate(text=text, cfg_value=2.0, inference_timesteps=10,
-                             seed=int(spec.get("seed", 42)))
+        # Зерно фиксируется, чтобы образец голоса был одним и тем же на любой машине.
+        import torch
+        torch.manual_seed(int(spec.get("seed", 42)))
+        wav = model.generate(text=text, cfg_value=2.0, inference_timesteps=10)
         REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
         sf.write(path, wav, model.tts_model.sample_rate)
     return path
@@ -91,7 +93,7 @@ def speak(request: SpeakRequest):
         model = _load()
         reference = _reference(request.voice or DEFAULT_VOICE)
         wav = model.generate(text=text, reference_wav_path=str(reference),
-                             cfg_value=2.0, inference_timesteps=10, seed=7)
+                             cfg_value=2.0, inference_timesteps=10)
         rate = model.tts_model.sample_rate
         buffer = io.BytesIO()
         sf.write(buffer, wav, rate, format="WAV", subtype="PCM_16")
