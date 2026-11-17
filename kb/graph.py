@@ -124,6 +124,11 @@ class KnowledgeBase:
         # где нужен обзор всей предметной области.
         self._recipe_index: Optional[Dict[str, List[Recipe]]] = None
         self._source_index: Optional[Dict[str, List[Source]]] = None
+        # Сведения об инструментах планировщик запрашивает на каждом шаге добычи. Граф после
+        # загрузки не меняется, поэтому ответ запоминается: без этого план цветного ковра,
+        # где перебирается много равноценных рецептов, строился 300 мс вместо 100.
+        self._tool_profiles: Dict[str, Optional[Tool]] = {}
+        self._tools_by_kind: Dict[str, List[Tool]] = {}
         self._name_index: Optional[Dict[str, Naming]] = None
 
     # --- загрузка ---
@@ -346,6 +351,11 @@ class KnowledgeBase:
 
     def tool_profile(self, item_id: str) -> Optional[Tool]:
         """Если предмет — инструмент, возвращает его вид и уровень."""
+        if item_id not in self._tool_profiles:
+            self._tool_profiles[item_id] = self._read_tool_profile(item_id)
+        return self._tool_profiles[item_id]
+
+    def _read_tool_profile(self, item_id: str) -> Optional[Tool]:
         uri = ont.thing_uri(item_id)
         kind_uri = next(iter(self.graph.objects(uri, ont.IS_TOOL_KIND)), None)
         if kind_uri is None:
@@ -359,6 +369,8 @@ class KnowledgeBase:
 
     def tools_of_kind(self, kind: str) -> List[Tool]:
         """Все инструменты заданного вида, от простого к сложному."""
+        if kind in self._tools_by_kind:
+            return list(self._tools_by_kind[kind])
         found: List[Tool] = []
         for uri in self.graph.subjects(ont.IS_TOOL_KIND, ont.tool_kind_uri(kind)):
             item_id = self._by_uri.get(uri)
@@ -367,7 +379,8 @@ class KnowledgeBase:
             profile = self.tool_profile(item_id)
             if profile is not None:
                 found.append(profile)
-        return sorted(found, key=lambda tool: (tool.tier_rank, tool.id))
+        self._tools_by_kind[kind] = sorted(found, key=lambda tool: (tool.tier_rank, tool.id))
+        return list(self._tools_by_kind[kind])
 
     def tool_tier_rank(self, tier: Optional[str]) -> int:
         return ont.TOOL_TIERS.get(tier or "", 0)

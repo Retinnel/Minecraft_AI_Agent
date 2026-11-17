@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from functools import cached_property
 from dataclasses import dataclass, field
 from math import ceil
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -109,6 +110,22 @@ class Step:
         for child in self.children:
             yield from child.walk()
 
+    @cached_property
+    def totals(self) -> Tuple[int, int]:
+        """Число тупиков и трудоёмкость поддерева.
+
+        Варианты сравниваются на каждом уровне вывода, и обход поддерева при каждом
+        сравнении давал квадратичную работу. Узел неизменяем, поэтому сумма считается один
+        раз и складывается из сумм вложенных узлов.
+        """
+        dead_ends = 1 if self.kind == MISSING else 0
+        effort = self.weight
+        for child in self.children:
+            child_dead_ends, child_effort = child.totals
+            dead_ends += child_dead_ends
+            effort += child_effort
+        return dead_ends, effort
+
 
 @dataclass(frozen=True)
 class Option:
@@ -177,7 +194,18 @@ class Plan:
     @property
     def effort(self) -> int:
         """Суммарная трудоёмкость плана по тем же весам, по которым выбирался вариант."""
-        return sum(step.weight for step in self.root.walk())
+        return self.root.totals[1]
+
+
+def _fork(stock: Counter) -> Counter:
+    """Копия запасов для пробной ветки вывода.
+
+    Штатная Counter.copy проходит через проверку типа и подсчёт; пробных веток на один
+    план тысячи, и на копиях терялась заметная доля времени вывода.
+    """
+    trial: Counter = Counter()
+    dict.update(trial, stock)
+    return trial
 
 
 class Planner:
@@ -248,7 +276,7 @@ class Planner:
 
         candidates: List[Tuple[Step, Counter]] = []
         for attempt in (self._try_recipes, self._try_sources):
-            trial = stock.copy()
+            trial = _fork(stock)
             step = attempt(item, remaining, trial, deeper, depth)
             if step is not None:
                 candidates.append((step, trial))
@@ -259,7 +287,7 @@ class Planner:
             # требует сначала добыть саму руду, тогда как прямая добыча даёт алмаз сразу.
             step, trial = max(candidates, key=lambda pair: self._score(pair[0]))
             stock.clear()
-            stock.update(trial)
+            dict.update(stock, trial)
             self._merge_decisions(item, depth, step, mark)
         else:
             step = self._missing(item, remaining, "нет ни рецепта, ни источника добычи", 0)
@@ -289,7 +317,7 @@ class Planner:
                              key=lambda r: self._recipe_cost(r, stack, stock))[:MAX_BRANCHES]:
             # Каждый вариант считается на своей копии запасов: неудачная попытка не должна
             # съедать инвентарь и портить следующие.
-            trial = stock.copy()
+            trial = _fork(stock)
             step = self._expand_recipe(recipe, item, count, trial, stack, depth)
             main = recipe.inputs[0].alternatives[0] if recipe.inputs and recipe.inputs[0].alternatives else None
             tried.append((step, recipe.station, main))
@@ -299,7 +327,7 @@ class Planner:
             return None
         self._record(item, depth, tried, best[0])
         stock.clear()
-        stock.update(best[1])
+        dict.update(stock, best[1])
         return best[0]
 
     def _expand_recipe(self, recipe: Recipe, item: str, count: int, stock: Counter,
@@ -338,7 +366,7 @@ class Planner:
         best: Optional[Tuple[Step, Counter]] = None
         tried: List[Tuple[Step, str, Optional[str]]] = []
         for source in sources[:MAX_BRANCHES]:
-            trial = stock.copy()
+            trial = _fork(stock)
             step = self._expand_source(source, item, count, trial, stack, depth)
             tried.append((step, source.id, None))
             if best is None or self._score(step) > self._score(best[0]):
@@ -347,7 +375,7 @@ class Planner:
             return None
         self._record(item, depth, tried, best[0])
         stock.clear()
-        stock.update(best[1])
+        dict.update(stock, best[1])
         return best[0]
 
     def _usable_sources(self, item: str) -> List[Source]:
@@ -550,8 +578,8 @@ class Planner:
         """Записывает рассмотренные варианты одного способа получения."""
         options = tuple(
             Option(kind=step.kind, detail=detail, via=via, feasible=step.satisfied,
-                   effort=sum(node.weight for node in step.walk()),
-                   dead_ends=sum(1 for node in step.walk() if node.kind == MISSING),
+                   effort=step.totals[1],
+                   dead_ends=step.totals[0],
                    chosen=step is winner)
             for step, detail, via in tried
         )
@@ -601,7 +629,5 @@ class Planner:
         трудоёмкость, а не число шагов, существенно: палки выпадают из мёртвого куста за один
         шаг, но с шансом получить ноль, и три надёжных шага через доски игроку полезнее.
         """
-        nodes = list(step.walk())
-        dead_ends = sum(1 for node in nodes if node.kind == MISSING)
-        effort = sum(node.weight for node in nodes)
+        dead_ends, effort = step.totals
         return (int(step.satisfied), -dead_ends, -effort)
