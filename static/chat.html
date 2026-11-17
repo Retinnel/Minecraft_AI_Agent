@@ -54,6 +54,7 @@
   .ask button.mic.on { background: var(--bad); border-color: var(--bad); color: #fff; }
   .voicebar { display: flex; gap: 14px; align-items: center; margin: -4px 0 12px; font-size: 14px; color: var(--muted); }
   .voicebar label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .voicebar select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -71,6 +72,7 @@
     </div>
     <div class="voicebar">
       <label><input type="checkbox" id="voice"> озвучивать ответы</label>
+      <label>голос <select id="voice-pick"><option value="">по говорящему</option></select></label>
       <span id="voice-engine"></span>
     </div>
     <div class="presets" id="presets"></div>
@@ -208,7 +210,7 @@ async function speakNow(text, source) {
   try {
     const resp = await fetch("/api/voice/speak", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, source })
+      body: JSON.stringify({ text, source, voice: node("voice-pick").value || null })
     });
     if (resp.ok) { await playBlob(await resp.blob()); return; }
   } catch (e) { /* сервер синтеза недоступен — говорит браузер */ }
@@ -237,8 +239,18 @@ async function detectVoice() {
   let label = "";
   try {
     const status = await (await fetch("/api/voice/status")).json();
-    label = status.available ? "голоса персонажей: " + status.engine
-      : ("speechSynthesis" in window ? "сервер синтеза не запущен — голос браузера" : "синтез недоступен");
+    const ENGINES = { voxcpm: "VoxCPM2, локально", elevenlabs: "ElevenLabs, облако" };
+    label = status.available ? "синтез: " + (ENGINES[status.engine] || status.engine)
+      : ("speechSynthesis" in window ? "движок синтеза не запущен — голос браузера" : "синтез недоступен");
+    const pick = node("voice-pick");
+    if (pick.options.length === 1) {
+      for (const voice of status.voices || []) {
+        const option = document.createElement("option");
+        option.value = voice.key;
+        option.textContent = voice.label;
+        pick.appendChild(option);
+      }
+    }
   } catch (e) { label = ""; }
   node("voice-engine").textContent = label;
 }

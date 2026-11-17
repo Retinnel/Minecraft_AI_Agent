@@ -1,29 +1,31 @@
 {
   "_comment": [
-    "Голоса ассистента и персонажей кампании. VoxCPM2 создаёт голос по словесному описанию;",
-    "описание даётся по-английски, как в документации модели, реплика — по-русски.",
-    "По описанию один раз синтезируется образец (reference), и все дальнейшие реплики",
-    "персонажа озвучиваются по этому образцу: иначе тембр менялся бы от реплики к реплике.",
-    "Ключи совпадают с пресетами персонажей в llm_prompts.json (campaign_personas);",
-    "assistant — голос обычных ответов вне кампании."
+    "Голоса ассистента. VoxCPM2 создаёт голос по словесному описанию; описание даётся",
+    "по-английски, как в документации модели, реплика — по-русски. По описанию один раз",
+    "синтезируется образец (data/voice_cache/reference/<ключ>.wav), и все дальнейшие реплики",
+    "озвучиваются по образцу: иначе тембр менялся бы от реплики к реплике. После правки",
+    "описания образец нужно удалить.",
+    "assistant — базовый голос: им говорит ассистент и персонажи без своего голоса.",
+    "Ключ, совпадающий с пресетом персонажа в llm_prompts.json (campaign_personas), даёт",
+    "этому персонажу свой голос. Выбор студента 2026-11-17: базовый — assistant, голос",
+    "кузнеца оставлен как вариант, голос старейшины снят.",
+    "elevenlabs_voice_id — идентификатор голоса из библиотеки ElevenLabs, если используется",
+    "облачный движок; у голоса без своего идентификатора берётся идентификатор базового."
   ],
   "sample_text": "Здравствуй. Я помогу тебе в этом мире: подскажу путь и предупрежу об опасности.",
+  "elevenlabs_model": "eleven_flash_v2_5",
   "voices": {
     "assistant": {
+      "label": "базовый",
       "description": "A young adult man, clear calm friendly voice, moderate pace",
-      "seed": 11
+      "seed": 11,
+      "elevenlabs_voice_id": ""
     },
     "smith": {
+      "label": "кузнец",
       "description": "An old man, deep rough gravelly voice, slow and stern, a village blacksmith",
-      "seed": 23
-    },
-    "elder": {
-      "description": "An elderly woman, soft warm voice, calm and dignified, unhurried",
-      "seed": 37
-    },
-    "cartographer": {
-      "description": "A young man, bright energetic curious voice, lively pace",
-      "seed": 51
+      "seed": 23,
+      "elevenlabs_voice_id": ""
     }
   }
 }
