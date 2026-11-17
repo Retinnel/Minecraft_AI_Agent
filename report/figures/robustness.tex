@@ -1,0 +1,41 @@
+% Устойчивость к замене языковой модели: основная и локальная малая модель, проценты.
+% Значения: eval/reports/2026-11-11-comparison.md (deepseek-chat),
+% eval/reports/2026-11-17-hybrid-qwen4b.md и 2026-11-17-llm_only-qwen4b.md (qwen3.5-4b).
+\begin{tikzpicture}[
+  font=\footnotesize,
+  x=1cm, y=0.052cm,
+  bar/.style={draw, semithick},
+  val/.style={font=\scriptsize, above, inner sep=1pt},
+]
+
+\pgfkeys{/pgf/number format/.cd, use comma, fixed, fixed zerofill, precision=1}
+
+% --- оси и сетка ---
+\foreach \v in {0, 20, 40, 60, 80, 100} {
+  \draw[very thin, gray!60] (0, \v) -- (13.4, \v);
+  \node[left] at (0, \v) {\v};
+}
+\draw[semithick] (0, 0) -- (13.4, 0);
+\draw[semithick] (0, 0) -- (0, 104);
+\node[rotate=90] at (-0.95, 50) {Доля, \%};
+
+% --- группы столбцов: только модель, гибрид ---
+\foreach \x/\a/\c/\name in {
+  0.75/62.3/91.8/{Совпало\\с разметкой,\\deepseek-chat},
+  4.05/36.1/85.2/{Совпало\\с разметкой,\\qwen3.5-4b},
+  7.35/26.2/0.0/{Недопустимые\\действия,\\deepseek-chat},
+  10.65/47.5/0.0/{Недопустимые\\действия,\\qwen3.5-4b}} {
+  \draw[bar, fill=white] (\x, 0) rectangle ++(0.9, \a);
+  \node[val] at (\x + 0.45, \a) {\pgfmathprintnumber{\a}};
+  \draw[bar, fill=black!75] (\x + 1.0, 0) rectangle ++(0.9, \c);
+  \node[val] at (\x + 1.45, \c) {\pgfmathprintnumber{\c}};
+  \node[align=center, below] at (\x + 0.95, -2) {\name};
+}
+
+% --- условные обозначения ---
+\draw[bar, fill=white] (3.0, -46) rectangle ++(0.5, 7);
+\node[right] at (3.55, -42.5) {только языковая модель};
+\draw[bar, fill=black!75] (8.4, -46) rectangle ++(0.5, 7);
+\node[right] at (8.95, -42.5) {гибрид};
+
+\end{tikzpicture}
