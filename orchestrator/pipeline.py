@@ -29,6 +29,8 @@ from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
+from solver.worldfacts import (AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS, WorldAnswer,
+                               WorldFacts, essentials as world_essentials, render_answer)
 
 NONE = "none"
 PLAN_GOAL = "plan_goal"
@@ -40,7 +42,7 @@ SHOW_PROGRESS = "show_progress"
 # Действия, которые может предложить модель. Остальные действия реестра (например, получение
 # награды за задание) выполняются системой сами и модели не предъявляются.
 PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
-              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS)
+              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS)
 
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
@@ -125,6 +127,11 @@ class Turn:
     # Заполняется только для show_progress: ступень развития и путь к следующей.
     progress: Optional[ProgressReport] = None
     progress_summary: Optional[str] = None
+    # Заполняется только для вопросов о мире: ответ базы знаний и названия, которые
+    # пересказ обязан сохранить.
+    world: Optional[WorldAnswer] = None
+    world_summary: Optional[str] = None
+    world_essentials: Sequence[str] = ()
 
 
 class Pipeline:
@@ -142,6 +149,7 @@ class Pipeline:
         self.mode = mode
         self._planner: Optional[Planner] = None
         self._campaigns: Optional[CampaignBuilder] = None
+        self._world: Optional[WorldFacts] = None
 
     @property
     def planner(self) -> Planner:
@@ -196,6 +204,10 @@ class Pipeline:
 
         if proposal.action == SHOW_PROGRESS and SHOW_PROGRESS in actions:
             return self._show_progress(inventory, stages)
+
+        # «Что я могу сделать сейчас» — вопрос об инвентаре, цели у него нет.
+        if proposal.action == AVAILABLE and AVAILABLE in actions:
+            return self._answer_world(AVAILABLE, None, inventory, stages)
 
         count = self._reconcile_count(utterance, proposal.count)
         stages["count"] = count
@@ -331,6 +343,11 @@ class Pipeline:
     def _decide(self, action: str, thing: str, count: Any, mode: str,
                 inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> "Turn":
         """Вердикт валидатора и, если действие допустимо, команда или план."""
+        # Вопрос о мире ничего в игре не меняет, поэтому проверять здесь нечего: спросить
+        # можно и о запрещённом к призыву драконе. Отвечает база знаний.
+        if action in WORLD_ACTIONS:
+            return self._answer_world(action, thing, inventory, stages)
+
         verdict = self.validator.validate(action, thing, count, mode)
         stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
 
@@ -511,6 +528,33 @@ class Pipeline:
             plan_summary=render_summary(first.plan, self.kb),
             proposed=proposed,
             candidates=tuple(candidates),
+        )
+
+    def _answer_world(self, action: str, thing: Optional[str],
+                      inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:
+        """Вопрос о мире: что делается из предмета, откуда он, что падает, что доступно.
+
+        Ответ — обратный запрос к онтологии. Модель определила только вид вопроса и назвала
+        предмет словами игрока; в ответе нет ничего, чего нет в базе знаний.
+        """
+        if self._world is None:
+            self._world = WorldFacts(self.kb, self.planner)
+        if action == AVAILABLE:
+            answer = self._world.available(inventory or {})
+        elif action == USES:
+            answer = self._world.uses(thing)
+        elif action == SOURCES:
+            answer = self._world.sources(thing)
+        else:
+            answer = self._world.drops(thing)
+        stages["world"] = {"question": answer.question, "subject": thing,
+                           "items": list(answer.items), "total": answer.total}
+        return Turn(
+            outcome=ACT, action=action, target=thing,
+            label=self.kb.label(thing) if thing else None,
+            explanation=list(answer.explanation), stages=stages,
+            world=answer, world_summary=render_answer(answer, self.kb),
+            world_essentials=tuple(world_essentials(answer, self.kb)),
         )
 
     def _show_progress(self, inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:

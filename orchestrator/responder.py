@@ -79,6 +79,8 @@ class Responder:
                 return turn.plan_summary or "План построен."
             if turn.action == SHOW_PROGRESS:
                 return turn.progress_summary or "Ступень определить не удалось."
+            if turn.world_summary:
+                return turn.world_summary
             if turn.action == START_CAMPAIGN and turn.campaign:
                 # Обычно кампанию озвучивает рассказчик; шаблон — на случай, если его нет.
                 return (f"Кампания к цели «{turn.label or turn.target}»: "
@@ -164,6 +166,13 @@ class Responder:
         """
         if turn.outcome == ACT and turn.action in ACTION_VERBS:
             return str(turn.count) in text
+        if turn.outcome == ACT and turn.world is not None:
+            # Ответ о мире — перечень из базы знаний. Пересказ, потерявший хоть одно
+            # название, неполон; добавить своё модель может, но тогда уйдёт шаблон —
+            # проверить это по словам нельзя, поэтому перечень в шаблоне всегда полный.
+            from resolver.text import name_stems
+            said = set(name_stems(text))
+            return all(set(name_stems(name)) <= said for name in turn.world_essentials)
         if turn.outcome == ACT and turn.action == SHOW_PROGRESS and turn.label:
             # Отчёт о ступени без названия следующей кирки теряет смысл «что дальше».
             from resolver.text import name_stems

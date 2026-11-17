@@ -38,6 +38,11 @@ KINDS_FOR_ACTION = {
     "remove_item": ("item", "block"),
     "summon_entity": ("creature",),
     "start_campaign": ("item", "block"),
+    # Вопросы о мире: предмет спрашивают про применение и происхождение, а «что падает» —
+    # про существо или блок.
+    "ask_uses": ("item", "block"),
+    "ask_sources": ("item", "block"),
+    "ask_drops": ("creature", "block"),
 }
 
 RESOLVED = "resolved"
