@@ -1,0 +1,50 @@
+% Схема алгоритма декомпозиции дальней цели на этапы кампании.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=3.6mm,
+  term/.style={draw, rounded rectangle, align=center, minimum width=3.4cm, minimum height=8mm},
+  proc/.style={draw, align=center, minimum width=7.0cm, minimum height=9mm, inner sep=3pt},
+  sub/.style={proc, inner xsep=4mm, append after command={
+    \pgfextra{
+      \draw ([xshift=2mm]\tikzlastnode.north west) -- ([xshift=2mm]\tikzlastnode.south west);
+      \draw ([xshift=-2mm]\tikzlastnode.north east) -- ([xshift=-2mm]\tikzlastnode.south east);
+    }}},
+  cond/.style={draw, diamond, aspect=3.4, align=center, inner sep=0pt, minimum width=7.0cm},
+  exit/.style={draw, rounded rectangle, align=center, text width=3.2cm, minimum height=9mm, inner sep=3pt},
+  side/.style={draw, align=center, text width=3.4cm, minimum height=9mm, inner sep=3pt},
+  arr/.style={-{Stealth[length=1.8mm]}, semithick},
+  ylbl/.style={font=\scriptsize, above, pos=0.3},
+  nlbl/.style={font=\scriptsize, right, pos=0.4},
+]
+
+\node[term] (start) {Начало: цель, инвентарь, режим};
+\node[sub, below=of start] (plan) {Построить план цели от инвентаря\\(рисунок~\ref{fig:planner})};
+\node[cond, below=of plan] (feasible) {План выполним?};
+\node[proc, below=of feasible] (marks) {Обойти дерево плана снизу вверх и выделить вехи:\\инструменты добычи, оборудование рецептов, цель};
+\node[proc, below=of marks] (next) {Взять очередную веху; состояние~--~прогноз\\инвентаря после принятых этапов};
+\node[sub, below=of next] (check) {Проверить веху как задание: план от прогноза,\\трудоёмкость по формуле~eqref{eq:quest}};
+\node[cond, below=of check] (fits) {Трудоёмкость\\в допустимых пределах?};
+\node[proc, below=of fits] (accept) {Принять этап; прогноз: добавить цель этапа,\\вычесть израсходованное его планом};
+\node[cond, below=of accept] (more) {Вехи остались?};
+\node[proc, below=of more] (rewards) {Назначить награды этапов по правилу отбора};
+\node[term, below=of rewards] (end) {Конец: цепочка этапов с наградами};
+
+\node[exit, right=10mm of feasible] (unreach) {Отказ: цель\\недостижима};
+\node[cond, right=8mm of fits, minimum width=3.9cm, aspect=2.4] (split) {Этап делится?};
+\node[side, above=7mm of split] (heavy) {Выделить самое тяжёлое поддерево материала в предшествующий этап};
+\node[exit, below=7mm of split] (fail) {Отказ: этап\\и причина};
+
+\foreach \a/\b in {start/plan, plan/feasible, marks/next, next/check, check/fits, accept/more, rewards/end}
+  \draw[arr] (\a) -- (\b);
+\draw[arr] (feasible) -- node[nlbl] {да} (marks);
+\draw[arr] (feasible) -- node[ylbl] {нет} (unreach);
+\draw[arr] (fits) -- node[nlbl] {да} (accept);
+\draw[arr] (fits) -- node[ylbl] {нет} (split);
+\draw[arr] (split) -- node[nlbl] {да} (heavy);
+\draw[arr] (split) -- node[nlbl] {нет} (fail);
+\draw[arr] (heavy.north) |- (check.east);
+\draw[arr] (more) -- node[nlbl] {нет} (rewards);
+% Возврат к следующей вехе по линии слева.
+\draw[arr] (more.west) -- node[font=\scriptsize, above, pos=0.5] {да} ++(-9mm, 0) |- (next.west);
+
+\end{tikzpicture}

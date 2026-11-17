@@ -159,6 +159,15 @@
 % крупная схема, не поместившаяся рядом со ссылкой, переносится в конец
 % документа или за выводы раздела.
 \usepackage[section]{placeins}
+% Зачем: крупный рисунок или таблица занимает верх страницы, а текст продолжается под
+% ним. Со значениями по умолчанию такой объект уходил на отдельную полупустую страницу.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.85}
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{3}
 
 % Зачем: Добавление подписей к рисункам
 \usepackage{caption}

@@ -1,0 +1,47 @@
+% Структура программной реализации: пакеты и зависимости между ними.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  pkg/.style={draw, align=center, minimum width=3.15cm, minimum height=10mm, inner sep=2pt},
+  ext/.style={pkg, dashed},
+  use/.style={-{Stealth[length=1.8mm]}, semithick},
+  data/.style={-{Stealth[length=1.8mm]}, semithick, dashed},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt, fill=white, align=center},
+]
+
+\node[pkg] (mod) at (0, 0) {mod/\\клиент среды};
+\node[pkg] (web) at (4.4, 0) {static/, frontend/\\веб-страницы};
+\node[pkg] (eval) at (8.8, 0) {eval/\\оценочный контур};
+\node[ext] (voice) at (0, -4.0) {voice/\\синтез речи};
+
+\node[pkg] (api) at (2.2, -2.0) {api/\\HTTP-слой, состояние};
+\node[pkg] (orch) at (8.8, -2.0) {orchestrator/\\конвейер};
+\node[ext] (llm) at (13.2, -2.0) {Языковая\\модель};
+
+\node[pkg] (resolver) at (4.4, -4.0) {resolver/\\сопоставление};
+\node[pkg] (solver) at (8.8, -4.0) {solver/\\решатель задач};
+
+\node[pkg] (kb) at (6.6, -6.0) {kb/\\база знаний};
+\node[ext] (game) at (1.2, -6.0) {Данные среды,\\локализация};
+\node[ext] (layers) at (12.0, -6.0) {Рукописные слои\\знаний};
+
+\draw[use] (mod) -- (api);
+\draw[use] (web) -- (api);
+\draw[use] (api) -- (orch);
+\draw[use] (eval) -- (orch);
+\draw[use] (orch) -- (llm);
+\draw[use] (orch) -- (resolver);
+\draw[use] (orch) -- (solver);
+\draw[use] (resolver) -- (kb);
+\draw[use] (solver) -- (kb);
+\draw[use] (api.south east) -- (solver.north west);
+\draw[use] (api.south west) -- (voice.north);
+\draw[data] (game) -- node[lbl] {сборка} (kb);
+\draw[data] (layers) -- node[lbl] {сборка} (kb);
+
+% --- условные обозначения ---
+\draw[use] (0.2, -7.3) -- ++(1.1, 0) node[right, font=\scriptsize] {использует};
+\draw[data] (4.2, -7.3) -- ++(1.1, 0) node[right, font=\scriptsize] {исходные данные};
+\node[ext, minimum width=1.1cm, minimum height=4mm] at (9.6, -7.3) {};
+\node[right, font=\scriptsize] at (10.25, -7.3) {внешний компонент или данные};
+
+\end{tikzpicture}

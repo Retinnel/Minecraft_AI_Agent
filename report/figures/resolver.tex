@@ -1,0 +1,43 @@
+% Схема алгоритма сопоставления названия с сущностью онтологии.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=4mm,
+  term/.style={draw, rounded rectangle, align=center, minimum width=3.4cm, minimum height=8mm},
+  proc/.style={draw, align=center, minimum width=5.9cm, minimum height=9mm, inner sep=3pt},
+  sub/.style={draw, align=center, minimum height=9mm, inner sep=3pt, inner xsep=4mm,
+    append after command={
+    \pgfextra{
+      \draw ([xshift=2mm]\tikzlastnode.north west) -- ([xshift=2mm]\tikzlastnode.south west);
+      \draw ([xshift=-2mm]\tikzlastnode.north east) -- ([xshift=-2mm]\tikzlastnode.south east);
+    }}},
+  cond/.style={draw, diamond, aspect=3.0, align=center, inner sep=0pt, minimum width=5.9cm},
+  exit/.style={draw, rounded rectangle, align=center, text width=2.75cm, minimum height=9mm, inner sep=3pt},
+  arr/.style={-{Stealth[length=1.8mm]}, semithick},
+  ylbl/.style={font=\scriptsize, above, pos=0.35},
+  nlbl/.style={font=\scriptsize, right, pos=0.4},
+]
+
+\node[term] (start) {Начало: название словами\\пользователя, действие};
+\node[proc, below=of start] (norm) {Привести к нижнему регистру, убрать\\служебные слова, выделить основы слов};
+\node[proc, below=of norm] (index) {Найти имена по индексу основ; основы\\вне индекса сравнить нечётко};
+\node[proc, below=of index] (score) {Оценить кандидатов по формуле~\eqref{eq:score},\\отбросить объясняющих менее 75\,\% запроса};
+\node[cond, below=of score] (found) {Кандидаты есть\\и $s_1 \geq 0{,}3$?};
+\node[cond, below=of found] (margin) {$s_1 - s_2 \geq 0{,}15$?};
+\node[term, below=of margin] (end) {Конец: сущность найдена};
+
+\node[sub, right=8mm of found, text width=3.0cm] (rename) {Переформулировка моделью, повторный поиск};
+\node[cond, below=of rename, minimum width=3.8cm, aspect=2.4] (again) {Найдено?};
+\node[exit, below=of again] (suggest) {Вопрос: подтвердить найденный вариант};
+\node[exit, below=of suggest] (none) {Отказ: объекта\\в среде нет};
+\node[exit, left=8mm of margin] (ambiguous) {Вопрос: выбрать из близких вариантов};
+
+\foreach \a/\b in {start/norm, norm/index, index/score, score/found, rename/again}
+  \draw[arr] (\a) -- (\b);
+\draw[arr] (found) -- node[nlbl] {да} (margin);
+\draw[arr] (margin) -- node[nlbl] {да} (end);
+\draw[arr] (found) -- node[ylbl] {нет} (rename);
+\draw[arr] (margin) -- node[ylbl] {нет} (ambiguous);
+\draw[arr] (again) -- node[nlbl] {да} (suggest);
+\draw[arr] (again.east) -- node[font=\scriptsize, above] {нет} ++(5mm, 0) |- (none.east);
+
+\end{tikzpicture}

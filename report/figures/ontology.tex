@@ -1,0 +1,39 @@
+% Классы ядра онтологии и отношения между ними.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  cls/.style={draw, align=center, minimum width=3.0cm, minimum height=9mm, inner sep=2pt},
+  rel/.style={-{Stealth[length=1.8mm]}, semithick},
+  isa/.style={-{Triangle[open, length=2.4mm, width=2.4mm]}, semithick},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt, fill=white, align=center},
+]
+
+\node[cls] (thing) at (7, 0) {Сущность};
+\node[cls] (restriction) at (12.2, 0) {Запрет};
+\node[cls] (block) at (1.8, -2.1) {Блок};
+\node[cls] (item) at (7, -2.1) {Предмет};
+\node[cls] (creature) at (12.2, -2.1) {Существо};
+\node[cls] (tool) at (1.8, -4.5) {Вид и уровень\\инструмента};
+\node[cls] (ingredient) at (7, -4.5) {Позиция состава};
+\node[cls] (recipe) at (12.2, -4.5) {Рецепт};
+\node[cls] (tag) at (7, -6.6) {Группа предметов};
+\node[cls] (station) at (12.2, -6.6) {Оборудование};
+
+% --- обобщение ---
+\draw[isa] (item) -- (thing);
+\draw[isa] (block.north) -- (thing.south west);
+\draw[isa] (creature.north) -- (thing.south east);
+
+% --- отношения ---
+\draw[rel] (restriction) -- node[lbl] {запрещает\\действие} (thing);
+\draw[rel] (block) -- node[lbl] {даёт} (item);
+\draw[rel] (creature) -- node[lbl] {даёт} (item);
+\draw[rel] (block) -- node[lbl] {требует} (tool);
+\draw[rel] (item.south west) -- node[lbl] {является} (tool.north east);
+\draw[rel] (ingredient) -- node[lbl] {вариант} (item);
+\draw[rel] (ingredient) -- node[lbl] {вариант} (tag);
+\draw[rel] (recipe) -- node[lbl] {требует} (ingredient);
+\draw[rel] (recipe.north west) -- node[lbl] {производит} (item.south east);
+\draw[rel] (recipe) -- node[lbl] {выполняется на} (station);
+\draw[rel] (tag.west) -- ++(-1.6, 0) |- node[lbl, pos=0.25] {содержит} ([yshift=-2.5mm]item.west);
+
+\end{tikzpicture}

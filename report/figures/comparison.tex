@@ -1,0 +1,45 @@
+% Сравнение трёх конфигураций на золотом наборе, проценты.
+% Значения: eval/reports/2026-11-11-comparison.md.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  x=1cm, y=0.052cm,
+  bar/.style={draw, semithick},
+  val/.style={font=\scriptsize, above, inner sep=1pt},
+]
+
+\pgfkeys{/pgf/number format/.cd, use comma, fixed, fixed zerofill, precision=1}
+
+% --- оси и сетка ---
+\foreach \v in {0, 20, 40, 60, 80, 100} {
+  \draw[very thin, gray!60] (0, \v) -- (15.2, \v);
+  \node[left] at (0, \v) {\v};
+}
+\draw[semithick] (0, 0) -- (15.2, 0);
+\draw[semithick] (0, 0) -- (0, 104);
+\node[rotate=90] at (-0.95, 50) {Доля, \%};
+
+% --- группы столбцов: A, B, C ---
+\foreach \x/\a/\b/\c/\name in {
+  0.45/62.3/47.5/91.8/{Совпало\\с разметкой},
+  3.45/26.2/11.5/0.0/{Недопустимые\\действия},
+  6.45/89.5/57.9/92.1/{Типичные\\реплики},
+  9.45/25.0/37.5/93.8/{Граничные\\реплики},
+  12.45/0.0/14.3/85.7/{Отрицательные\\реплики}} {
+  \draw[bar, fill=white] (\x, 0) rectangle ++(0.72, \a);
+  \node[val] at (\x + 0.36, \a) {\pgfmathprintnumber{\a}};
+  \draw[bar, fill=gray!45] (\x + 0.78, 0) rectangle ++(0.72, \b);
+  \node[val] at (\x + 1.14, \b) {\pgfmathprintnumber{\b}};
+  \draw[bar, fill=black!75] (\x + 1.56, 0) rectangle ++(0.72, \c);
+  \node[val] at (\x + 1.92, \c) {\pgfmathprintnumber{\c}};
+  \node[align=center, below] at (\x + 1.14, -2) {\name};
+}
+
+% --- условные обозначения ---
+\draw[bar, fill=white] (1.6, -34) rectangle ++(0.5, 7);
+\node[right] at (2.15, -30.5) {только языковая модель};
+\draw[bar, fill=gray!45] (6.6, -34) rectangle ++(0.5, 7);
+\node[right] at (7.15, -30.5) {только символьная схема};
+\draw[bar, fill=black!75] (11.6, -34) rectangle ++(0.5, 7);
+\node[right] at (12.15, -30.5) {гибрид};
+
+\end{tikzpicture}

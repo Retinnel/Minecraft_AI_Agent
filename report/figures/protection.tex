@@ -1,0 +1,56 @@
+% Схема вывода мер защиты: общая для предупреждения об угрозе и разбора гибели.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=3.6mm,
+  term/.style={draw, rounded rectangle, align=center, minimum width=3.4cm, minimum height=8mm},
+  proc/.style={draw, align=center, minimum width=7.0cm, minimum height=9mm, inner sep=3pt},
+  sub/.style={proc, inner xsep=4mm, append after command={
+    \pgfextra{
+      \draw ([xshift=2mm]\tikzlastnode.north west) -- ([xshift=2mm]\tikzlastnode.south west);
+      \draw ([xshift=-2mm]\tikzlastnode.north east) -- ([xshift=-2mm]\tikzlastnode.south east);
+    }}},
+  cond/.style={draw, diamond, aspect=3.4, align=center, inner sep=0pt, minimum width=7.0cm},
+  exit/.style={draw, rounded rectangle, align=center, text width=3.3cm, minimum height=9mm, inner sep=3pt},
+  side/.style={draw, align=center, text width=3.3cm, minimum height=9mm, inner sep=3pt},
+  arr/.style={-{Stealth[length=1.8mm]}, semithick},
+  ylbl/.style={font=\scriptsize, above, pos=0.3},
+  nlbl/.style={font=\scriptsize, right, pos=0.4},
+]
+
+\node[term] (start) {Начало: существо рядом либо причина\\гибели; инвентарь, надетое снаряжение};
+\node[proc, below=of start] (class) {Отнести событие к классу угрозы\\по рукописному слою базы знаний};
+\node[cond, below=of class] (any) {Есть меры защиты\\от этого класса?};
+\node[proc, below=of any] (next) {Взять очередную меру по убыванию пользы};
+\node[cond, below=of next] (owned) {Мера надета, в руке\\или лежит в инвентаре?};
+\node[sub, below=of owned] (plan) {Построить план изготовления меры\\от остатка инвентаря (рисунок~\ref{fig:planner})};
+\node[cond, below=of plan] (reach) {План выполним без добычи,\\оборудование есть или собирается?};
+\node[cond, below=of reach] (more) {Меры остались?};
+\node[cond, below=of more] (offer) {Есть неприменённая\\или достижимая мера?};
+\node[term, below=of offer] (end) {Конец: сообщение о мерах защиты};
+
+\node[exit, right=10mm of any] (useless) {Снаряжение от угрозы\\не защищает};
+\node[side, right=10mm of owned] (mark) {Отметить: в деле либо не применена};
+\node[side, right=10mm of reach] (craft) {Отметить достижимой, вычесть израсходованное из остатка};
+\node[exit, right=10mm of offer] (silent) {До гибели: молчание; после: ближайшая мера на будущее};
+
+\foreach \a/\b in {start/class, class/any, next/owned, plan/reach}
+  \draw[arr] (\a) -- (\b);
+\draw[arr] (any) -- node[nlbl] {да} (next);
+\draw[arr] (any) -- node[ylbl] {нет} (useless);
+\draw[arr] (owned) -- node[nlbl] {нет} (plan);
+\draw[arr] (owned) -- node[ylbl] {да} (mark);
+\draw[arr] (reach) -- node[nlbl] {нет} (more);
+\draw[arr] (reach) -- node[ylbl] {да} (craft);
+\draw[arr] (more) -- node[nlbl] {нет} (offer);
+\draw[arr] (offer) -- node[nlbl] {да} (end);
+\draw[arr] (offer) -- node[ylbl] {нет} (silent);
+
+% Отмеченная мера возвращает к проверке, остались ли меры.
+\coordinate (rail) at ($(craft.east) + (5mm, 0)$);
+\draw[semithick] (mark.east) -- (mark.east -| rail);
+\draw[semithick] (craft.east) -- (craft.east -| rail);
+\draw[arr] (mark.east -| rail) |- (more.east);
+% Возврат к следующей мере по линии слева.
+\draw[arr] (more.west) -- node[font=\scriptsize, above, pos=0.5] {да} ++(-9mm, 0) |- (next.west);
+
+\end{tikzpicture}

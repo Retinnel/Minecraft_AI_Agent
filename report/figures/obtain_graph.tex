@@ -1,0 +1,39 @@
+% Фрагмент графа способов получения объектов: путь к железной кирке.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  thing/.style={draw, align=center, minimum width=2.5cm, minimum height=8mm, inner sep=2pt},
+  part/.style={-{Stealth[length=1.8mm]}, semithick},
+  tool/.style={-{Stealth[length=1.8mm]}, semithick, dashed},
+  station/.style={-{Stealth[length=1.8mm]}, semithick, dotted},
+  lbl/.style={font=\scriptsize, inner sep=1.5pt, fill=white},
+]
+
+\node[thing] (log) at (0, 0) {Бревно};
+\node[thing] (planks) at (3.3, 0) {Доски};
+\node[thing] (stick) at (6.6, 0) {Палка};
+\node[thing] (woodpick) at (0, -1.7) {Деревянная\\кирка};
+\node[thing] (cobble) at (3.3, -1.7) {Булыжник};
+\node[thing] (stonepick) at (6.6, -1.7) {Каменная\\кирка};
+\node[thing] (furnace) at (9.9, -1.7) {Печь};
+\node[thing] (ore) at (6.6, -3.4) {Железная\\руда};
+\node[thing] (ingot) at (9.9, -3.4) {Железный\\слиток};
+\node[thing] (ironpick) at (13.2, -1.7) {Железная\\кирка};
+
+\draw[part] (log) -- node[lbl] {1} (planks);
+\draw[part] (planks) -- node[lbl] {2} (stick);
+\draw[part] (planks.south west) -- node[lbl] {3} (woodpick.north east);
+\draw[part] (cobble) -- node[lbl] {3} (stonepick);
+\draw[part] (stick) -- node[lbl] {2} (stonepick);
+\draw[part] (ore) -- node[lbl] {1} (ingot);
+\draw[part] (ingot.east) -| node[lbl, pos=0.75] {3} (ironpick.south);
+\draw[part] (stick.east) -| node[lbl, pos=0.75] {2} (ironpick.north);
+\draw[tool] (woodpick) -- (cobble);
+\draw[tool] (stonepick) -- (ore);
+\draw[station] (furnace) -- (ingot);
+
+% --- условные обозначения ---
+\draw[part] (0.2, -4.6) -- ++(1.1, 0) node[right, font=\scriptsize] {входит в состав, число~--~количество};
+\draw[tool] (8.4, -4.6) -- ++(1.1, 0) node[right, font=\scriptsize] {требуется для добычи};
+\draw[station] (0.2, -5.15) -- ++(1.1, 0) node[right, font=\scriptsize] {оборудование рецепта};
+
+\end{tikzpicture}
