@@ -163,6 +163,12 @@ async function ask(text) {
     if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
     html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
     pending.innerHTML = html;
+    if (d.assistant_mode && d.assistant_mode !== knownMode) {
+      // Режим сменён репликой: шапка должна показать его, а отметка в журнале не нужна —
+      // ответ ассистента уже об этом сказал.
+      knownMode = d.assistant_mode;
+      document.dispatchEvent(new CustomEvent("assistant-mode-changed", { detail: { mode: d.assistant_mode } }));
+    }
     speak(d.response, d.source);
     if (d.plan_tree) node("plan").textContent = d.plan_tree;
     if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");

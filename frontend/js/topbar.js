@@ -88,6 +88,10 @@
     for (const k in buttons) buttons[k].disabled = false;
   }
 
+  // Режим меняется и фразой в чате («режим выживания»): страница сообщает об этом сюда,
+  // иначе переключатель показывал бы прежний режим до перезагрузки.
+  document.addEventListener("assistant-mode-changed", (e) => show(e.detail.mode));
+
   fetch("/api/rp/mode").then(r => r.json()).then(d => show(d.mode)).catch(() => {});
   fetch("/api/compare/model").then(r => r.json()).then(m => {
     model.textContent = "модель: " + (m.name || "?") + (m.provider ? " (" + m.provider + ")" : "");
