@@ -385,6 +385,9 @@ def main() -> int:
                              "файл настроек при этом не меняется")
     parser.add_argument("--repeat", type=int, default=1,
                         help="сколько раз прогнать набор; в сводку идут медиана и разброс")
+    parser.add_argument("--tag",
+                        help="метка в имени отчёта: прогон на другой модели не затирает "
+                             "основной отчёт дня и не попадает в сводную таблицу")
     args = parser.parse_args()
 
     cases = load_golden_set(args.golden_set)
@@ -414,8 +417,9 @@ def main() -> int:
     if args.report:
         REPORTS_DIR.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%Y-%m-%d")
-        (REPORTS_DIR / f"{stamp}-{config.key}.md").write_text(report, encoding="utf-8")
-        (REPORTS_DIR / f"{stamp}-{config.key}.json").write_text(
+        name = f"{stamp}-{config.key}" + (f"-{args.tag}" if args.tag else "")
+        (REPORTS_DIR / f"{name}.md").write_text(report, encoding="utf-8")
+        (REPORTS_DIR / f"{name}.json").write_text(
             json.dumps({"summary": summary, "model": profile, "rows": rows,
                         "all_rows": [run_rows for run_rows, _ in runs] if len(runs) > 1 else None},
                        ensure_ascii=False, indent=2),

@@ -84,6 +84,16 @@
         "max_tokens": 200,
         "temperature": 0.7
       }
+    },
+    "qwen3.5-4b-local": {
+      "name": "qwen3.5-4b",
+      "provider": "lmstudio",
+      "description": "Qwen3.5 4B локально через LM Studio (localhost:1234) — малая модель для проверки устойчивости",
+      "parameters": {
+        "max_tokens": 200,
+        "temperature": 0.7,
+        "thinking": false
+      }
     }
   }
 }

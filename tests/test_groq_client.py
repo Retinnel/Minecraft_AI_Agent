@@ -128,6 +128,44 @@ class GroqClientTests(unittest.TestCase):
         self.assertEqual(client.get_source_name(), "ollama")
         self.assertTrue(client.is_available())
 
+    def test_lmstudio_provider_needs_no_key(self):
+        fake_client = _FakeClient("ok")
+        with patch("api.groq_client.OllamaClient", return_value=fake_client) as factory, \
+                patch("api.groq_client.os.getenv", return_value=None):
+            client = GroqClient(llm_config=_build_config(provider="lmstudio"))
+
+        self.assertEqual(client.get_source_name(), "lmstudio")
+        self.assertTrue(client.is_available())
+        self.assertIn("1234", factory.call_args.kwargs["base_url"])
+
+    def test_lmstudio_thinking_is_switched_off_by_an_empty_block(self):
+        """Параметр "thinking": false добавляет в запрос пустой блок рассуждения."""
+        fake_client = _CapturingFakeClient('{"action": "none"}')
+        config = _build_config(provider="lmstudio")
+        config.models["test-model"].parameters["thinking"] = False
+        with patch("api.groq_client.OllamaClient", return_value=fake_client):
+            client = GroqClient(llm_config=config)
+
+        params = client._build_api_params()
+        params["messages"] = [{"role": "user", "content": "дай меч"}]
+        client._create_completion(params)
+
+        self.assertEqual([m["role"] for m in fake_client.last_messages], ["user", "assistant"])
+        self.assertIn("</think>", fake_client.last_messages[-1]["content"])
+        # Сообщения вызывающей стороны не тронуты: повтор запроса не накапливает заготовки.
+        self.assertEqual(len(params["messages"]), 1)
+
+    def test_lmstudio_keeps_thinking_unless_told_otherwise(self):
+        fake_client = _CapturingFakeClient("ok")
+        with patch("api.groq_client.OllamaClient", return_value=fake_client):
+            client = GroqClient(llm_config=_build_config(provider="lmstudio"))
+
+        params = client._build_api_params()
+        params["messages"] = [{"role": "user", "content": "дай меч"}]
+        client._create_completion(params)
+
+        self.assertEqual([m["role"] for m in fake_client.last_messages], ["user"])
+
     def test_groq_provider_is_selected_from_config(self):
         fake_client = _FakeClient('{"mode":"chat","spoken_response":"ok","action_type":null,"item_id":null,"count":1,"execute":false,"error":null}')
         with patch("api.groq_client.Groq", return_value=fake_client), patch("api.groq_client.os.getenv", return_value="test-key"):

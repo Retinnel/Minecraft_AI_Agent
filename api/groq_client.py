@@ -16,10 +16,20 @@ from api.player_state import get_player_state_prompt_context
 logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+# LM Studio отдаёт локальную модель по протоколу OpenAI; ключ не нужен.
+LMSTUDIO_BASE_URL = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 # DeepSeek совместим с API OpenAI. Ключ — платный баланс, поэтому провайдер не по умолчанию:
 # подключается выбором модели в llm_config.json, когда квоты Groq не хватает.
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+
+# Провайдеры, работающие на этой же машине: доступность не зависит от ключа.
+LOCAL_PROVIDERS = {"ollama", "lmstudio"}
+
+# Пустой блок рассуждения в начале ответа. Qwen3.5 в LM Studio рассуждает всегда, параметра
+# для отключения у сервера нет: без заготовки на JSON из трёх полей уходит больше тысячи
+# токенов и пятнадцать секунд. С заготовкой модель сразу пишет ответ.
+EMPTY_THINKING = "<think>\n\n</think>\n\n"
 
 # Separate passive RP polling from interactive chat/tool requests so a slow tip
 # request cannot monopolize the workers needed for /api/rp/chat.
@@ -154,6 +164,14 @@ class GroqClient:
             except Exception as e:
                 logger.error(f"Failed to initialize Ollama client: {e}")
                 self.client = None
+        elif self.provider == "lmstudio":
+            try:
+                self.client = OllamaClient(base_url=LMSTUDIO_BASE_URL, api_key="lm-studio")
+                print(make_console_safe(f"[LLM] Using LM Studio | model: {self.model} | url: {LMSTUDIO_BASE_URL}"))
+                logger.info(make_console_safe(f"Initialized LM Studio client with model: {self.model}"))
+            except Exception as e:
+                logger.error(f"Failed to initialize LM Studio client: {e}")
+                self.client = None
         elif self.provider == "openrouter":
             if self.openrouter_api_key:
                 try:
@@ -208,7 +226,7 @@ class GroqClient:
 
     def is_available(self) -> bool:
         """Check if LLM API is configured and ready."""
-        if self.provider == "ollama":
+        if self.provider in LOCAL_PROVIDERS:
             return self.client is not None
         return self.client is not None and self.provider_api_key is not None
 
@@ -244,6 +262,12 @@ class GroqClient:
 
     def _create_completion(self, api_params: dict):
         """Create a completion and retry Ollama/Qwen calls that exhaust budget on reasoning."""
+        if self._thinking_disabled():
+            api_params = dict(api_params)
+            api_params["messages"] = list(api_params.get("messages") or []) + [
+                {"role": "assistant", "content": EMPTY_THINKING}
+            ]
+
         completion = self.client.chat.completions.create(**api_params)
 
         if self.provider != "ollama":
@@ -278,6 +302,12 @@ class GroqClient:
             retry_max_tokens,
         )
         return self.client.chat.completions.create(**retry_params)
+
+    def _thinking_disabled(self) -> bool:
+        """Рассуждение отключается параметром модели "thinking": false; только LM Studio."""
+        if self.provider != "lmstudio" or not self.llm_config:
+            return False
+        return self.llm_config.get_parameter("thinking", True) is False
 
     def generate_tip(self, recent_logs: list) -> Optional[str]:
         """
