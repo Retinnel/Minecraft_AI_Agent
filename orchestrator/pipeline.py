@@ -69,6 +69,15 @@ REMOVAL_CUES = re.compile(
     re.IGNORECASE,
 )
 
+# Признаки просьбы о цели. Кампания начинается сразу, поэтому одного слова модели мало:
+# малая модель, не разобрав «дай», выбирала предложение цели, и игрок получал кампанию,
+# о которой не просил.
+GOAL_CUES = re.compile(
+    r"(цел|задач|заняться|занять себя|что\s+(мне\s+)?(делать|дальше)|чем\s+заня|предлож|"
+    r"посовет|подскаж|куда\s+двигаться|goal|what\s+next|suggest)",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class Proposal:
@@ -200,6 +209,15 @@ class Pipeline:
             return self._build_quest(utterance, proposal, actions, mode, inventory, stages)
 
         if proposal.action == PROPOSE_GOAL and PROPOSE_GOAL in actions:
+            # Сомнение разрешается вопросом, а не действием — как и с удалением ниже.
+            if not GOAL_CUES.search(utterance or ""):
+                return Turn(
+                    outcome=CLARIFY,
+                    action=PROPOSE_GOAL,
+                    reason="Предложить тебе цель? Если да, скажи прямо: «предложи цель».",
+                    explanation=["цель предложена моделью, но в реплике нет просьбы о цели"],
+                    stages=stages,
+                )
             return self._propose_goal(mode, inventory, state, stages)
 
         if proposal.action == SHOW_PROGRESS and SHOW_PROGRESS in actions:

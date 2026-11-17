@@ -51,6 +51,27 @@ class PipelineTests(unittest.TestCase):
     def test_not_an_action(self):
         self.assertEqual(self.run_turn("привет", Proposal("none")).outcome, "none")
 
+    # --- устойчивость к малой модели ---
+
+    def test_null_count_means_one(self):
+        """Малая модель пишет "count": null там, где большая поле опускает."""
+        from orchestrator.extractor import LanguageModelIntent
+
+        answer = {"action": "plan_goal", "target": "факел", "count": None}
+        pipeline = Pipeline(LanguageModelIntent(lambda prompt, utterance: answer), self.kb)
+        turn = pipeline.handle("как скрафтить факел?")
+        self.assertEqual(turn.outcome, ACT)
+        self.assertEqual(turn.target, "minecraft:torch")
+
+    def test_goal_is_not_proposed_without_a_request_for_it(self):
+        """Кампания начинается сразу, поэтому одного слова модели для неё мало."""
+        for utterance in ("дай", "дай крылья"):
+            with self.subTest(utterance=utterance):
+                turn = self.run_turn(utterance, Proposal("propose_goal"))
+                self.assertEqual(turn.outcome, CLARIFY)
+                self.assertIn("предложи цель", turn.reason)
+                self.assertIsNone(turn.command)
+
     # --- модель не решает, какой предмет выдать ---
 
     def test_model_identifier_is_ignored(self):

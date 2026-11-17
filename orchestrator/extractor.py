@@ -161,10 +161,14 @@ class LanguageModelIntent:
                 feedback: Optional[str] = None, context: Optional[str] = None) -> Proposal:
         payload = self._ask(build_prompt(actions, feedback, context), utterance)
         action = str(payload.get("action") or "none").strip()
+        # Малые модели пишут "count": null там, где большие поле опускают. Смысл один —
+        # количество не названо, то есть речь об одной штуке. Без этого вопрос «как
+        # скрафтить факел?» заканчивался отказом «не понял количество».
+        count = payload.get("count")
         return Proposal(
             action=action,
             target=_text(payload.get("target")),
-            count=payload.get("count", 1),
+            count=1 if count is None else count,
             goal_kind=_text(payload.get("goal_kind")),
             reward=_text(payload.get("reward")),
             reward_count=payload.get("reward_count", 1),
