@@ -8,6 +8,7 @@
     { href: "/chat", title: "Игровой чат" },
     { href: "/tree", title: "Древо развития" },
     { href: "/compare", title: "Сравнение конфигураций" },
+    { href: "/steam", title: "Библиотека крафтов" },
     { href: "/", title: "Панель" },
     { href: "/admin", title: "Логи" },
     { href: "/admin/challenges", title: "Задания" },
