@@ -27,6 +27,12 @@ SUMMARY_LIMIT = 4
 
 MODE_LABELS = {"creative": "творческий", "survival": "выживание"}
 
+# Игра по умолчанию — та, для которой есть онтология.
+DEFAULT_GAME = "Minecraft"
+
+# Длина названия игры: защита от того, чтобы в «игру» не попала целая фраза.
+MAX_GAME_NAME = 60
+
 
 @dataclass
 class Session:
@@ -46,6 +52,24 @@ class Session:
     pending: Optional[object] = None
     # Предыдущий обмен одной строкой — для продолжений вроде «и ещё крипера».
     last_exchange: Optional[str] = None
+    # Игра, о которой спрашивает игрок. Для Minecraft работает онтология, для остальных —
+    # только поиск. Когда появится распознавание экрана, игру будет определять оно.
+    game: str = DEFAULT_GAME
+
+    # --- игра ---
+
+    def set_game(self, name: str) -> bool:
+        name = " ".join((name or "").split()).strip(" .,!?«»\"")
+        if not name or len(name) > MAX_GAME_NAME:
+            return False
+        if name.lower() != self.game.lower():
+            self.pending = None
+        self.game = name
+        return True
+
+    @property
+    def is_default_game(self) -> bool:
+        return self.game.lower() == DEFAULT_GAME.lower()
 
     # --- режим ---
 
@@ -81,6 +105,8 @@ class Session:
                 self.summoned[label] += int(turn.count or 0)
             elif turn.action == "plan_goal":
                 self._remember(self.asked_about, f"как получить «{label}»")
+            elif turn.action == "search_web":
+                self._remember(self.asked_about, f"«{label}» — ответ найден в сети")
             elif turn.action == "create_quest":
                 self._remember(self.quests, f"«{label}» ×{turn.count}")
             elif turn.action == "start_campaign":
@@ -121,10 +147,11 @@ class Session:
         return "\n".join(lines)
 
     def reset(self) -> None:
-        mode, persona = self.mode, self.persona
+        mode, persona, game = self.mode, self.persona, self.game
         self.__init__()
         self.mode = mode
         self.persona = persona
+        self.game = game
 
 
 _session: Optional[Session] = None

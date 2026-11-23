@@ -38,11 +38,16 @@ CREATE_QUEST = "create_quest"
 START_CAMPAIGN = "start_campaign"
 PROPOSE_GOAL = "propose_goal"
 SHOW_PROGRESS = "show_progress"
+SEARCH_WEB = "search_web"
+
+# Игра, для которой есть онтология. Для любой другой игры знаний в базе нет, и модели
+# предъявляется только поиск: выдавать, планировать и проверять там нечем.
+DEFAULT_GAME = "Minecraft"
 
 # Действия, которые может предложить модель. Остальные действия реестра (например, получение
 # награды за задание) выполняются системой сами и модели не предъявляются.
 PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
-              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS)
+              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS, SEARCH_WEB)
 
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
@@ -90,6 +95,9 @@ class Proposal:
     goal_kind: Optional[str] = None
     reward: Optional[str] = None
     reward_count: Any = 1
+    # Только для search_web: поисковый запрос, который модель составила на английском —
+    # на нём поисковики находят игровые руководства, на русском — новости и мусор.
+    search_query: Optional[str] = None
     raw: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -102,7 +110,8 @@ class IntentExtractor(Protocol):
     """
 
     def extract(self, utterance: str, *, actions: Sequence[str] = PROPOSABLE,
-                feedback: Optional[str] = None, context: Optional[str] = None) -> Proposal: ...
+                feedback: Optional[str] = None, context: Optional[str] = None,
+                game: Optional[str] = None) -> Proposal: ...
 
 
 @dataclass
@@ -141,6 +150,9 @@ class Turn:
     world: Optional[WorldAnswer] = None
     world_summary: Optional[str] = None
     world_essentials: Sequence[str] = ()
+    # Заполняется только для search_web: найденные фрагменты и источники.
+    web: Optional[Any] = None
+    game: Optional[str] = None
 
 
 class Pipeline:
@@ -150,8 +162,10 @@ class Pipeline:
         kb: Optional[KnowledgeBase] = None,
         *,
         mode: str = CREATIVE,
+        search: Optional[Any] = None,
     ) -> None:
         self.kb = kb or KnowledgeBase.shared()
+        self._search = search
         self.extractor = extractor
         self.resolver = Resolver(self.kb)
         self.validator = Validator(self.kb)
@@ -173,8 +187,18 @@ class Pipeline:
             self._campaigns = CampaignBuilder(self.kb, self.planner, self.validator)
         return self._campaigns
 
-    def actions_for(self, mode: str) -> Sequence[str]:
-        """Действия, которые предъявляются модели в данном режиме."""
+    @property
+    def search(self):
+        """Веб-поиск, общий на процесс: его кэш экономит кредиты и время."""
+        if self._search is None:
+            from search import shared
+            self._search = shared()
+        return self._search
+
+    def actions_for(self, mode: str, game: Optional[str] = None) -> Sequence[str]:
+        """Действия, которые предъявляются модели в данном режиме и для данной игры."""
+        if game and game.lower() != DEFAULT_GAME.lower():
+            return (SEARCH_WEB,)
         allowed = set(self.validator.available_actions(mode))
         return tuple(action for action in PROPOSABLE if action in allowed)
 
@@ -182,7 +206,8 @@ class Pipeline:
                inventory: Optional[Dict[str, int]] = None,
                pending: Optional["Turn"] = None,
                context: Optional[str] = None,
-               state: Optional[str] = None) -> Turn:
+               state: Optional[str] = None,
+               game: Optional[str] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -190,20 +215,39 @@ class Pipeline:
         context — предыдущий обмен репликами одной строкой, для продолжений вроде
         «и ещё крипера».
         state — снимок состояния игрока словами, для выбора цели кампании.
+        game — игра, о которой спрашивает игрок; по умолчанию Minecraft.
         """
         mode = mode or self.mode
-        actions = self.actions_for(mode)
+        game = game or DEFAULT_GAME
+        actions = self.actions_for(mode, game)
 
-        follow_up = self._follow_up(utterance, pending, mode, inventory)
-        if follow_up is not None:
-            return follow_up
+        # Продолжение уточнения достраивает действие Minecraft («какой меч?» → «алмазный»)
+        # и в разговоре о другой игре дало бы команду в обход проверки игры ниже.
+        if game.lower() == DEFAULT_GAME.lower():
+            follow_up = self._follow_up(utterance, pending, mode, inventory)
+            if follow_up is not None:
+                return follow_up
 
-        proposal = self.extractor.extract(utterance, actions=actions, context=context)
+        proposal = self.extractor.extract(utterance, actions=actions, context=context, game=game)
         stages: Dict[str, Any] = {
             "llm": {"action": proposal.action, "target": proposal.target, "count": proposal.count}
         }
         if not proposal.action or proposal.action == NONE:
-            return Turn(outcome=NONE, stages=stages)
+            return Turn(outcome=NONE, stages=stages, game=game)
+
+        if proposal.action == SEARCH_WEB and SEARCH_WEB in actions:
+            return self._search_web(utterance, proposal, game, stages)
+
+        # Второй рубеж для чужой игры: модели предъявлен только поиск, но если она всё же
+        # предложит выдачу или план, валидатор об игре не знает и пропустил бы команду
+        # Minecraft в разговор об Elden Ring. Онтология есть только для Minecraft.
+        if game.lower() != DEFAULT_GAME.lower():
+            return Turn(outcome=REJECT, action=proposal.action, game=game,
+                        reason=f"В {game} я только ищу ответы на вопросы: выдавать предметы "
+                               f"и строить планы умею в Minecraft.",
+                        explanation=[f"действие {proposal.action} недоступно для игры {game}: "
+                                     f"базы знаний по ней нет"],
+                        stages=stages)
 
         if proposal.action == CREATE_QUEST and CREATE_QUEST in actions:
             return self._build_quest(utterance, proposal, actions, mode, inventory, stages)
@@ -573,6 +617,39 @@ class Pipeline:
             explanation=list(answer.explanation), stages=stages,
             world=answer, world_summary=render_answer(answer, self.kb),
             world_essentials=tuple(world_essentials(answer, self.kb)),
+        )
+
+    def _search_web(self, utterance: str, proposal: Proposal, game: str,
+                    stages: Dict[str, Any]) -> Turn:
+        """Вопрос, на который онтология не отвечает: ответ ищется в сети.
+
+        Модель составила поисковый запрос, поиск нашёл фрагменты и отбросил нерелевантные;
+        формулировать ответ модель будет только по ним. Найденный текст в выбор действия не
+        попадает: на его основании ничего не выдаётся и не призывается.
+        """
+        query = proposal.search_query or proposal.target or utterance
+        answer = self.search.search(query, game=game)
+        stages["search"] = {"query": answer.query, "engine": answer.engine,
+                            "sources": [hit.site for hit in answer.hits],
+                            "rejected": answer.rejected, "errors": list(answer.errors),
+                            "elapsed_ms": round(answer.elapsed_ms), "cached": answer.cached,
+                            "game": game}
+        if not answer.found:
+            # Сбой всех движков и «ничего релевантного» — разные вещи, и игрок должен их
+            # различать: в первом случае стоит спросить позже, во втором — иначе.
+            unavailable = bool(answer.errors) and not answer.rejected
+            reason = ("Поиск сейчас недоступен, попробуй позже." if unavailable
+                      else "В сети не нашёл надёжного ответа на этот вопрос.")
+            return Turn(outcome=REJECT, action=SEARCH_WEB, reason=reason, query=proposal.target,
+                        explanation=[f"поиск «{answer.query}»: " + (
+                            "все движки недоступны" if unavailable
+                            else f"релевантных страниц нет, отброшено {answer.rejected}")],
+                        stages=stages, web=answer, game=game)
+        return Turn(
+            outcome=ACT, action=SEARCH_WEB, query=proposal.target,
+            explanation=[f"поиск «{answer.query}» через {answer.engine}: "
+                         + ", ".join(hit.site for hit in answer.hits)],
+            stages=stages, web=answer, game=game,
         )
 
     def _show_progress(self, inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:

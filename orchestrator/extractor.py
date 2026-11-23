@@ -40,22 +40,38 @@ ACTION_HINTS = {
     "ask_available": ("игрок спрашивает, что он может изготовить из того, что у него есть: "
                       "«что я могу сделать прямо сейчас», «что собрать из моего инвентаря»; "
                       "\"target\" — null"),
+    "search_web": ("игрок спрашивает то, на что нет ответа в рецептах и добыче: как победить "
+                   "босса или моба, где найти постройку или биом, как работает механика или "
+                   "зачарование, что ответить или выбрать в диалоге, совет или тактика; а также "
+                   "любой вопрос о другой игре. Вопросы «как сделать», «из чего», «откуда "
+                   "берётся», «что выпадает» сюда не относятся — для них есть свои действия. "
+                   "В \"target\" — тема словами игрока"),
 }
 
 EXTRACTABLE = tuple(ACTION_HINTS)
 
-PROMPT = """Ты разбираешь реплику игрока в Minecraft.
+# Для игры без онтологии остаётся одно действие, и его описание другое: оговорка «вопросы
+# "из чего" и "откуда берётся" сюда не относятся» верна только там, где для них есть свои
+# действия. Без этой подмены модель отправляла «для чего нужен аккумулятор» в Stardew Valley
+# в болтовню, а та выдумывала ответ.
+OTHER_GAME_SEARCH_HINT = ("любой вопрос об игре: предметы и их назначение, рецепты, где что "
+                          "найти, прохождение, боссы, диалоги и выборы, советы. В \"target\" — "
+                          "тема словами игрока")
+OTHER_GAME_NONE_HINT = ('- "none" — только приветствие, благодарность или разговор не об игре; '
+                        'просьбы выдать предмет или что-то сделать в игре — тоже "none".')
+
+PROMPT = """Ты разбираешь реплику игрока в игре {game}.
 
 Верни ТОЛЬКО JSON без пояснений:
 {{
   "action": {actions} | "none",
   "target": "предмет или существо словами игрока, либо null",
-  "count": число{quest_fields}
+  "count": число{quest_fields}{search_fields}
 }}
 
 Значения action:
 {hints}
-- "none" — во всех остальных случаях: разговор, вопрос, приветствие.
+{none_hint}
 
 Правила:
 - В "target" перенеси название так, как его назвал игрок. Идентификаторы вида
@@ -72,6 +88,17 @@ CONTEXT = """
 Предыдущий обмен: {context}
 Если реплика продолжает его («и ещё …», «а теперь …»), сохрани то же действие.
 """
+
+SEARCH_FIELDS = """,
+  "query": "запрос для поиска в интернете на английском — только для search_web\""""
+
+# Поисковый запрос — на английском: замер показал, что по-русски поисковик находит новости
+# и биржевые сводки (релевантность 0,05), а по-английски — руководства (0,84). Модель знает
+# английские названия («Маргит» — Margit the Fell Omen), и это её подзадача, а не поиска.
+SEARCH_RULES = """
+- Для search_web в "query" напиши короткий поисковый запрос на английском: английское
+  название игры, официальные английские названия существ, предметов и мест, суть
+  вопроса, без вежливых слов."""
 
 QUEST_FIELDS = """,
   "goal_kind": "collect" | "kill" — только для create_quest,
@@ -96,16 +123,26 @@ NO_GIVE_RULE = """
 
 
 def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
-                 context: Optional[str] = None) -> str:
-    """Промпт под набор действий, доступных в текущем режиме."""
+                 context: Optional[str] = None, game: Optional[str] = None) -> str:
+    """Промпт под набор действий, доступных в текущем режиме и для текущей игры."""
     usable = [action for action in actions if action in ACTION_HINTS]
     quest = "create_quest" in usable
+    search = "search_web" in usable
     rules = QUEST_RULES if quest else ""
     if "give_item" not in usable and "plan_goal" in usable:
         rules += NO_GIVE_RULE
+    if search:
+        rules += SEARCH_RULES
+    other_game = bool(game) and game.lower() != "minecraft"
+    hints = {action: (OTHER_GAME_SEARCH_HINT if other_game and action == "search_web"
+                      else ACTION_HINTS[action]) for action in usable}
     return PROMPT.format(
+        game=game or "Minecraft",
+        none_hint=(OTHER_GAME_NONE_HINT if other_game else
+                   '- "none" — во всех остальных случаях: разговор, вопрос, приветствие.'),
+        search_fields=SEARCH_FIELDS if search else "",
         actions=" | ".join(f'"{action}"' for action in usable),
-        hints="\n".join(f'- "{action}" — {ACTION_HINTS[action]}.' for action in usable),
+        hints="\n".join(f'- "{action}" — {hints[action]}.' for action in usable),
         quest_fields=QUEST_FIELDS if quest else "",
         quest_rules=rules,
         feedback=FEEDBACK.format(reason=feedback) if feedback else "",
@@ -158,8 +195,9 @@ class LanguageModelIntent:
         self._ask = ask
 
     def extract(self, utterance: str, *, actions: Sequence[str] = EXTRACTABLE,
-                feedback: Optional[str] = None, context: Optional[str] = None) -> Proposal:
-        payload = self._ask(build_prompt(actions, feedback, context), utterance)
+                feedback: Optional[str] = None, context: Optional[str] = None,
+                game: Optional[str] = None) -> Proposal:
+        payload = self._ask(build_prompt(actions, feedback, context, game), utterance)
         action = str(payload.get("action") or "none").strip()
         # Малые модели пишут "count": null там, где большие поле опускают. Смысл один —
         # количество не названо, то есть речь об одной штуке. Без этого вопрос «как
@@ -172,6 +210,7 @@ class LanguageModelIntent:
             goal_kind=_text(payload.get("goal_kind")),
             reward=_text(payload.get("reward")),
             reward_count=payload.get("reward_count", 1),
+            search_query=_text(payload.get("query")),
             raw=payload,
         )
 

@@ -25,6 +25,7 @@ COPY models models
 COPY orchestrator orchestrator
 COPY resolver resolver
 COPY solver solver
+COPY search search
 COPY kb kb
 COPY eval eval
 COPY static static

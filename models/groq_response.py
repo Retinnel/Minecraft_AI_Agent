@@ -29,6 +29,8 @@ class GroqAdvice(BaseModel):
     explanation: List[str] = Field(default_factory=list)  # цепочка применённых правил
     options: List[str] = Field(default_factory=list)      # варианты уточняющего вопроса
     campaign: Optional[dict] = None            # кампания: персонаж, этап, прогресс — для оверлея
+    sources: List[dict] = Field(default_factory=list)     # откуда взят ответ, найденный в сети
+    game: Optional[str] = None                 # игра, о которой идёт разговор
 
 
 class ChatMessage(BaseModel):

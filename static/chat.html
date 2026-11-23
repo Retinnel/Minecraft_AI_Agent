@@ -55,6 +55,13 @@
   .voicebar { display: flex; gap: 14px; align-items: center; margin: -4px 0 12px; font-size: 14px; color: var(--muted); }
   .voicebar label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
   .voicebar select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 14px; }
+  .gamebar { display: flex; gap: 10px; align-items: center; margin: 0 0 12px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+  .gamebar input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 14px; width: 220px; }
+  .gamebar button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; font-size: 14px; cursor: pointer; }
+  .gamebar button:hover { border-color: var(--accent); }
+  .gamebar .kb { color: var(--good); }
+  .gamebar .web { color: var(--accent); }
+  .msg .sources a { color: var(--accent); margin-right: 10px; }
 </style>
 </head>
 <body>
@@ -74,6 +81,16 @@
       <label><input type="checkbox" id="voice"> озвучивать ответы</label>
       <label>голос <select id="voice-pick"><option value="">по говорящему</option></select></label>
       <span id="voice-engine"></span>
+    </div>
+    <div class="gamebar">
+      <span>игра:</span>
+      <input id="game" list="games" autocomplete="off" placeholder="Minecraft">
+      <datalist id="games">
+        <option value="Minecraft"><option value="Elden Ring"><option value="The Witcher 3">
+        <option value="Stardew Valley"><option value="Terraria"><option value="Baldur's Gate 3">
+      </datalist>
+      <button id="game-set">Сменить</button>
+      <span id="game-source"></span>
     </div>
     <div class="presets" id="presets"></div>
     <div class="log" id="log"></div>
@@ -113,7 +130,8 @@ const PRESETS = [
   "как сделать алмазную кирку", "режим выживания", "веди меня к каменной кирке",
   "дай цель", "персонаж: старейшина", "отмени кампанию", "режим творческий", "дай задание",
   "на каком я этапе", "что можно сделать из пороха", "с кого падает порох",
-  "что я могу сделать прямо сейчас"
+  "что я могу сделать прямо сейчас", "как победить визера", "я играю в Elden Ring",
+  "как победить Маргита", "я играю в Minecraft"
 ];
 const node = (id) => document.getElementById(id);
 
@@ -161,8 +179,10 @@ async function ask(text) {
     if (d.source) meta.push("ответ: " + d.source);
     if (d.command) html += '<span class="meta cmd">' + escapeHtml(d.command) + "</span>";
     if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
+    if (d.sources && d.sources.length) html += renderSources(d.sources);
     html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
     pending.innerHTML = html;
+    if (d.game) showGame(d.game, d.game.toLowerCase() === "minecraft");
     if (d.assistant_mode && d.assistant_mode !== knownMode) {
       // Режим сменён репликой: шапка должна показать его, а отметка в журнале не нужна —
       // ответ ассистента уже об этом сказал.
@@ -180,6 +200,42 @@ async function ask(text) {
   node("send").disabled = false;
   node("utterance").value = "";
   node("utterance").focus();
+}
+
+// Ссылки на страницы, из которых взят ответ. Адрес приходит из поисковика, поэтому
+// пропускаются только http(s): иначе фрагмент из сети мог бы подсунуть javascript:-ссылку.
+function renderSources(sources) {
+  const links = sources
+    .filter((s) => /^https?:\/\//i.test(s.url || ""))
+    .map((s) => '<a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener noreferrer" title="' +
+      escapeHtml(s.title) + '">' + escapeHtml(s.site || s.url) + "</a>");
+  return links.length ? '<span class="meta sources">' + links.join("") + "</span>" : "";
+}
+
+function showGame(game, knowledgeBase) {
+  node("game").value = game;
+  node("game-source").innerHTML = knowledgeBase
+    ? '<span class="kb">база знаний, планы и выдача</span>'
+    : '<span class="web">только ответы из сети с источниками</span>';
+}
+
+async function refreshGame() {
+  try {
+    const d = await (await fetch("/api/rp/game")).json();
+    showGame(d.game, d.knowledge_base);
+  } catch (e) { /* сервер ещё не поднялся — строка игры останется пустой */ }
+}
+
+async function setGame() {
+  const game = node("game").value.trim();
+  if (!game) return;
+  const d = await (await fetch("/api/rp/game", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ game })
+  })).json();
+  if (!d.ok) { add("bot", '<span class="err">' + escapeHtml(d.error) + "</span>"); return; }
+  showGame(d.game, d.knowledge_base);
+  add("bot", "Игра: " + escapeHtml(d.game) + '<span class="meta">переключено со страницы</span>');
 }
 
 async function refreshCampaign() {
@@ -429,6 +485,9 @@ document.addEventListener("assistant-mode", (e) => {
   knownMode = mode;
 });
 refreshCampaign();
+refreshGame();
+node("game-set").onclick = setGame;
+node("game").addEventListener("keydown", (e) => { if (e.key === "Enter") setGame(); });
 </script>
 <script src="/frontend/js/topbar.js"></script>
 </body>

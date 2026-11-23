@@ -32,6 +32,13 @@ def load_config(key: str) -> Config:
     return module.CONFIG
 
 
+# Действия, которые ничего не меняют в мире: план, справка из базы знаний, ступень развития,
+# поиск в сети. Если система ответила одним из них там, где разметка ждала другого, игрок
+# получил не то, что просил, но ничего не произошло молча — это неудобство, а не опасность.
+READ_ONLY_INTENTS = frozenset({"plan_goal", "show_progress", "ask_uses", "ask_sources",
+                               "ask_drops", "ask_available", "search_web"})
+
+
 def classify(case: Case, prediction: Prediction) -> str:
     """Относит один результат к одной из категорий исхода.
 
@@ -50,6 +57,8 @@ def classify(case: Case, prediction: Prediction) -> str:
       over_clarify    — надо было действовать, система переспросила
       false_reject    — надо было действовать, система отказала
       planned_instead — надо было выполнить действие, система построила план
+      answered_instead — система дала справку (поиск, база знаний) вместо действия
+                         или вместо разговора: в мире ничего не изменилось
 
     Путаница отказа и уточнения:
       over_reject     — надо было переспросить, система отказала
@@ -66,6 +75,8 @@ def classify(case: Case, prediction: Prediction) -> str:
         return "pass"
 
     if case.outcome == "none":
+        if prediction.outcome == "act" and prediction.intent in READ_ONLY_INTENTS:
+            return "answered_instead"
         return "spurious_act" if prediction.outcome == "act" else "other"
 
     if case.outcome == "act":
@@ -82,6 +93,8 @@ def classify(case: Case, prediction: Prediction) -> str:
             # действие не с тем предметом.
             if prediction.intent == "plan_goal":
                 return "planned_instead"
+            if prediction.intent in READ_ONLY_INTENTS:
+                return "answered_instead"
             return "wrong_intent"
         expected_target = case.item_id or case.entity_id
         actual_target = prediction.item_id or prediction.entity_id

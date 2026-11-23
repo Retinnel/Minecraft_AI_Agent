@@ -27,10 +27,11 @@ MODES = (CREATIVE, SURVIVAL)
 MODE_ACTIONS = {
     CREATIVE: ("give_item", "remove_item", "summon_entity", "plan_goal",
                "create_quest", "claim_quest_reward", "start_campaign", "propose_goal",
-               "show_progress", "ask_uses", "ask_sources", "ask_drops", "ask_available"),
+               "show_progress", "ask_uses", "ask_sources", "ask_drops", "ask_available",
+               "search_web"),
     SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward",
                "start_campaign", "propose_goal", "show_progress",
-               "ask_uses", "ask_sources", "ask_drops", "ask_available"),
+               "ask_uses", "ask_sources", "ask_drops", "ask_available", "search_web"),
 }
 
 # Действие требует, чтобы целью был предмет либо существо.

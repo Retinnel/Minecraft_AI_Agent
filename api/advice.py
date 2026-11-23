@@ -853,6 +853,17 @@ MODE_COMMANDS = (
     ("creative", re.compile(r"\bрежим\w*\s+(творч|креатив|creative)", re.IGNORECASE)),
 )
 
+# Смена игры: «я играю в Ведьмака 3», «играю в Elden Ring». Как и режим, разбирается без
+# модели: команда однозначна, а от игры зависит, какие действия вообще предъявляются модели.
+GAME_COMMAND = re.compile(r"^\s*(?:я\s+)?(?:сейчас\s+)?(?:играю|играем)\s+в\s+(.+?)\s*[.!]?\s*$",
+                          re.IGNORECASE)
+MINECRAFT_NAMES = re.compile(r"майнкрафт|майн\b|minecraft", re.IGNORECASE)
+MAX_GAME_WORDS = 6
+# «Играю в выживании», «играю в мультиплеере» — это о том, как играют, а не во что:
+# игру такая фраза не меняет.
+NOT_GAME_NAMES = re.compile(r"^(?:режим\w*\s+)?(?:выживани|творческ|креатив|хардкор|survival|"
+                            r"creative|hardcore|одиночн|мультиплеер|сетев|кооп)", re.IGNORECASE)
+
 # Как действие конвейера называется в протоколе мода.
 MOD_ACTION_TYPES = {"give_item": "give", "remove_item": "clear", "summon_entity": "summon"}
 
@@ -865,6 +876,10 @@ CAMPAIGN_CANCEL = re.compile(
 
 # Строка чата длиннее этого предела в игре переносится неудобно; план целиком идёт в оверлей.
 CHAT_REPLY_LIMIT = 240
+
+# Ответ по найденному в сети — несколько фраз и источник; обрезать его на 240 знаках значит
+# потерять источник.
+WEB_REPLY_LIMIT = 700
 
 
 def _assistant_pipeline():
@@ -1146,6 +1161,20 @@ def _state_snapshot() -> str:
     return get_player_state_prompt_context()
 
 
+def _game_command(text: str) -> Optional[str]:
+    """Название игры из команды «я играю в …» или None."""
+    match = GAME_COMMAND.match(text or "")
+    # Длинная фраза — уже не название игры, а рассказ: «играю в кубики с другом, и…».
+    # Такая реплика идёт обычным путём.
+    if not match or len(match.group(1).split()) > MAX_GAME_WORDS:
+        return None
+    if NOT_GAME_NAMES.match(match.group(1)):
+        return None
+    from orchestrator.session import DEFAULT_GAME
+    name = match.group(1)
+    return DEFAULT_GAME if MINECRAFT_NAMES.search(name) else name
+
+
 def _mode_command(text: str) -> Optional[str]:
     for mode, pattern in MODE_COMMANDS:
         if pattern.search(text or ""):
@@ -1168,8 +1197,10 @@ def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqA
     executes = turn.outcome == "act" and action_type is not None and bool(turn.command)
     is_summon = turn.action == "summon_entity"
 
+    found_online = turn.outcome == "act" and getattr(turn, "web", None) is not None
+
     return GroqAdvice(
-        response=_clip(reply_text),
+        response=_clip(reply_text, WEB_REPLY_LIMIT if found_online else CHAT_REPLY_LIMIT),
         confidence=0.9 if source == "model" else 0.8,
         level=level,
         threats=threats,
@@ -1190,6 +1221,8 @@ def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqA
         plan_alternatives=turn.plan_alternatives,
         explanation=list(turn.explanation or []),
         options=[option.label for option in (turn.options or [])],
+        sources=turn.web.sources() if found_online else [],
+        game=session.game,
     )
 
 
@@ -1223,6 +1256,37 @@ async def _mode_reply(mode: str, text: str, last: Any) -> GroqAdvice:
     result = GroqAdvice(response=reply, confidence=1.0, level="INFO", threats=[],
                         source="rule", mode="chat", outcome="act", assistant_mode=session.mode)
     return await _store_chat_result(result, text)
+
+
+async def _game_reply(name: str, text: str) -> GroqAdvice:
+    session = _assistant_session()
+    session.set_game(name)
+    reply = ("Возвращаемся к Minecraft: снова работают база знаний, планы и выдача."
+             if session.is_default_game else
+             f"Игра: {session.game}. Базы знаний по ней у меня нет — отвечаю по найденному "
+             f"в сети и называю источник.")
+    result = GroqAdvice(response=reply, confidence=1.0, level="INFO", threats=[], source="rule",
+                        mode="chat", outcome="act", assistant_mode=session.mode, game=session.game)
+    return await _store_chat_result(result, text)
+
+
+@router.get("/game")
+async def get_assistant_game() -> Dict[str, Any]:
+    session = _assistant_session()
+    return {"game": session.game, "knowledge_base": session.is_default_game}
+
+
+@router.post("/game")
+async def set_assistant_game(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Смена игры со страницы чата. Позже игру будет определять распознавание экрана."""
+    session = _assistant_session()
+    name = str(payload.get("game") or "")
+    from orchestrator.session import DEFAULT_GAME
+    if MINECRAFT_NAMES.search(name):
+        name = DEFAULT_GAME
+    if not session.set_game(name):
+        return {"ok": False, "error": "Название игры пустое или слишком длинное.", "game": session.game}
+    return {"ok": True, "game": session.game, "knowledge_base": session.is_default_game}
 
 
 @router.get("/mode")
@@ -1262,6 +1326,10 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if mode:
         return await _mode_reply(mode, text, last)
 
+    game = _game_command(text)
+    if game:
+        return await _game_reply(game, text)
+
     persona = _persona_command(text)
     if persona:
         session.persona = persona
@@ -1293,7 +1361,8 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     try:
         turn = await asyncio.to_thread(
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
-            pending=session.pending, context=session.last_exchange, state=_state_snapshot())
+            pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
+            game=session.game)
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
