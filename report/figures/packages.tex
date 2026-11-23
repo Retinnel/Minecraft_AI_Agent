@@ -20,9 +20,12 @@
 \node[pkg] (resolver) at (4.4, -4.0) {resolver/\\сопоставление};
 \node[pkg] (solver) at (8.8, -4.0) {solver/\\решатель задач};
 
-\node[pkg] (kb) at (6.6, -6.0) {kb/\\база знаний};
+\node[pkg] (search) at (13.2, -4.0) {search/\\поиск в сети};
+
+\node[pkg] (kb) at (6.0, -6.0) {kb/\\база знаний};
 \node[ext] (game) at (1.2, -6.0) {Данные среды,\\локализация};
-\node[ext] (layers) at (12.0, -6.0) {Рукописные слои\\знаний};
+\node[ext, minimum width=2.8cm] (layers) at (10.0, -6.0) {Рукописные слои\\знаний};
+\node[ext, minimum width=2.4cm] (engines) at (13.2, -6.0) {Поисковые\\службы};
 
 \draw[use] (mod) -- (api);
 \draw[use] (web) -- (api);
@@ -31,6 +34,8 @@
 \draw[use] (orch) -- (llm);
 \draw[use] (orch) -- (resolver);
 \draw[use] (orch) -- (solver);
+\draw[use] (orch) -- (search);
+\draw[use] (search) -- (engines);
 \draw[use] (resolver) -- (kb);
 \draw[use] (solver) -- (kb);
 \draw[use] (api.south east) -- (solver.north west);

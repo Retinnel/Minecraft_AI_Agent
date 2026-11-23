@@ -1,0 +1,40 @@
+% Схема ответа на вопрос вне базы знаний: поиск в сети.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=3.6mm,
+  term/.style={draw, rounded rectangle, align=center, minimum width=3.4cm, minimum height=8mm},
+  proc/.style={draw, align=center, minimum width=7.0cm, minimum height=9mm, inner sep=3pt},
+  cond/.style={draw, diamond, aspect=3.4, align=center, inner sep=0pt, minimum width=7.0cm},
+  scond/.style={draw, diamond, aspect=2.2, align=center, inner sep=0pt, text width=2.6cm},
+  exit/.style={draw, rounded rectangle, align=center, text width=3.3cm, minimum height=9mm, inner sep=3pt},
+  arr/.style={-{Stealth[length=1.8mm]}, semithick},
+  ylbl/.style={font=\scriptsize, above, pos=0.3},
+  nlbl/.style={font=\scriptsize, right, pos=0.4},
+]
+
+\node[term] (start) {Начало: реплика пользователя,\\текущая игра};
+\node[proc, below=of start] (actions) {Предъявить модели перечень действий: для игры с базой\\знаний~--- действия режима, для другой игры~--- только поиск};
+\node[proc, below=of actions] (model) {Модель: действие из перечня и поисковый запрос\\на английском языке с официальными названиями};
+\node[cond, below=of model] (search) {Выбран поиск?};
+\node[proc, below=of search] (compose) {Добавить к запросу название игры, проверить кэш};
+\node[proc, below=of compose] (engine) {Запросить очередную поисковую службу};
+\node[cond, below=of engine] (relevant) {Есть фрагменты с оценкой\\релевантности не ниже 0,3?};
+\node[proc, below=of relevant] (answer) {Модель формулирует ответ только по фрагментам;\\текст страниц~--- данные, а не указания};
+\node[proc, below=of answer] (sources) {Система добавляет перечень источников};
+\node[term, below=of sources] (end) {Конец: ответ с источниками};
+
+\node[exit, right=10mm of search] (other) {Решение по базе знаний\\(рисунок~\ref{fig:sequence}); для\\другой игры~--- отказ};
+\node[scond, right=8mm of relevant] (more) {Остались\\службы?};
+\node[exit, below=6mm of more] (none) {Ответ не найден\\либо поиск недоступен};
+
+\foreach \a/\b in {start/actions, actions/model, model/search, compose/engine, engine/relevant,
+                   answer/sources, sources/end}
+  \draw[arr] (\a) -- (\b);
+\draw[arr] (search) -- node[nlbl] {да} (compose);
+\draw[arr] (search) -- node[ylbl] {нет} (other);
+\draw[arr] (relevant) -- node[nlbl] {да} (answer);
+\draw[arr] (relevant) -- node[ylbl] {нет} (more);
+\draw[arr] (more) -- node[nlbl] {нет} (none);
+\draw[arr] (more.north) |- node[font=\scriptsize, right, pos=0.25] {да} (engine.east);
+
+\end{tikzpicture}

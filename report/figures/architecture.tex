@@ -26,6 +26,7 @@
 
 % --- внешние системы ---
 \node[ext, minimum width=2.4cm] (llm) at (13.3, 0) {Провайдер\\языковой модели};
+\node[ext, minimum width=2.4cm] (search) at (13.3, -2.7) {Поисковая\\служба};
 \node[box, minimum width=2.4cm] (importer) at (13.3, -5.3) {Импортёр};
 \node[ext, minimum width=2.4cm] (data) at (13.3, -7.2) {Данные среды\\и локализация};
 
@@ -40,6 +41,10 @@
   ([yshift=3mm]llm.west);
 \draw[arr] ([yshift=-3mm]llm.west) -- node[lbl, below] {намерение}
   ([yshift=-3mm]orch.east);
+
+% --- оркестратор и поиск в сети ---
+\draw[biarr] (orch.south east) -- node[lbl, right, pos=0.4] {запрос /\\фрагменты}
+  (search.west);
 
 % --- внутри сервера: подписи собраны в промежутке между колонками ---
 \draw[biarr] (orch.south -| resolver.north) -- node[lbl, right] {название /\\сущность}
