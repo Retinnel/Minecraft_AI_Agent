@@ -26,7 +26,7 @@
 ## Статус
 
 Не запускается вместе с основным сервером и не поддерживается. Зависимости вынесены в
-`requirements-vision.txt` (torch, PyQt6, faster-whisper, PyAudio, chromadb и прочее — установка
+`legacy/vision-assistant/requirements.txt` (torch, PyQt6, faster-whisper, PyAudio, chromadb и прочее — установка
 долгая и на Windows требует сборочных инструментов).
 
 ## Зачем сохранено

@@ -112,7 +112,7 @@ data/minecraft_crafting_recipes.json
 3. Проверьте валидность JSON (не должно быть синтаксических ошибок)
 4. Запустите тест:
 ```bash
-python test_recipes.py
+.venv/Scripts/python.exe -m pytest tests/test_crafting_recipes.py -q
 ```
 
 ## Примеры
@@ -214,7 +214,7 @@ print(f"Invalid: {len(result['invalid'])}")
 
 ```bash
 # Полный тест всей системы
-python test_recipes.py
+.venv/Scripts/python.exe -m pytest tests/test_crafting_recipes.py -q
 
 # Модульные тесты (требует pytest)
 pytest tests/test_crafting_recipes.py -v

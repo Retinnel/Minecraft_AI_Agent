@@ -1,18 +1,22 @@
+# Окружения и кэши
+.venv
+.venv-voice
 venv
 __pycache__
 *.pyc
-*.pyo
-*.pyd
-.git
 .pytest_cache
-.mypy_cache
-.coverage
-tests
-scratch
-logs
+.git
+.env
+
+# Не нужно серверу
+legacy
 mod
-backend
-COPILOT_HELPER.md
-start_server.bat
-start_minecraft_client.bat
-start_server.bat
+report
+docs
+tests
+logs
+scripts
+voice
+eval/reports
+data/game
+data/challenge_state.json

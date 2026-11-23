@@ -14,7 +14,7 @@ python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 Windows helpers already exist:
 
 ```powershell
-.\start_server.bat
+.\scripts\start_server.bat
 ```
 
 ### Fabric mod
@@ -28,7 +28,7 @@ Set-Location mod\minecraft-mod
 Windows helper:
 
 ```powershell
-.\start_minecraft_client.bat
+.\scripts\start_minecraft_client.bat
 ```
 
 ### Tests and lint

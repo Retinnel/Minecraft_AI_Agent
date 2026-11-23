@@ -5,7 +5,7 @@
 
     py -3.10 -m venv .venv-voice
     .venv-voice/Scripts/python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-    .venv-voice/Scripts/python.exe -m pip install -r requirements-voice.txt
+    .venv-voice/Scripts/python.exe -m pip install -r voice/requirements.txt
     .venv-voice/Scripts/python.exe -m uvicorn voice.server:app --host 127.0.0.1 --port 8001
 
 Основной сервер обращается сюда через `api/voice.py` и работает без него: тогда страница

@@ -52,7 +52,7 @@
 
 ### Подготовка за десять минут
 
-1. `start_server.bat` (или `./.venv/Scripts/python.exe -m uvicorn main:app --port 8000`).
+1. `scripts/start_server.bat` (или `./.venv/Scripts/python.exe -m uvicorn main:app --port 8000`).
    В консоли должно быть `[LLM] Using DeepSeek | model: deepseek-chat`. Groq на этой
    машине отвечает 403 на всё (поднят адаптер Radmin VPN — при желании отключить и
    переключить модель на `qwen` на `/admin/settings`); DeepSeek работает, показ стоит
@@ -100,7 +100,7 @@
 
 ### Игровой клиент — только если будет время
 
-`start_minecraft_client.bat` запускает dev-клиент через Gradle, две-три минуты. В игре:
+`scripts/start_minecraft_client.bat` запускает dev-клиент через Gradle, две-три минуты. В игре:
 чат — те же реплики, клавиша O — оверлей с вкладкой «План». Завершение этапа и следующее
 поручение приходят в чат сами, по снимку инвентаря. Вкладки «Кампания» в оверлее ещё нет
 (шаг 6 плана); вживую в клиенте кампания не проверялась.

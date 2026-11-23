@@ -16,8 +16,8 @@
 челлендж).
 
 Руководство по курсовому проектированию в репозиторий не входит (репозиторий публичный);
-на исходной машине оно лежало на уровень выше:
-`../Руководство пользователя по курсовому проектированию (версия от 06.09.2026).pdf`.
+на исходной машине оно лежит рядом с проектом, в папке материалов:
+`../materials/Руководство пользователя по курсовому проектированию (версия от 06.09.2026).pdf`.
 Выжимка — в [docs/handoff.md](docs/handoff.md).
 
 ### Оформление записки — обязательно
@@ -280,14 +280,14 @@ orchestrator.Pipeline:
 
 ## Команды
 
-Окружение — `.venv` (старый `venv/` в репозитории собран на чужой машине и нерабочий).
+Окружение — `.venv`.
 
 ```bash
 python -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
-Запуск сервера (или `start_server.bat`):
+Запуск сервера (или `scripts/start_server.bat`):
 
 ```bash
 ./.venv/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
@@ -327,7 +327,7 @@ python -m venv .venv
 cd mod/minecraft-mod && ./gradlew.bat build
 ```
 
-Запуск dev-клиента Minecraft с модом (или `start_minecraft_client.bat`):
+Запуск dev-клиента Minecraft с модом (или `scripts/start_minecraft_client.bat`):
 
 ```bash
 cd mod/minecraft-mod && ./gradlew.bat runClient
@@ -337,8 +337,9 @@ cd mod/minecraft-mod && ./gradlew.bat runClient
 
 - `requirements.txt` — ядро сервера, этого достаточно для запуска и тестов
 - `requirements-dev.txt` — плюс pytest и selenium
-- `requirements-vision.txt` — плюс архивная подсистема `legacy/vision-assistant/`, ставится долго (torch ~2.5 ГБ)
-- `requirements.docker.txt` — минимальный набор для контейнера
+- `legacy/vision-assistant/requirements.txt` — архивная подсистема одногруппника, ставится долго (torch ~2.5 ГБ)
+- `voice/requirements.txt` — отдельное окружение синтеза речи `.venv-voice`
+- `Dockerfile` ставит тот же `requirements.txt`; базу знаний для образа собирают на хосте заранее
 
 Древо развития — `http://127.0.0.1:8000/tree`. Голос: на странице `/chat` кнопка «Голос»
 (распознавание речи — Chrome или Edge) и флажок «озвучивать ответы». Голоса персонажей даёт
@@ -347,7 +348,7 @@ cd mod/minecraft-mod && ./gradlew.bat runClient
 ```bash
 py -3.10 -m venv .venv-voice
 ./.venv-voice/Scripts/python.exe -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-./.venv-voice/Scripts/python.exe -m pip install -r requirements-voice.txt
+./.venv-voice/Scripts/python.exe -m pip install -r voice/requirements.txt
 ./.venv-voice/Scripts/python.exe -m uvicorn voice.server:app --host 127.0.0.1 --port 8001
 ```
 
@@ -418,8 +419,6 @@ py -3.10 -m venv .venv-voice
 - **`data/challenge_state.json` — рантайм-состояние, снято с отслеживания** и внесено в
   `.gitignore`, иначе висело в каждом `git status`. При отсутствии файла `load_challenge_state()`
   подставляет состояние по умолчанию, так что на чистом клоне всё работает.
-- **`.report/` (LaTeX-исходники пояснительной записки) в `.gitignore`** — то есть записка вне
-  контроля версий. Для курсовой это стоит пересмотреть.
 
 ## Соглашения
 
