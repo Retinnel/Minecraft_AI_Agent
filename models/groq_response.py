@@ -31,6 +31,7 @@ class GroqAdvice(BaseModel):
     campaign: Optional[dict] = None            # кампания: персонаж, этап, прогресс — для оверлея
     sources: List[dict] = Field(default_factory=list)     # откуда взят ответ, найденный в сети
     game: Optional[str] = None                 # игра, о которой идёт разговор
+    screen: Optional[dict] = None              # что ассистент видел на экране при ответе
 
 
 class ChatMessage(BaseModel):

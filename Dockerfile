@@ -26,6 +26,7 @@ COPY orchestrator orchestrator
 COPY resolver resolver
 COPY solver solver
 COPY search search
+COPY vision vision
 COPY kb kb
 COPY eval eval
 COPY static static

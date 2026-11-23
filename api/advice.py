@@ -1161,6 +1161,17 @@ def _state_snapshot() -> str:
     return get_player_state_prompt_context()
 
 
+def _screen_facts():
+    """Что сейчас на экране игрока, если наблюдатель снял свежий кадр; иначе None."""
+    from vision import shared
+
+    try:
+        return shared().context()
+    except Exception as error:   # экран — подсказка; без него разговор идёт как раньше
+        logger.warning(f"[Vision] Экран недоступен: {error}")
+        return None
+
+
 def _game_command(text: str) -> Optional[str]:
     """Название игры из команды «я играю в …» или None."""
     match = GAME_COMMAND.match(text or "")
@@ -1358,11 +1369,14 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if _looks_like_challenge_status_request(text):
         return await _store_chat_result(_build_challenge_status_response(last), text)
 
+    # Экран — до чтения игры сессии: разбор кадра может её сменить.
+    screen = await asyncio.to_thread(_screen_facts)
+
     try:
         turn = await asyncio.to_thread(
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
-            game=session.game)
+            game=session.game, screen=screen.as_prompt() if screen else None)
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
@@ -1389,6 +1403,9 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     session.record(text, turn, reply.text)
 
     result = _advice_from_turn(turn, reply.text, last, source=reply.source)
+    if screen is not None:
+        result.screen = screen.to_dict()
+        result.explanation.insert(0, f"по снимку экрана: {screen.summary or screen.as_prompt()}")
     if narrated is not None:
         result.campaign = _campaign_brief()
     _safe_console_log(f"[Chat] {turn.outcome} {turn.action} {turn.target}: {result.response}",

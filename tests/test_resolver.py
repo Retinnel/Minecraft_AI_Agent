@@ -86,6 +86,12 @@ class ResolverTests(unittest.TestCase):
         self.assertNotIn("меч", aliases)
         self.assertIn("Алмазный меч", aliases)
 
+    def test_english_name_is_not_outranked_by_foreign_synonym(self):
+        """Синоним «flint» у огнива целиком входит в английское название кремня и перебивал
+        его. Модель зрения называет предметы по-английски — «Flint» должен найти кремень."""
+        self.assertEqual(self.resolve("Flint", action="ask_uses").thing, "minecraft:flint")
+        self.assertEqual(self.resolve("огниво").thing, "minecraft:flint_and_steel")
+
     # --- политика: несуществующее отличается от неоднозначного ---
 
     def test_unknown_item_is_not_found(self):

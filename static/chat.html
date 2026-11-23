@@ -62,6 +62,16 @@
   .gamebar .kb { color: var(--good); }
   .gamebar .web { color: var(--accent); }
   .msg .sources a { color: var(--accent); margin-right: 10px; }
+  .vision-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 14px; }
+  .vision-row select, .vision-row input[type=number] { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 14px; }
+  .vision-row select { flex: 1; min-width: 0; }
+  .vision-row input[type=number] { width: 56px; }
+  .vision-row button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; font-size: 14px; cursor: pointer; }
+  .vision-row button:hover { border-color: var(--accent); }
+  .vision-row .upload { color: var(--muted); cursor: pointer; text-decoration: underline; }
+  .vision-row .upload input { display: none; }
+  #vision-frame { width: 100%; border-radius: 8px; border: 1px solid var(--line); margin: 6px 0; }
+  #vision-status .warn { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -106,6 +116,31 @@
       <div class="presets" id="sim-death"></div>
       <label class="muted autopoll"><input type="checkbox" id="autopoll" checked>
         опрос сервера каждые 3 с, как у мода</label>
+    </div>
+    <div class="card">
+      <h2>Экран</h2>
+      <div class="vision-row">
+        <select id="vision-window" title="окно игры"></select>
+        <button id="vision-refresh" title="обновить список окон">обновить</button>
+      </div>
+      <div class="vision-row">
+        каждые <input id="vision-interval" type="number" min="2" max="30" value="4"> с
+        <select id="vision-mode">
+          <option value="continuous">разбирать сразу</option>
+          <option value="on_demand">разбирать по вопросу</option>
+        </select>
+      </div>
+      <div class="vision-row">
+        <button id="vision-start">Смотреть</button>
+        <button id="vision-stop">Стоп</button>
+        <label class="upload">снимок из файла<input type="file" id="vision-file" accept="image/*"></label>
+        <label title="кадры и распознанное — в data/vision_frames для замера"><input type="checkbox" id="vision-save"> сохранять кадры</label>
+      </div>
+      <div id="vision-status" class="muted" style="font-size:14px">не запущено</div>
+      <img id="vision-frame" alt="последний кадр" hidden>
+      <pre id="vision-facts" class="muted">—</pre>
+      <div class="muted" style="font-size:12px">Снимается только окно игры и только когда оно на переднем
+        плане; в игру ничего не встраивается и ничего не нажимается.</div>
     </div>
     <div class="card">
       <h2>Кампания</h2>
@@ -180,6 +215,7 @@ async function ask(text) {
     if (d.command) html += '<span class="meta cmd">' + escapeHtml(d.command) + "</span>";
     if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
     if (d.sources && d.sources.length) html += renderSources(d.sources);
+    if (d.screen) meta.push("экран: " + (d.screen.summary || d.screen.scene || "учтён"));
     html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
     pending.innerHTML = html;
     if (d.game) showGame(d.game, d.game.toLowerCase() === "minecraft");
@@ -236,6 +272,72 @@ async function setGame() {
   if (!d.ok) { add("bot", '<span class="err">' + escapeHtml(d.error) + "</span>"); return; }
   showGame(d.game, d.knowledge_base);
   add("bot", "Игра: " + escapeHtml(d.game) + '<span class="meta">переключено со страницы</span>');
+}
+
+// --- экран: наблюдатель за окном игры (api/vision.py) ---
+let visionFrameAge = null;
+
+function renderFacts(f) {
+  if (!f) return "—";
+  const lines = [];
+  if (f.game) lines.push("игра: " + f.game);
+  if (f.scene) lines.push("сцена: " + f.scene);
+  if (f.focus) lines.push("под курсором: " + f.focus);
+  if (f.items && f.items.length) lines.push("видно: " + f.items.join(", "));
+  if (f.dialogue) {
+    lines.push("диалог: " + (f.dialogue.speaker || "") + (f.dialogue.line ? " — " + f.dialogue.line : ""));
+    (f.dialogue.options || []).forEach((o, i) => lines.push("  " + (i + 1) + ") " + o));
+  }
+  if (f.text && f.text.length) lines.push("надписи: " + f.text.join("; "));
+  if (f.summary) lines.push("кратко: " + f.summary);
+  return lines.join("\n");
+}
+
+async function loadWindows() {
+  try {
+    const d = await (await fetch("/api/vision/windows")).json();
+    const select = node("vision-window");
+    const current = select.value;
+    select.innerHTML = "";
+    if (!d.supported) select.innerHTML = '<option value="">захват окна — только в Windows</option>';
+    for (const title of d.windows || []) {
+      const option = document.createElement("option");
+      option.value = option.textContent = title;
+      select.appendChild(option);
+    }
+    if (current) select.value = current;
+  } catch (e) { /* сервер ещё не поднялся */ }
+}
+
+async function refreshVision() {
+  let d;
+  try { d = await (await fetch("/api/vision/state")).json(); } catch (e) { return; }
+  const c = d.counters || {};
+  let status = d.running
+    ? "смотрю «" + escapeHtml(d.window) + "» каждые " + d.interval + " с: кадров " + (c.captured || 0) +
+      ", разобрано " + (c.described || 0) + ", без изменений " + (c.unchanged || 0)
+    : (c.uploaded ? "снимок из файла" : "не запущено");
+  if (d.elapsed_ms) status += "; разбор " + d.elapsed_ms + " мс";
+  if (d.facts_age !== null && d.facts_age !== undefined) status += ", " + d.facts_age + " с назад";
+  const problem = d.warning || d.error || (d.running ? d.last_skip : null);
+  if (problem) status += '<br><span class="warn">' + escapeHtml(problem) + "</span>";
+  node("vision-status").innerHTML = status;
+  node("vision-facts").textContent = renderFacts(d.facts);
+  if (d.frame_age !== null && d.frame_age !== undefined && d.frame_age !== visionFrameAge) {
+    visionFrameAge = d.frame_age;
+    const img = node("vision-frame");
+    img.src = "/api/vision/frame.jpg?t=" + Date.now();
+    img.hidden = false;
+  }
+}
+
+async function visionPost(url, body) {
+  const resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify(body || {}) });
+  const d = await resp.json();
+  if (!resp.ok) add("bot", '<span class="err">' + escapeHtml(d.detail || "ошибка") + "</span>");
+  refreshVision();
+  return d;
 }
 
 async function refreshCampaign() {
@@ -486,6 +588,25 @@ document.addEventListener("assistant-mode", (e) => {
 });
 refreshCampaign();
 refreshGame();
+loadWindows();
+refreshVision();
+setInterval(refreshVision, 3000);
+node("vision-refresh").onclick = loadWindows;
+node("vision-start").onclick = () => visionPost("/api/vision/start", {
+  window: node("vision-window").value, interval: Number(node("vision-interval").value) || 4,
+  mode: node("vision-mode").value, save: node("vision-save").checked });
+node("vision-stop").onclick = () => visionPost("/api/vision/stop");
+node("vision-file").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    node("vision-status").textContent = "разбираю снимок…";
+    await visionPost("/api/vision/frame", { image: reader.result });
+    e.target.value = "";
+  };
+  reader.readAsDataURL(file);
+};
 node("game-set").onclick = setGame;
 node("game").addEventListener("keydown", (e) => { if (e.key === "Enter") setGame(); });
 </script>

@@ -106,7 +106,11 @@ class LexicalIndex:
         """
         by_token: Dict[str, Set[str]] = {}
         for thing, naming in self.kb.index_names().items():
-            for token in tokenize(naming.label_ru or ""):
+            # Английские названия — наравне с русскими: синоним «flint» у огнива целиком
+            # входит в название кремня (Flint) и перебивал его, потому что вес синонима
+            # выше веса английского названия. Проявилось при распознавании экрана: модель
+            # зрения называет предметы по-английски.
+            for token in tokenize(naming.label_ru or "") + tokenize(naming.label_en or ""):
                 by_token.setdefault(token, set()).add(thing)
 
         generic: Set[Tuple[str, Tuple[str, ...]]] = set()

@@ -111,7 +111,7 @@ class IntentExtractor(Protocol):
 
     def extract(self, utterance: str, *, actions: Sequence[str] = PROPOSABLE,
                 feedback: Optional[str] = None, context: Optional[str] = None,
-                game: Optional[str] = None) -> Proposal: ...
+                game: Optional[str] = None, screen: Optional[str] = None) -> Proposal: ...
 
 
 @dataclass
@@ -207,7 +207,8 @@ class Pipeline:
                pending: Optional["Turn"] = None,
                context: Optional[str] = None,
                state: Optional[str] = None,
-               game: Optional[str] = None) -> Turn:
+               game: Optional[str] = None,
+               screen: Optional[str] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -216,6 +217,9 @@ class Pipeline:
         «и ещё крипера».
         state — снимок состояния игрока словами, для выбора цели кампании.
         game — игра, о которой спрашивает игрок; по умолчанию Minecraft.
+        screen — что видно на экране игрока, факты модели зрения одной строкой. Они только
+        поясняют реплику («что это за предмет»): действие выбирается по реплике и, как
+        всегда, проходит валидатор.
         """
         mode = mode or self.mode
         game = game or DEFAULT_GAME
@@ -228,10 +232,16 @@ class Pipeline:
             if follow_up is not None:
                 return follow_up
 
-        proposal = self.extractor.extract(utterance, actions=actions, context=context, game=game)
+        if screen:
+            proposal = self.extractor.extract(utterance, actions=actions, context=context,
+                                              game=game, screen=screen)
+        else:
+            proposal = self.extractor.extract(utterance, actions=actions, context=context, game=game)
         stages: Dict[str, Any] = {
             "llm": {"action": proposal.action, "target": proposal.target, "count": proposal.count}
         }
+        if screen:
+            stages["screen"] = screen
         if not proposal.action or proposal.action == NONE:
             return Turn(outcome=NONE, stages=stages, game=game)
 

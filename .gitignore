@@ -89,3 +89,6 @@ data/kb/
 # Отдельное окружение синтеза речи (VoxCPM, Python 3.10) и кэш озвученных реплик
 /.venv-voice/
 /data/voice_cache/
+
+# Кадры, сохранённые наблюдателем за экраном для замера (vision/)
+data/vision_frames/
