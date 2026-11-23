@@ -27,7 +27,8 @@ from search.service import WebSearch
 from vision import frames
 from vision.capture import BACKGROUND, Grab
 from vision.scene import Description, SceneFacts, VisionModel, VisionUnavailable
-from vision.watcher import CONTINUOUS, FRESH_SECONDS, ON_DEMAND, ScreenWatcher
+from vision.guard import Detection, detect
+from vision.watcher import CONTINUOUS, FRESH_SECONDS, ON_DEMAND, AnticheatRunning, ScreenWatcher
 
 KB_PATH = Path(__file__).resolve().parent.parent / "data" / "kb" / "game.ttl"
 
@@ -76,10 +77,10 @@ class Clock:
         return self.now
 
 
-def watcher_with(*grabs, model=None, mode=CONTINUOUS):
+def watcher_with(*grabs, model=None, mode=CONTINUOUS, guard=lambda: None):
     clock = Clock()
     watcher = ScreenWatcher(model or FakeModel(), capture_factory=lambda title: FakeCapture(*grabs),
-                            clock=clock)
+                            clock=clock, guard=guard)
     watcher.mode = mode
     watcher._capture = FakeCapture(*grabs)
     return watcher, clock
@@ -256,6 +257,47 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(watcher.context().focus, "Graphics card")
 
 
+class GuardTests(unittest.TestCase):
+    TARKOV = Detection("BattlEye", "EscapeFromTarkov_BE.exe")
+
+    def test_known_anticheats_are_detected(self):
+        cases = {"EscapeFromTarkov_BE.exe": "BattlEye", "BEService.exe": "BattlEye",
+                 "EasyAntiCheat_EOS.exe": "Easy Anti-Cheat", "start_protected_game.exe": "Easy Anti-Cheat",
+                 "vgc.exe": "Riot Vanguard", "FACEIT.exe": "FACEIT"}
+        for process, anticheat in cases.items():
+            self.assertEqual(detect(["explorer.exe", process]).anticheat, anticheat, process)
+
+    def test_ordinary_processes_pass(self):
+        self.assertIsNone(detect(["explorer.exe", "javaw.exe", "Stardew Valley.exe", "chrome.exe"]))
+
+    def test_start_is_refused_while_anticheat_runs(self):
+        model = FakeModel()
+        watcher, _ = watcher_with(Grab(image=picture()), model=model, guard=lambda: self.TARKOV)
+        with self.assertRaises(AnticheatRunning) as raised:
+            watcher.start("EscapeFromTarkov")
+        self.assertIn("BattlEye", str(raised.exception))
+        self.assertFalse(watcher.running)
+
+    def test_capture_stops_when_anticheat_appears(self):
+        """Игру с античитом запустили во время съёмки: кадр не снимается, съёмка кончается."""
+        detections = [None, self.TARKOV]
+        model = FakeModel()
+        watcher, _ = watcher_with(Grab(image=picture()), Grab(image=picture(box=(0, 0, 300, 300))),
+                                  model=model, guard=lambda: detections.pop(0))
+        watcher.tick()
+        watcher.tick()
+        self.assertEqual(model.calls, 1)
+        state = watcher.snapshot()
+        self.assertEqual(state["blocked"], "BattlEye")
+        self.assertIn("одиночных игр", state["warning"])
+        self.assertTrue(watcher._stop.is_set())
+
+    def test_process_list_is_readable(self):
+        from vision import guard
+        if guard.IS_WINDOWS:
+            self.assertIn("python.exe", [name.lower() for name in guard.process_names()])
+
+
 class ScreenPromptTests(unittest.TestCase):
     def test_screen_goes_last_before_the_utterance(self):
         prompt = build_prompt(("search_web",), game="Escape from Tarkov",
@@ -365,6 +407,14 @@ class VisionApiTests(unittest.IsolatedAsyncioTestCase):
             state = await vision_api.state()
         self.assertEqual(answer["facts"]["focus"], "Graphics card")
         self.assertEqual(state["counters"]["uploaded"], 1)
+
+    async def test_start_answers_409_while_anticheat_runs(self):
+        from fastapi import HTTPException
+        watcher, _ = watcher_with(Grab(skipped=BACKGROUND),
+                                  guard=lambda: Detection("BattlEye", "EscapeFromTarkov_BE.exe"))
+        with patch("vision.watcher._shared", watcher), self.assertRaises(HTTPException) as raised:
+            await vision_api.start({"window": "EscapeFromTarkov"})
+        self.assertEqual(raised.exception.status_code, 409)
 
     async def test_bad_image_is_rejected(self):
         from fastapi import HTTPException

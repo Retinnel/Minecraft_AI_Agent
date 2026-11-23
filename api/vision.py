@@ -19,6 +19,7 @@ from PIL import Image, UnidentifiedImageError
 
 from vision import capture, watcher as watchers
 from vision.scene import VisionUnavailable
+from vision.watcher import AnticheatRunning
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ async def start(payload: Dict[str, Any]) -> Dict[str, Any]:
                       mode=str(payload.get("mode") or watchers.CONTINUOUS),
                       follow_game=bool(payload.get("follow_game", True)),
                       save=bool(payload.get("save", False)))
+    except AnticheatRunning as error:
+        raise HTTPException(status_code=409, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     return watcher.snapshot()

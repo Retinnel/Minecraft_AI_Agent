@@ -29,6 +29,7 @@ from PIL import Image
 
 from vision import frames
 from vision.capture import WindowCapture
+from vision.guard import Detection, running_anticheat
 from vision.scene import Description, SceneFacts, VisionModel, VisionUnavailable
 
 CONTINUOUS = "continuous"
@@ -55,6 +56,14 @@ BLACK_WARNING = ("кадр чёрный: игра, похоже, в эксклю
                  "включите оконный режим без рамки")
 
 
+class AnticheatRunning(RuntimeError):
+    """Съёмка не запускается: работает античит (vision.guard)."""
+
+    def __init__(self, detection: Detection) -> None:
+        super().__init__(detection.message)
+        self.detection = detection
+
+
 @dataclass
 class Frame:
     image: Image.Image
@@ -67,9 +76,11 @@ class Frame:
 class ScreenWatcher:
     def __init__(self, model: Optional[VisionModel] = None, *,
                  capture_factory: Callable[[str], Any] = WindowCapture,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic,
+                 guard: Callable[[], Optional[Detection]] = running_anticheat) -> None:
         self.model = model or VisionModel()
         self._capture_factory = capture_factory
+        self._guard = guard
         self._clock = clock
         self._lock = threading.Lock()
         self._describe_lock = threading.Lock()
@@ -93,6 +104,7 @@ class ScreenWatcher:
             self.last_skip: Optional[str] = None
             self.warning: Optional[str] = None
             self.error: Optional[str] = None
+            self.blocked: Optional[str] = None
             self.frame: Optional[Frame] = None
             self.facts: Optional[SceneFacts] = None
             self.facts_signature: Optional[Image.Image] = None
@@ -110,6 +122,9 @@ class ScreenWatcher:
               follow_game: bool = True, save: bool = False) -> None:
         if mode not in MODES:
             raise ValueError(f"режим должен быть одним из: {', '.join(MODES)}")
+        detection = self._guard()
+        if detection is not None:
+            raise AnticheatRunning(detection)
         self.stop()
         self.reset()
         with self._lock:
@@ -143,7 +158,19 @@ class ScreenWatcher:
     # --- один шаг ---
 
     def tick(self) -> None:
-        """Снять кадр; если экран изменился и режим постоянный — разобрать его."""
+        """Снять кадр; если экран изменился и режим постоянный — разобрать его.
+
+        Перед каждым кадром — предохранитель: если запустили игру с античитом, съёмка
+        прекращается совсем, а не приостанавливается, и снова включается только вручную.
+        """
+        detection = self._guard()
+        if detection is not None:
+            with self._lock:
+                self.blocked = detection.anticheat
+                self.warning = self.last_skip = detection.message
+                self.counters["blocked"] += 1
+            self._stop.set()
+            return
         grab = self._capture.grab()
         if grab.image is None:
             with self._lock:
@@ -261,6 +288,7 @@ class ScreenWatcher:
                 "skipped": dict(self.skipped),
                 "last_skip": self.last_skip,
                 "warning": self.warning,
+                "blocked": self.blocked,
                 "error": self.error,
                 "frame_age": frame_age,
                 "facts": None if self.facts is None else self.facts.to_dict(),
