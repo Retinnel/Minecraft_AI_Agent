@@ -16,7 +16,7 @@ import statistics
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from eval.schema import Case, Config, Prediction, load_golden_set
 
@@ -135,6 +135,9 @@ UNSAFE = ("wrong_target", "wrong_count", "wrong_intent", "missed_clarify", "spur
 
 
 def run(config: Config, cases: List[Case]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    from orchestrator import llm
+
+    llm.reset_usage()
     rows: List[Dict[str, Any]] = []
     for case in cases:
         prediction = config.predict(case.utterance)
@@ -200,6 +203,8 @@ def run(config: Config, cases: List[Case]) -> Tuple[List[Dict[str, Any]], Dict[s
             "median": round(statistics.median(latencies), 3) if latencies else 0.0,
             "max": round(max(latencies), 3) if latencies else 0.0,
         },
+        # Расход токенов за прогон, всего и по назначению вызова; у символьной схемы пусто.
+        "tokens": llm.usage_report(),
     }
     return rows, summary
 
@@ -223,6 +228,7 @@ def format_report(rows: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
     lines.append(f"| Небезопасных расхождений | {summary['unsafe']} ({summary['unsafe_rate']:.1%}) |")
     lines.append(f"| Время отклика, медиана | {summary['latency_ms']['median']} мс |")
     lines.append(f"| Время отклика, максимум | {summary['latency_ms']['max']} мс |")
+    lines += _token_lines(summary.get("tokens"), len(rows))
     lines.append("")
 
     lines.append("## По группам")
@@ -266,6 +272,16 @@ def format_report(rows: List[Dict[str, Any]], summary: Dict[str, Any]) -> str:
                          "объективно правильного ответа.")
     lines.append("")
     return "\n".join(lines)
+
+
+def _token_lines(tokens: Optional[Dict[str, Any]], cases: int) -> List[str]:
+    """Строки сводки о расходе токенов: на реплику и доля входа, взятая из кэша провайдера."""
+    total = (tokens or {}).get("total")
+    if not total or not cases:
+        return []
+    return [f"| Токенов на реплику, вход / выход | {total['prompt'] / cases:.0f} / "
+            f"{total['completion'] / cases:.0f} |",
+            f"| Доля входа из кэша провайдера | {total['cache_share']:.1%} |"]
 
 
 def _describe(payload: Dict[str, Any]) -> str:
@@ -373,6 +389,15 @@ def format_repeated(summary: Dict[str, Any]) -> str:
         lines.append(f"| Пройдено, {group} | {_n(bucket['pass'])} из {bucket['total']} | {lo}–{hi} |")
     if summary.get("failed"):
         lines.append(f"| Сбоев связи с моделью за все прогоны | {summary['failed']} | |")
+    tokens = [run.get("tokens", {}).get("total") for run in summary.get("runs", [])]
+    tokens = [entry for entry in tokens if entry]
+    if tokens and total:
+        per_case = [entry["prompt"] / total for entry in tokens]
+        shares = [entry["cache_share"] for entry in tokens]
+        lines.append(f"| Входных токенов на реплику | {statistics.median(per_case):.0f} | "
+                     f"{min(per_case):.0f}–{max(per_case):.0f} |")
+        lines.append(f"| Доля входа из кэша провайдера | {statistics.median(shares):.1%} | "
+                     f"{min(shares):.1%}–{max(shares):.1%} |")
     lines += ["", "## Нестабильные реплики", ""]
     if summary["unstable"]:
         lines += ["Исход этих реплик менялся от прогона к прогону:", "",

@@ -13,7 +13,9 @@
 
 from __future__ import annotations
 
+import threading
 import time
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
 from api.groq_client import GroqClient, _loads_jsonish_object
@@ -35,6 +37,69 @@ TRUNCATION_GROWTH = 2
 
 class ModelUnavailable(RuntimeError):
     """Сбой канала связи с моделью, а не решение системы."""
+
+
+# Расход токенов по назначению вызова. Нужен двум потребителям: оценке («расход токенов» —
+# метрика сравнения конфигураций) и проверке кэша провайдера. DeepSeek кэширует совпадающее
+# начало запроса и берёт за попадание в пятьдесят раз меньше, поэтому неизменная часть
+# промпта стоит первой, а реплика, факты и найденное — в конце. Попадания здесь видны
+# напрямую: провайдер сообщает их в usage.
+@dataclass
+class Usage:
+    calls: int = 0
+    prompt: int = 0
+    cache_hit: int = 0
+    completion: int = 0
+
+    @property
+    def cache_share(self) -> float:
+        return self.cache_hit / self.prompt if self.prompt else 0.0
+
+
+_usage: Dict[str, Usage] = {}
+_usage_lock = threading.Lock()
+
+
+def _cached_tokens(usage: Any) -> int:
+    """Попадания в кэш: у DeepSeek — prompt_cache_hit_tokens, в формате OpenAI — cached_tokens."""
+    hit = getattr(usage, "prompt_cache_hit_tokens", None)
+    if hit is None:
+        details = getattr(usage, "prompt_tokens_details", None)
+        hit = getattr(details, "cached_tokens", None) if details is not None else None
+    return int(hit or 0)
+
+
+def _record(purpose: str, completion: Any) -> None:
+    usage = getattr(completion, "usage", None)
+    if usage is None:
+        return
+    with _usage_lock:
+        entry = _usage.setdefault(purpose, Usage())
+        entry.calls += 1
+        entry.prompt += int(getattr(usage, "prompt_tokens", 0) or 0)
+        entry.cache_hit += _cached_tokens(usage)
+        entry.completion += int(getattr(usage, "completion_tokens", 0) or 0)
+
+
+def usage_report() -> Dict[str, Dict[str, Any]]:
+    """Расход с последнего сброса: {назначение: {calls, prompt, cache_hit, completion, cache_share}}."""
+    with _usage_lock:
+        report = {purpose: {**asdict(entry), "cache_share": round(entry.cache_share, 3)}
+                  for purpose, entry in _usage.items()}
+        if _usage:
+            total = Usage()
+            for entry in _usage.values():
+                total.calls += entry.calls
+                total.prompt += entry.prompt
+                total.cache_hit += entry.cache_hit
+                total.completion += entry.completion
+            report["total"] = {**asdict(total), "cache_share": round(total.cache_share, 3)}
+        return report
+
+
+def reset_usage() -> None:
+    with _usage_lock:
+        _usage.clear()
 
 
 _client: Optional[GroqClient] = None
@@ -71,7 +136,7 @@ def available() -> bool:
         return False
 
 
-def _complete(messages: List[Dict[str, str]], max_tokens: int) -> str:
+def _complete(messages: List[Dict[str, str]], max_tokens: int, purpose: str = "text") -> str:
     active = client()
     if not active.is_available():
         raise ModelUnavailable(
@@ -86,6 +151,7 @@ def _complete(messages: List[Dict[str, str]], max_tokens: int) -> str:
     for attempt in range(ATTEMPTS):
         try:
             completion = active._create_completion(params)
+            _record(purpose, completion)
             choices = getattr(completion, "choices", None)
             if not choices:
                 raise ValueError("ответ без вариантов")
@@ -108,10 +174,10 @@ def _complete(messages: List[Dict[str, str]], max_tokens: int) -> str:
 def ask_json(prompt: str, utterance: str) -> Dict[str, Any]:
     """Ответ модели, разобранный как объект JSON."""
     text = _complete([{"role": "user", "content": prompt.replace("{utterance}", utterance)}],
-                     JSON_MAX_TOKENS)
+                     JSON_MAX_TOKENS, purpose="json")
     return _loads_jsonish_object(text) or {}
 
 
 def ask_text(messages: List[Dict[str, str]]) -> str:
     """Свободный текст: формулирование ответа игроку."""
-    return _complete(messages, TEXT_MAX_TOKENS).strip()
+    return _complete(messages, TEXT_MAX_TOKENS, purpose="text").strip()
