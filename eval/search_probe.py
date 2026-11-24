@@ -48,11 +48,19 @@ QUESTIONS = [
 ]
 
 
-def run(model_key: str | None) -> str:
+def run(model_key: str | None, engines: list[str] | None = None) -> str:
     if model_key:
         from eval.model_profile import apply
         apply(model_key)
-    pipeline = Pipeline(LanguageModelIntent())
+    search = None
+    if engines:
+        # Замер конкретного движка: без запасных, чтобы не подменили результат.
+        from search.engines import default_engines
+        from search.service import WebSearch
+        search = WebSearch(default_engines(engines))
+        if not search.engines:
+            raise SystemExit(f"Нет доступных движков из {engines}: нужен ключ или библиотека")
+    pipeline = Pipeline(LanguageModelIntent(), search=search)
     responder = Responder()
 
     rows = []
@@ -105,12 +113,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--model", help="ключ модели из llm_config.json")
     parser.add_argument("--report", action="store_true", help="сохранить в eval/reports/")
+    parser.add_argument("--engine", action="append",
+                        help="поисковый движок: tavily, deepseek, duckduckgo; можно несколько — "
+                             "по порядку; без ключа — как на сервере")
     args = parser.parse_args()
-    report = run(args.model)
+    # Журнал печатает стрелки и кавычки; консоль Windows в cp1251 на них падала.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    report = run(args.model, args.engine)
     print()
     print(report)
     if args.report:
-        target = REPORTS / f"{datetime.now():%Y-%m-%d}-search-probe.md"
+        tag = "-" + "-".join(args.engine) if args.engine else ""
+        target = REPORTS / f"{datetime.now():%Y-%m-%d}-search-probe{tag}.md"
         target.write_text(report, encoding="utf-8")
         print(f"Сохранено: {target}")
     return 0

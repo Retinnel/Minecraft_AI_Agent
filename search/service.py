@@ -21,7 +21,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from search.engines import Engine, Hit, SearchUnavailable, default_engines
 
-# Порог релевантности для движков, которые её оценивают (см. замер выше).
+# Порог релевантности для движков, которые её оценивают (см. замер выше). Движок может
+# задать свой порог свойством `min_score`: шкалы оценок у движков разные.
 MIN_SCORE = 0.3
 
 # Сколько фрагментов отдаётся модели и какой длины. Ответ игроку — несколько фраз, а запрос к
@@ -123,7 +124,8 @@ class WebSearch:
             except SearchUnavailable as error:
                 answer.errors.append(str(error))
                 continue
-            accepted = [hit for hit in hits if self._relevant(hit, full)]
+            threshold = getattr(engine, "min_score", None)
+            accepted = [hit for hit in hits if self._relevant(hit, full, threshold)]
             answer.rejected += len(hits) - len(accepted)
             if accepted:
                 answer.hits = [Hit(title=hit.title, url=hit.url, content=clean_passage(hit.content),
@@ -139,11 +141,11 @@ class WebSearch:
         return answer
 
     @staticmethod
-    def _relevant(hit: Hit, query: str) -> bool:
+    def _relevant(hit: Hit, query: str, threshold: Optional[float] = None) -> bool:
         if not hit.content.strip():
             return False
         if hit.score is not None:
-            return hit.score >= MIN_SCORE
+            return hit.score >= (MIN_SCORE if threshold is None else threshold)
         return _mentions_query(hit, query)
 
 
