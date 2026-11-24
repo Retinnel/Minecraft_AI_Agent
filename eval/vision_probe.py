@@ -48,7 +48,14 @@ PRICE_OUTPUT = 1.20
 
 
 def _same(a: Optional[str], b: Optional[str]) -> bool:
-    return (a or "").strip().lower() == (b or "").strip().lower()
+    """Совпало ли распознанное с разметкой.
+
+    В разметке допустимы варианты через «|»: «Печь|Furnace». Подписанный предмет модель
+    называет так, как он написан в игре, неподписанный — официальным английским названием,
+    и оба ответа верны.
+    """
+    seen = (a or "").strip().lower()
+    return any(seen == variant.strip().lower() for variant in (b or "").split("|"))
 
 
 def score(facts: SceneFacts, truth: Dict[str, Any]) -> Dict[str, Optional[float]]:
@@ -58,8 +65,8 @@ def score(facts: SceneFacts, truth: Dict[str, Any]) -> Dict[str, Optional[float]
     if "focus" in truth:
         result["focus"] = float(_same(facts.focus, truth["focus"]))
     if truth.get("items"):
-        seen = {item.lower() for item in facts.items}
-        result["items"] = sum(item.lower() in seen for item in truth["items"]) / len(truth["items"])
+        result["items"] = sum(any(_same(seen, item) for seen in facts.items)
+                              for item in truth["items"]) / len(truth["items"])
     if "options" in truth:
         found = len(facts.dialogue.options) if facts.dialogue else 0
         result["options"] = float(found == truth["options"])
