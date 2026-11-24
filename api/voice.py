@@ -119,7 +119,8 @@ def engines() -> List[str]:
 
 
 def _elevenlabs_key() -> Optional[str]:
-    return os.environ.get("ELEVENLABS_API_KEY") or None
+    from api import keys
+    return keys.get("ELEVENLABS_API_KEY")
 
 
 def _elevenlabs_voice(voice: str) -> Optional[str]:

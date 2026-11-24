@@ -7,6 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
+from api import keys
 from api.console_utils import make_console_safe
 from groq import Groq
 from openai import OpenAI as OllamaClient
@@ -35,6 +36,25 @@ EMPTY_THINKING = "<think>\n\n</think>\n\n"
 # request cannot monopolize the workers needed for /api/rp/chat.
 _tip_executor = ThreadPoolExecutor(max_workers=1)
 _interactive_executor = ThreadPoolExecutor(max_workers=2)
+
+
+# Имена переменных с ключами, по убыванию предпочтения. В .env проекта ключ DeepSeek заведён
+# как DEEPSEEK_API; привычное имя с суффиксом принимается тоже.
+GROQ_KEY_NAMES = ("GROQ_API_KEY",)
+OPENROUTER_KEY_NAMES = ("OPENROUTER_API_KEY",)
+DEEPSEEK_KEY_NAMES = ("DEEPSEEK_API", "DEEPSEEK_API_KEY")
+PROVIDER_KEY_NAMES = {"groq": GROQ_KEY_NAMES, "openrouter": OPENROUTER_KEY_NAMES,
+                      "deepseek": DEEPSEEK_KEY_NAMES}
+
+
+def key_note(*names: str) -> str:
+    """Строка для журнала запуска: откуда взят ключ и не лежит ли в окружении другой."""
+    details = keys.describe(*names)
+    note = f"ключ: {details['source']}, отпечаток {details['fingerprint']}"
+    if details["ignored_environment"]:
+        note += (f"; в окружении есть другой ключ ({', '.join(details['ignored_environment'])})"
+                 f" — он не используется")
+    return note
 
 
 def _strip_thinking(text: str) -> str:
@@ -139,10 +159,10 @@ class GroqClient:
     """Wrapper for LLM API calls (Groq or Ollama) with Minecraft game state context."""
 
     def __init__(self, llm_config=None):
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
-        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        # Переменная в .env заведена как DEEPSEEK_API; принимается и привычное имя с суффиксом.
-        self.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("DEEPSEEK_API")
+        # Ключи берутся из .env проекта; окружение — запасной вариант (api/keys.py).
+        self.groq_api_key = keys.get(*GROQ_KEY_NAMES)
+        self.openrouter_api_key = keys.get(*OPENROUTER_KEY_NAMES)
+        self.deepseek_api_key = keys.get(*DEEPSEEK_KEY_NAMES)
         self.provider_api_key = None
         self.client = None
         self.llm_config = llm_config
@@ -185,7 +205,8 @@ class GroqClient:
                         api_key=self.openrouter_api_key,
                         default_headers=headers,
                     )
-                    print(make_console_safe(f"[LLM] Using OpenRouter | model: {self.model} | url: {OPENROUTER_BASE_URL}"))
+                    print(make_console_safe(f"[LLM] Using OpenRouter | model: {self.model} | url: {OPENROUTER_BASE_URL}"
+                                            f" | {key_note(*OPENROUTER_KEY_NAMES)}"))
                     logger.info(make_console_safe(f"Initialized OpenRouter client with model: {self.model}"))
                 except Exception as e:
                     logger.error(f"Failed to initialize OpenRouter client: {e}")
@@ -198,7 +219,8 @@ class GroqClient:
                 try:
                     self.provider_api_key = self.deepseek_api_key
                     self.client = OllamaClient(base_url=DEEPSEEK_BASE_URL, api_key=self.deepseek_api_key)
-                    print(make_console_safe(f"[LLM] Using DeepSeek | model: {self.model} | url: {DEEPSEEK_BASE_URL}"))
+                    print(make_console_safe(f"[LLM] Using DeepSeek | model: {self.model} | url: {DEEPSEEK_BASE_URL}"
+                                            f" | {key_note(*DEEPSEEK_KEY_NAMES)}"))
                     logger.info(make_console_safe(f"Initialized DeepSeek client with model: {self.model}"))
                 except Exception as e:
                     logger.error(f"Failed to initialize DeepSeek client: {e}")
@@ -211,7 +233,8 @@ class GroqClient:
                 try:
                     self.provider_api_key = self.groq_api_key
                     self.client = Groq(api_key=self.groq_api_key)
-                    print(make_console_safe(f"[LLM] Using Groq | model: {self.model}"))
+                    print(make_console_safe(f"[LLM] Using Groq | model: {self.model}"
+                                            f" | {key_note(*GROQ_KEY_NAMES)}"))
                     logger.info(make_console_safe(f"Initialized Groq client with model: {self.model}"))
                 except Exception as e:
                     logger.error(f"Failed to initialize Groq client: {e}")

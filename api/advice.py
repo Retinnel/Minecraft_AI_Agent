@@ -1469,10 +1469,19 @@ async def get_available_llm_models() -> Dict[str, Any]:
     for model in models:
         model_details[model] = get_model_info(model)
     
+    # Какой ключ в работе у текущего провайдера — без самого ключа: откуда взят, отпечаток
+    # и нет ли в окружении другого, который раньше мог его подменять.
+    from api import keys
+    from api.groq_client import PROVIDER_KEY_NAMES
+    provider = getattr(llm_config.get_active_model(), "provider", None)
+    names = PROVIDER_KEY_NAMES.get(provider or "")
+
     return {
         "current_model": current,
         "available_models": models,
-        "model_details": model_details
+        "model_details": model_details,
+        "provider": provider,
+        "key": keys.describe(*names) if names else None,
     }
 
 

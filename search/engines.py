@@ -128,7 +128,8 @@ class DuckDuckGoEngine:
 def default_engines() -> List[Engine]:
     """Движки по доступности: Tavily, если есть ключ, затем DuckDuckGo, если стоит ddgs."""
     engines: List[Engine] = []
-    key = os.getenv("TAVILY_API_KEY")
+    from api import keys
+    key = keys.get("TAVILY_API_KEY")
     if key:
         engines.append(TavilyEngine(key))
     try:

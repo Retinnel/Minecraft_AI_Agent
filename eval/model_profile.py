@@ -36,10 +36,16 @@ def apply(model_type: Optional[str] = None, temperature: float = EVAL_TEMPERATUR
     parameters["max_tokens"] = max(int(parameters.get("max_tokens") or 0), EVAL_MAX_TOKENS)
     model.parameters = parameters
 
+    from api import keys
+    from api.groq_client import PROVIDER_KEY_NAMES
+    names = PROVIDER_KEY_NAMES.get(model.provider)
+
     return {
         "ключ": config.model_type,
         "модель": model.name,
         "провайдер": model.provider,
         "температура": temperature,
         "max_tokens": parameters["max_tokens"],
+        # Откуда взят ключ провайдера (сам ключ и его отпечаток в отчёт не идут).
+        "ключ провайдера": keys.lookup(*names)[1] if names else "не нужен",
     }

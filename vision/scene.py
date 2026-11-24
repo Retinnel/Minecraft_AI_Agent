@@ -172,7 +172,11 @@ class VisionModel:
 
     def __init__(self, api_key: Optional[str] = None, *, model: Optional[str] = None,
                  client: Optional[httpx.Client] = None, max_width: int = MAX_WIDTH) -> None:
-        self.api_key = api_key if api_key is not None else os.getenv("DEEPSEEK_API", "")
+        if api_key is None:
+            # Тот же ключ и из того же места, что у языковой модели (api/keys.py).
+            from api import keys
+            api_key = keys.get("DEEPSEEK_API", "DEEPSEEK_API_KEY") or ""
+        self.api_key = api_key
         self.model = model or os.getenv("VISION_MODEL", DEFAULT_MODEL)
         self.max_width = max_width
         self._client = client
