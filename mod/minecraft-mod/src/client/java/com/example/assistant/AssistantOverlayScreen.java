@@ -200,14 +200,29 @@ public class AssistantOverlayScreen extends Screen {
         return Math.min(this.width - 40, 460);
     }
 
+    // Над панелью стоит ряд вкладок, под ней — ряд кнопок. Высота панели считается от
+    // высоты окна: при постоянных 220 в окне 854×480 вкладки уходили за верхний край, а
+    // кнопки ложились поверх плана.
+    private static final int TAB_ROW = 24;
+    private static final int BUTTON_ROW = 24;
+
+    private int panelHeight() {
+        return Math.max(140, Math.min(220, this.height - TAB_ROW - BUTTON_ROW - 8));
+    }
+
+    private int panelTop() {
+        int free = this.height - TAB_ROW - BUTTON_ROW - panelHeight();
+        return TAB_ROW + Math.max(4, free / 2);
+    }
+
     @Override
     protected void init() {
         super.init();
 
         int panelW = panelWidth();
-        int panelH = 220;
+        int panelH = panelHeight();
         int left = (this.width - panelW) / 2;
-        int top = (this.height - panelH) / 2;
+        int top = panelTop();
 
         // Вкладки
         int tabY = top - 24;
@@ -254,9 +269,9 @@ public class AssistantOverlayScreen extends Screen {
         }).bounds(left + panelW - 130, top + 30, 115, 18).build();
         addRenderableWidget(whyButton);
         
-        int btnY = this.height - 40;
-        int btnWidth = 95;
-        int spacing = 8;
+        int btnY = top + panelH + 3;
+        int spacing = 6;
+        int btnWidth = Math.min(100, (panelW - spacing * 3) / 4);
         int startX = (this.width - (btnWidth * 4 + spacing * 3)) / 2;
         
         // Кнопка обновления
@@ -373,9 +388,9 @@ public class AssistantOverlayScreen extends Screen {
         
         // Основная панель (центрированная)
         int panelW = panelWidth();
-        int panelH = 220;
+        int panelH = panelHeight();
         int left = (this.width - panelW) / 2;
-        int top = (this.height - panelH) / 2;
+        int top = panelTop();
         
         // Тень
         graphics.fill(left + 4, top + 4, left + panelW + 4, top + panelH + 4, 0x55000000);
@@ -591,7 +606,8 @@ public class AssistantOverlayScreen extends Screen {
     }
 
     private String modeLabel() {
-        return "survival".equals(runtime.getAssistantMode()) ? "§aРежим: выживание" : "§eРежим: творчество";
+        // Короткая подпись: «Режим: творчество» в кнопку узкого окна не помещалась.
+        return "survival".equals(runtime.getAssistantMode()) ? "§aВыживание" : "§eТворчество";
     }
 
     private void refreshMode() {
