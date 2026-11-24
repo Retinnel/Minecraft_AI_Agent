@@ -32,6 +32,36 @@ DEFAULT_ORDER = ("tavily", "deepseek", "duckduckgo")
 EXCLUDED_DOMAINS = ("youtube.com", "tiktok.com", "instagram.com", "facebook.com",
                     "pinterest.com")
 
+# Общая шкала релевантности — от 0 до 1 с двумя опорными точками, одинаковыми для всех
+# движков: ниже ACCEPTABLE страница в ответ не идёт, около GOOD лежит типичная страница по
+# теме вопроса.
+ACCEPTABLE = 0.3
+GOOD = 0.8
+
+
+def normalize(raw: float, acceptable: float, good: float) -> float:
+    """Оценка движка на общей шкале.
+
+    У движков свои шкалы: Tavily оценивает от 0 до 1, мусору даёт 0,03–0,05, страницам по
+    теме — 0,75–0,85; DeepSeek оценивает от 0 до 3, мусору даёт 0,6–0,9, страницам по теме —
+    1,6–1,96. Сравнивать такие числа с одним порогом нельзя, а держать порог у каждого
+    движка — значит размазать одно правило по нескольким местам.
+
+    Движок называет две точки своей шкалы: с какой оценки страница приемлема и какую
+    оценку получает типичная страница по теме. Первая переходит в ACCEPTABLE, вторая — в
+    GOOD, между ними и за ними оценка пересчитывается линейно и не выходит за [0, 1].
+    Одной точки мало: при пересчёте только по границе хорошие страницы DeepSeek ложились
+    на 0,32–0,48, а Tavily — на 0,57–0,86, и одинаковые числа значили разное.
+    """
+    raw = max(0.0, float(raw))
+    if raw <= acceptable:
+        value = ACCEPTABLE * raw / acceptable
+    else:
+        value = ACCEPTABLE + (GOOD - ACCEPTABLE) * (raw - acceptable) / (good - acceptable)
+    # Округление убирает хвост двоичной арифметики: 0,84 у движка остаётся 0,84 и здесь.
+    return round(min(value, 1.0), 6)
+
+
 # Сколько ждать ответа поисковика. Вопрос игрока — живой диалог: дольше ждать нельзя,
 # лучше перейти к запасному движку.
 TIMEOUT_SECONDS = 15.0
@@ -44,9 +74,11 @@ class Hit:
     title: str
     url: str
     content: str
-    # Релевантность по оценке движка, от 0 до 1. У движков без оценки — None.
+    # Релевантность на общей шкале от 0 до 1 (см. normalize). У движков без оценки — None.
     score: Optional[float]
     engine: str
+    # Оценка в том виде, в каком её дал движок: для журнала и замеров.
+    raw_score: Optional[float] = None
 
     @property
     def site(self) -> str:
@@ -65,15 +97,14 @@ class Engine(Protocol):
     def search(self, query: str, *, max_results: int = 5) -> List[Hit]: ...
 
 
-# Необязательное свойство движка `min_score` — его собственный порог релевантности на шкале
-# от 0 до 1. Шкалы у движков разные: у Tavily мусор получает 0,03–0,05, у DeepSeek — около
-# 0,25, и общий порог годился бы только одному.
-
 
 class TavilyEngine:
     """Tavily: обычный поиск стоит 1 кредит, углублённый — 2; бесплатно 1000 в месяц."""
 
     name = "tavily"
+    # Шкала от 0 до 1; по замеру страницы по теме получают 0,75–0,85, мусор — 0,03–0,05.
+    # Обе опорные точки совпадают с общими, так что пересчёт оценку не меняет.
+    SCALE = (0.3, 0.8)
 
     def __init__(self, api_key: str, *, depth: str = "basic", client=None,
                  excluded: Sequence[str] = EXCLUDED_DOMAINS) -> None:
@@ -107,8 +138,10 @@ class TavilyEngine:
         results = response.json().get("results") or []
         return [Hit(title=str(item.get("title") or ""), url=str(item.get("url") or ""),
                     content=str(item.get("content") or ""),
-                    score=float(item["score"]) if item.get("score") is not None else None,
-                    engine=self.name)
+                    score=(normalize(item["score"], *self.SCALE)
+                           if item.get("score") is not None else None),
+                    engine=self.name,
+                    raw_score=float(item["score"]) if item.get("score") is not None else None)
                 for item in results if item.get("url")]
 
 
@@ -117,15 +150,17 @@ class DeepSeekEngine:
 
     Замер 2026-11-24 (шесть запросов об играх): ответ за секунду; оценка `rerank_score` от
     0 до 3 у страниц по теме — 1,4–1,96, у запроса о выдуманном существе — 0,56–0,86.
-    Провайдер считает качественными результаты от 1,5; этот порог и взят. Без указания
+    Провайдер считает качественными результаты от 1,5; эта оценка и названа границей
+    приемлемого при пересчёте на общую шкалу. Без указания
     языка в выдачу попадают китайские и японские страницы, поэтому к запросу латиницей
     добавляется оператор `lang:en`. Одна площадка с автоматически собранными ответами
     занимала первые три места из шести — берётся не больше одной страницы с сайта.
     """
 
     name = "deepseek"
-    # 1,5 из 3 по шкале провайдера.
-    min_score = 0.5
+    # Шкала от 0 до 3: приемлемое — от 1,5 (граница провайдера), типичная страница по теме
+    # на замере — около 1,9.
+    SCALE = (1.5, 1.9)
     MAX_QUERY = 128          # предел длины запроса у API
     FETCHED = 10             # запрашивается с запасом: часть результатов отсеивается здесь
     # Площадки с автоматически собранными ответами. На замере ncesc.com стоял первым
@@ -181,9 +216,11 @@ class DeepSeekEngine:
             # Выжимка длиннее и написана для модели; короткий фрагмент — запасной вариант.
             hit = Hit(title=str(item.get("title") or ""), url=url,
                       content=str(item.get("summary") or item.get("snippet") or ""),
-                      score=(max(0.0, min(1.0, float(item["rerank_score"]) / 3.0))
+                      score=(normalize(item["rerank_score"], *self.SCALE)
                              if item.get("rerank_score") is not None else None),
-                      engine=self.name)
+                      engine=self.name,
+                      raw_score=(float(item["rerank_score"])
+                                 if item.get("rerank_score") is not None else None))
             if hit.site in sites:
                 continue
             sites.add(hit.site)

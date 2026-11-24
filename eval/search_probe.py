@@ -81,6 +81,8 @@ def run(model_key: str | None, engines: list[str] | None = None) -> str:
             "ok": ok,
             "query": search.get("query", "—"), "engine": search.get("engine") or "—",
             "sources": ", ".join(search.get("sources") or []) or "—",
+            "scores": ", ".join(f"{score:.2f}" for score in search.get("scores") or []) or "—",
+            "rejected": search.get("rejected", 0),
             "search_ms": search.get("elapsed_ms", 0), "total_ms": round((finished - started) * 1000),
             "route_ms": round((routed - started) * 1000), "reply": reply.text, "by": reply.source,
         })
@@ -104,7 +106,8 @@ def run(model_key: str | None, engines: list[str] | None = None) -> str:
     for row in rows:
         lines += [f"**{row['game']}: {row['utterance']}**", "",
                   f"- поисковый запрос: `{row['query']}`, движок: {row['engine']}, "
-                  f"поиск {row['search_ms']} мс",
+                  f"поиск {row['search_ms']} мс; релевантность принятых страниц на общей "
+                  f"шкале: {row['scores']}; отброшено по порогу: {row['rejected']}",
                   f"- ответ ({row['by']}): {row['reply']}", ""]
     return "\n".join(lines) + "\n"
 

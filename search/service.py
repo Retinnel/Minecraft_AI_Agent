@@ -19,11 +19,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from search.engines import Engine, Hit, SearchUnavailable, default_engines
+from search.engines import ACCEPTABLE, Engine, Hit, SearchUnavailable, default_engines
 
-# Порог релевантности для движков, которые её оценивают (см. замер выше). Движок может
-# задать свой порог свойством `min_score`: шкалы оценок у движков разные.
-MIN_SCORE = 0.3
+# Порог релевантности для движков, которые её оценивают (см. замер выше). Он один на всех:
+# каждый движок сам приводит свою оценку к общей шкале (search.engines.normalize).
+MIN_SCORE = ACCEPTABLE
 
 # Сколько фрагментов отдаётся модели и какой длины. Ответ игроку — несколько фраз, а запрос к
 # модели должен оставаться коротким: длинный контекст ухудшает ответ слабой модели.
@@ -124,12 +124,11 @@ class WebSearch:
             except SearchUnavailable as error:
                 answer.errors.append(str(error))
                 continue
-            threshold = getattr(engine, "min_score", None)
-            accepted = [hit for hit in hits if self._relevant(hit, full, threshold)]
+            accepted = [hit for hit in hits if self._relevant(hit, full)]
             answer.rejected += len(hits) - len(accepted)
             if accepted:
                 answer.hits = [Hit(title=hit.title, url=hit.url, content=clean_passage(hit.content),
-                                   score=hit.score, engine=hit.engine)
+                                   score=hit.score, engine=hit.engine, raw_score=hit.raw_score)
                                for hit in accepted[:MAX_SOURCES]]
                 answer.engine = engine.name
                 break
@@ -141,11 +140,11 @@ class WebSearch:
         return answer
 
     @staticmethod
-    def _relevant(hit: Hit, query: str, threshold: Optional[float] = None) -> bool:
+    def _relevant(hit: Hit, query: str) -> bool:
         if not hit.content.strip():
             return False
         if hit.score is not None:
-            return hit.score >= (MIN_SCORE if threshold is None else threshold)
+            return hit.score >= MIN_SCORE
         return _mentions_query(hit, query)
 
 

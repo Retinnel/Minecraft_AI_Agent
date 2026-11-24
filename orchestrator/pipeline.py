@@ -654,6 +654,9 @@ class Pipeline:
         answer = self.search.search(query, game=game)
         stages["search"] = {"query": answer.query, "engine": answer.engine,
                             "sources": [hit.site for hit in answer.hits],
+                            # Релевантность принятых страниц на общей шкале движков.
+                            "scores": [round(hit.score, 2) for hit in answer.hits
+                                       if hit.score is not None],
                             "rejected": answer.rejected, "errors": list(answer.errors),
                             "elapsed_ms": round(answer.elapsed_ms), "cached": answer.cached,
                             "game": game}

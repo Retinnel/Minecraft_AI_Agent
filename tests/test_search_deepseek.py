@@ -13,8 +13,8 @@ from unittest.mock import patch
 import httpx
 
 from api import keys
-from search.engines import (DeepSeekEngine, DuckDuckGoEngine, Hit, SearchUnavailable,
-                            TavilyEngine, default_engines)
+from search.engines import (ACCEPTABLE, GOOD, DeepSeekEngine, DuckDuckGoEngine, Hit,
+                            SearchUnavailable, TavilyEngine, default_engines, normalize)
 from search.service import WebSearch
 
 
@@ -39,7 +39,9 @@ class DeepSeekEngineTests(unittest.TestCase):
         hits = DeepSeekEngine("key", client=client([result(1.92)], seen=seen)).search("Margit")
         self.assertEqual(hits[0].site, "polygon.com")
         self.assertEqual(hits[0].content, "Margit is weak to bleed.")     # выжимка, не сниппет
-        self.assertAlmostEqual(hits[0].score, 0.64)
+        self.assertAlmostEqual(hits[0].score, normalize(1.92, *DeepSeekEngine.SCALE))
+        self.assertAlmostEqual(hits[0].score, 0.825)
+        self.assertEqual(hits[0].raw_score, 1.92)                         # исходная оценка — для журнала
         self.assertEqual(hits[0].engine, "deepseek")
         self.assertEqual(seen[0]["auth"], "Bearer key")
         self.assertTrue(seen[0]["url"].endswith("/v1/tools/search"))
@@ -79,16 +81,64 @@ class DeepSeekEngineTests(unittest.TestCase):
             DeepSeekEngine("")
 
 
+class NormalizationTests(unittest.TestCase):
+    """Оценки движков приводятся к общей шкале, и порог на ней один."""
+
+    def test_both_anchor_points_of_an_engine_land_on_the_common_ones(self):
+        for engine in (TavilyEngine, DeepSeekEngine):
+            acceptable, good = engine.SCALE
+            with self.subTest(engine=engine.name):
+                self.assertAlmostEqual(normalize(acceptable, *engine.SCALE), ACCEPTABLE)
+                self.assertAlmostEqual(normalize(good, *engine.SCALE), GOOD)
+
+    def test_values_stay_within_the_scale(self):
+        scale = DeepSeekEngine.SCALE
+        self.assertEqual(normalize(0.0, *scale), 0.0)
+        self.assertEqual(normalize(-1.0, *scale), 0.0)
+        self.assertEqual(normalize(3.0, *scale), 1.0)        # верх шкалы движка
+        self.assertEqual(normalize(7.0, *scale), 1.0)
+
+    def test_order_is_preserved(self):
+        raws = [0.2, 0.86, 1.46, 1.5, 1.6, 1.75, 1.92, 2.9]
+        scores = [normalize(raw, *DeepSeekEngine.SCALE) for raw in raws]
+        self.assertEqual(scores, sorted(scores))
+        self.assertLess(normalize(1.46, *DeepSeekEngine.SCALE), ACCEPTABLE)   # чуть ниже границы
+        self.assertGreater(normalize(1.6, *DeepSeekEngine.SCALE), ACCEPTABLE)
+
+    def test_good_pages_of_both_engines_get_similar_scores(self):
+        """Ради этого и нужна вторая опорная точка: одинаковые числа значат одно и то же."""
+        tavily = [normalize(raw, *TavilyEngine.SCALE) for raw in (0.75, 0.80, 0.85)]
+        deepseek = [normalize(raw, *DeepSeekEngine.SCALE) for raw in (1.85, 1.90, 1.95)]
+        for ours, theirs in zip(deepseek, tavily):
+            self.assertAlmostEqual(ours, theirs, delta=0.1)
+        # Мусор у обоих остаётся далеко под границей.
+        self.assertLess(normalize(0.05, *TavilyEngine.SCALE), 0.1)
+        self.assertLess(normalize(0.86, *DeepSeekEngine.SCALE), 0.2)
+
+    def test_tavily_scale_already_matches_the_common_one(self):
+        for raw in (0.04, 0.3, 0.55, 0.84, 1.0):
+            self.assertAlmostEqual(normalize(raw, *TavilyEngine.SCALE), raw)
+
+    def test_tavily_hits_carry_both_scores(self):
+        def handler(request):
+            return httpx.Response(200, json={"results": [
+                {"title": "t", "url": "https://minecraft.wiki/w", "content": "c", "score": 0.84}]})
+        hits = TavilyEngine("key", client=httpx.Client(
+            transport=httpx.MockTransport(handler))).search("q")
+        self.assertAlmostEqual(hits[0].score, 0.84)
+        self.assertEqual(hits[0].raw_score, 0.84)
+
+
 class EngineThresholdTests(unittest.TestCase):
-    """У каждого движка своя шкала оценок: общий порог годился бы только одному."""
+    """Порог один, а отсекает он у каждого движка то, что этот движок считает слабым."""
 
     def engine(self, scores):
         return DeepSeekEngine("key", client=client(
             [result(score, url=f"https://site{index}.com/x") for index, score in enumerate(scores)]))
 
-    def test_engine_threshold_drops_what_the_common_one_would_keep(self):
-        # 0,86 из 3 — запрос о выдуманном существе на замере; по общему порогу 0,3 от
-        # единицы такая страница почти проходила бы (0,29), по порогу движка — нет.
+    def test_weak_pages_of_this_engine_are_dropped(self):
+        # 0,86 из 3 — запрос о выдуманном существе на замере. Простое деление на три дало
+        # бы 0,29 — у самого порога; пересчёт от границы движка даёт 0,17.
         answer = WebSearch([self.engine([0.86, 0.72])]).search("pink unicorn")
         self.assertFalse(answer.found)
         self.assertEqual(answer.rejected, 2)
@@ -98,7 +148,7 @@ class EngineThresholdTests(unittest.TestCase):
         self.assertEqual(len(answer.hits), 2)
         self.assertEqual(answer.engine, "deepseek")
 
-    def test_engine_without_its_own_threshold_uses_the_common_one(self):
+    def test_engine_with_scores_on_the_common_scale_needs_no_scale_of_its_own(self):
         class Plain:
             name = "plain"
 
