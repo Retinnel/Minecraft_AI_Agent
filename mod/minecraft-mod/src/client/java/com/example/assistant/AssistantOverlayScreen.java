@@ -646,9 +646,66 @@ public class AssistantOverlayScreen extends Screen {
         java.util.List<String> lines = new java.util.ArrayList<>();
         String text = showWhy ? runtime.getLastPlanAlternatives() : runtime.getLastPlanTree();
         if (text != null && !text.isBlank()) {
-            lines.addAll(java.util.Arrays.asList(text.split("\\r?\\n")));
+            int maxWidth = panelWidth() - 30;
+            for (String raw : text.split("\\r?\\n")) {
+                lines.addAll(fitLine(showWhy ? raw : narrowIndent(raw), maxWidth));
+            }
         }
         return lines;
+    }
+
+    /**
+     * Отступ уровня дерева — два знака вместо четырёх: сервер рисует дерево для
+     * моноширинной страницы, а в узкой панели игры глубокие шаги уходили за край.
+     */
+    private static String narrowIndent(String line) {
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (at + 4 <= line.length()) {
+            String unit = line.substring(at, at + 4);
+            if (unit.equals("    ")) {
+                out.append("  ");
+            } else if (unit.equals("│   ")) {
+                out.append("│ ");
+            } else if (unit.equals("├── ")) {
+                out.append("├─ ");
+            } else if (unit.equals("└── ")) {
+                out.append("└─ ");
+            } else {
+                break;
+            }
+            at += 4;
+        }
+        return out + line.substring(at);
+    }
+
+    /** Строка шире панели переносится по словам; продолжение стоит под текстом шага. */
+    private java.util.List<String> fitLine(String line, int maxWidth) {
+        java.util.List<String> rows = new java.util.ArrayList<>();
+        if (font.width(line) <= maxWidth) {
+            rows.add(line);
+            return rows;
+        }
+        int textStart = 0;
+        while (textStart < line.length() && " │├└─".indexOf(line.charAt(textStart)) >= 0) {
+            textStart++;
+        }
+        String head = line.substring(0, textStart);
+        String continuation = head.replace('├', '│').replace('└', ' ').replace('─', ' ') + "   ";
+        StringBuilder current = new StringBuilder(head);
+        boolean empty = true;
+        for (String word : line.substring(textStart).split(" ")) {
+            String piece = empty ? word : " " + word;
+            if (!empty && font.width(current + piece) > maxWidth) {
+                rows.add(current.toString());
+                current = new StringBuilder(continuation).append(word);
+            } else {
+                current.append(piece);
+            }
+            empty = false;
+        }
+        rows.add(current.toString());
+        return rows;
     }
 
     private void renderPlanTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
@@ -685,9 +742,13 @@ public class AssistantOverlayScreen extends Screen {
         }
 
         if (!showWhy && summary != null && !summary.isBlank()) {
-            graphics.drawString(font, font.plainSubstrByWidth("§7" + summary, maxWidth), textLeft, y,
-                    COLOR_MUTED);
-            y += font.lineHeight + 4;
+            // Сводка переносится на вторую строку, а не обрезается: в ней число шагов.
+            java.util.List<String> summaryRows = fitLine(summary, maxWidth);
+            for (int i = 0; i < summaryRows.size() && i < 2; i++) {
+                graphics.drawString(font, summaryRows.get(i), textLeft, y, COLOR_MUTED);
+                y += font.lineHeight + 1;
+            }
+            y += 3;
         }
 
         int visible = Math.max(1, (bottom - y) / (font.lineHeight + 1));
