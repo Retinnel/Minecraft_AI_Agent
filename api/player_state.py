@@ -43,6 +43,36 @@ def reset_player_state() -> None:
     _player_state["last_death"] = None
 
 
+def progress_snapshot() -> Dict[str, Any]:
+    """То, что нельзя восстановить из игры: счётчики убийств и последняя гибель.
+
+    Инвентарь сюда не входит — мод присылает его заново при входе в мир.
+    """
+    return {
+        "kill_counts": dict(_player_state["kill_counts"]),
+        "recent_kills": list(_player_state["recent_kills"]),
+        "last_kill_at": _player_state["last_kill_at"],
+        "last_death": deepcopy(_player_state["last_death"]),
+    }
+
+
+def restore_progress(saved: Any) -> None:
+    """Возвращает счётчики мира после перезапуска; от них считается прогресс заданий."""
+    if not isinstance(saved, dict):
+        return
+    counts = saved.get("kill_counts")
+    if isinstance(counts, dict):
+        _player_state["kill_counts"] = {
+            str(key): int(value) for key, value in counts.items() if isinstance(value, (int, float))}
+    kills = saved.get("recent_kills")
+    if isinstance(kills, list):
+        _player_state["recent_kills"] = [kill for kill in kills if isinstance(kill, dict)][-MAX_RECENT_KILLS:]
+    if isinstance(saved.get("last_kill_at"), str):
+        _player_state["last_kill_at"] = saved["last_kill_at"]
+    if isinstance(saved.get("last_death"), dict):
+        _player_state["last_death"] = deepcopy(saved["last_death"])
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 

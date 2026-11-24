@@ -14,6 +14,7 @@ from api import wiki
 from api import compare
 from api import tree
 from api import voice
+from api import worlds
 from api import vision
 from api.llm_config_manager import get_llm_config
 
@@ -47,6 +48,18 @@ app.include_router(compare.router)
 app.include_router(tree.router)
 app.include_router(voice.router)
 app.include_router(vision.router)
+app.include_router(worlds.router)
+
+
+@app.on_event("startup")
+async def restore_world():
+    """Возвращает мир прошлого запуска: разговор продолжается с того же места."""
+    worlds.restore()
+
+
+@app.on_event("shutdown")
+async def save_world():
+    worlds.save()
 
 # Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")

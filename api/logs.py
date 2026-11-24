@@ -49,6 +49,10 @@ async def add_log(entry: LogEntry):
     logs_db.append(entry)
     apply_log_to_player_state(entry)
     refresh_challenge_progress()
+    if entry.event_type in ("mob_kill", "death"):
+        # Счётчики убийств и последняя гибель из игры не восстанавливаются.
+        from api import worlds
+        worlds.save_player()
     if len(logs_db) > 10000:  # Ограничение
         logs_db.pop(0)
     return {"status": "added"}

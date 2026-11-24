@@ -153,6 +153,60 @@ class Session:
         self.persona = persona
         self.game = game
 
+    # --- сохранение между запусками ---
+
+    def to_dict(self) -> Dict[str, object]:
+        """Всё, что нужно, чтобы продолжить разговор после перезапуска.
+
+        Неотвеченный уточняющий вопрос не сохраняется: он живёт одну реплику, и игрок,
+        вернувшийся в мир на следующий день, отвечает уже не на него.
+        """
+        return {
+            "mode": self.mode, "persona": self.persona, "game": self.game,
+            "window": [list(pair) for pair in self._window],
+            "given": dict(self.given), "removed": dict(self.removed),
+            "summoned": dict(self.summoned),
+            "asked_about": list(self.asked_about), "refused": list(self.refused),
+            "quests": list(self.quests), "campaign": self.campaign,
+            "last_exchange": self.last_exchange,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, object]) -> "Session":
+        """Сессия из сохранённого; повреждённые или чужие поля отбрасываются молча —
+        разговор в худшем случае начнётся заново, а не упадёт."""
+        session = cls()
+        if not isinstance(data, dict):
+            return session
+        session.set_mode(str(data.get("mode") or CREATIVE))
+        session.persona = data.get("persona") if isinstance(data.get("persona"), str) else None
+        if isinstance(data.get("game"), str):
+            session.set_game(data["game"])
+        for pair in data.get("window") or []:
+            if (isinstance(pair, (list, tuple)) and len(pair) == 2
+                    and pair[0] in ("user", "assistant") and isinstance(pair[1], str)):
+                session._window.append((pair[0], pair[1]))
+        for name in ("given", "removed", "summoned"):
+            counts = data.get(name)
+            if isinstance(counts, dict):
+                getattr(session, name).update(
+                    {str(key): int(value) for key, value in counts.items()
+                     if isinstance(value, (int, float))})
+        for name in ("asked_about", "refused", "quests"):
+            facts = data.get(name)
+            if isinstance(facts, list):
+                getattr(session, name).extend(str(fact) for fact in facts[-SUMMARY_LIMIT:])
+        session.campaign = data.get("campaign") if isinstance(data.get("campaign"), str) else None
+        session.last_exchange = (data.get("last_exchange")
+                                 if isinstance(data.get("last_exchange"), str) else None)
+        return session
+
+
+def replace(session: Session) -> None:
+    """Подменяет сеанс процесса: при входе в другой мир разговор продолжается с его места."""
+    global _session
+    _session = session
+
 
 _session: Optional[Session] = None
 

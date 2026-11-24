@@ -129,6 +129,9 @@ async def _store_chat_result(result: GroqAdvice, player_message: str, *, add_use
         _append_conversation_message("user", player_message)
     _append_conversation_message("assistant", _response_text_for_conversation(result))
     entry = _add_to_history(result.model_dump(), player_message=player_message)
+    # История мира и сессия после реплики — на диск: перезапуск разговор не обрывает.
+    from api import worlds
+    worlds.record_exchange(player_message if add_user else None, result.model_dump())
     await _broadcast_response(entry)
     return result
 
@@ -825,6 +828,8 @@ async def get_rp_response() -> GroqAdvice:
                 _last_rp_response_time = time.time()
                 _last_rp_response = current_response
                 entry = _add_to_history(current_response)
+                from api import worlds
+                worlds.record_proactive(current_response)
                 await _broadcast_response(entry)
                 return GroqAdvice(**current_response)
             elif _last_rp_response:
@@ -908,6 +913,13 @@ def _assistant_narrator():
         from orchestrator.narrator import Narrator
         _assistant_narrator_instance = Narrator()
     return _assistant_narrator_instance
+
+
+def _world_brief() -> Optional[Dict[str, Any]]:
+    """Текущий мир и размер его истории — для оверлея и страницы чата."""
+    from api import worlds
+    state = worlds.snapshot(0)
+    return dict(state["world"], messages=state["messages"]) if state["world"] else None
 
 
 def _assistant_session():
@@ -1322,6 +1334,8 @@ async def set_assistant_game(payload: Dict[str, Any]) -> Dict[str, Any]:
         name = DEFAULT_GAME
     if not session.set_game(name):
         return {"ok": False, "error": "Название игры пустое или слишком длинное.", "game": session.game}
+    from api import worlds
+    worlds.save()
     return {"ok": True, "game": session.game, "knowledge_base": session.is_default_game}
 
 
@@ -1337,6 +1351,8 @@ async def set_assistant_mode(payload: Dict[str, Any]) -> Dict[str, Any]:
     session = _assistant_session()
     if not session.set_mode(str(payload.get("mode") or "")):
         return {"ok": False, "error": "Режим должен быть creative или survival.", "mode": session.mode}
+    from api import worlds
+    worlds.save()
     return {"ok": True, "mode": session.mode, "label": session.mode_label}
 
 
@@ -1560,6 +1576,7 @@ async def get_compact_status() -> Dict[str, Any]:
         "campaign": campaign_brief,
         "progression": _progress_brief(),
         "assistant_mode": _assistant_session().mode,
+        "world": _world_brief(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
