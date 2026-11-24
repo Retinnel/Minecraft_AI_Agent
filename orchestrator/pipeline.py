@@ -29,8 +29,9 @@ from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
 from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
-from solver.worldfacts import (AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS, WorldAnswer,
-                               WorldFacts, essentials as world_essentials, render_answer)
+from solver.worldfacts import (ABOUT, AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS,
+                               WorldAnswer, WorldFacts, essentials as world_essentials,
+                               render_answer)
 
 NONE = "none"
 PLAN_GOAL = "plan_goal"
@@ -296,6 +297,16 @@ class Pipeline:
                 query=proposal.target,
                 reason="Убрать это из инвентаря? Если да, скажи прямо: «убери …».",
                 explanation=["удаление предложено моделью, но в реплике нет просьбы что-либо убрать"],
+                stages=stages,
+            )
+
+        # «Что это?» без названия и без сведений об экране: гадать не о чем.
+        if proposal.action == ABOUT and not str(proposal.target or "").strip():
+            return Turn(
+                outcome=CLARIFY, action=ABOUT, game=game,
+                reason="Не вижу, на что ты смотришь. Назови предмет, блок или существо — "
+                       "расскажу, что это.",
+                explanation=["вопрос «что это» без названия: сведений об экране нет"],
                 stages=stages,
             )
 
@@ -617,6 +628,8 @@ class Pipeline:
             answer = self._world.uses(thing)
         elif action == SOURCES:
             answer = self._world.sources(thing)
+        elif action == ABOUT:
+            answer = self._world.about(thing)
         else:
             answer = self._world.drops(thing)
         stages["world"] = {"question": answer.question, "subject": thing,

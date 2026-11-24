@@ -43,6 +43,7 @@ KINDS_FOR_ACTION = {
     "ask_uses": ("item", "block"),
     "ask_sources": ("item", "block"),
     "ask_drops": ("creature", "block"),
+    "ask_about": ("item", "block", "creature"),
 }
 
 RESOLVED = "resolved"

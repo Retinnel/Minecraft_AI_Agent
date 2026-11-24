@@ -6,7 +6,8 @@
     uses        что делается из предмета — рецепты, где он входит в состав;
     sources     откуда предмет берётся — из каких блоков и существ, каким инструментом и где;
     drops       что выпадает из блока или существа;
-    available   что собирается прямо сейчас из инвентаря одним действием.
+    available   что собирается прямо сейчас из инвентаря одним действием;
+    about       что это такое — вид, из чего делается или откуда берётся, на что идёт.
 
 Ответ целиком берётся из базы знаний: языковая модель определяет только вид вопроса и
 пересказывает найденное, а назвать предмет, которого в ответе нет, ей не даёт сверка
@@ -20,16 +21,21 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from kb.graph import KnowledgeBase, Recipe, Source
 from solver.planner import STATION_ITEMS, UNNATURAL, Planner
-from solver.render import REMOTE_RU, TIER_RU, TOOL_KIND_RU
+from solver.render import REMOTE_RU, STATION_RU, TIER_RU, TOOL_KIND_RU
 
 USES = "ask_uses"
 SOURCES = "ask_sources"
 DROPS = "ask_drops"
 AVAILABLE = "ask_available"
-WORLD_ACTIONS = (USES, SOURCES, DROPS, AVAILABLE)
+ABOUT = "ask_about"
+WORLD_ACTIONS = (USES, SOURCES, DROPS, AVAILABLE, ABOUT)
 
 # Сколько названий перечислять: ответ читается в строке чата.
 MAX_LISTED = 6
+# В карточке «что это» разделов несколько, поэтому в каждом названий меньше.
+MAX_ABOUT = 3
+
+KIND_RU = {"creature": "существо", "block": "блок", "item": "предмет"}
 
 
 @dataclass
@@ -42,6 +48,16 @@ class WorldAnswer:
     craftable: bool = False             # sources: у предмета есть рецепт
     notes: Dict[str, str] = field(default_factory=dict)  # пояснение к названному: инструмент, место
     explanation: List[str] = field(default_factory=list)
+    # Только для карточки «что это».
+    kind: Optional[str] = None                           # creature | block | item
+    made_of: List[Tuple[str, int]] = field(default_factory=list)   # состав первого рецепта
+    station: Optional[str] = None                        # где изготавливается
+    station_for: int = 0                                 # для скольких предметов служит оборудованием
+    uses: List[str] = field(default_factory=list)        # во что входит
+    uses_total: int = 0
+    drops: List[str] = field(default_factory=list)       # что выпадает
+    in_world: bool = False                               # встречается в мире сама по себе
+    world_note: str = ""                                 # чем добывается и где
 
     @property
     def empty(self) -> bool:
@@ -147,6 +163,58 @@ class WorldFacts:
             f"ненадёжно: {len(found) - len(reliable) - (1 if (thing, False) in found else 0)}")
         return answer
 
+    # --- что это такое ---
+
+    def about(self, thing: str) -> WorldAnswer:
+        """Карточка сущности: вид, происхождение, назначение — всё из базы знаний."""
+        kinds = self.kb.kinds(thing)
+        # Снаряд (брошенный жемчуг) числится в игре и предметом, и существом: это предмет.
+        kind = next((name for name in ("block", "item", "creature") if name in kinds), None)
+        answer = WorldAnswer(ABOUT, subject=thing, kind=kind)
+
+        # Сначала — откуда берётся в мире: алмаз формально «выплавляется из алмазной руды»,
+        # но игроку важно, что его добывают. Источник с тем же названием, что у самой
+        # сущности, — это она же, стоящая в мире (руда, посев): его называть незачем.
+        origin = self.sources(thing) if kind != "creature" else WorldAnswer(SOURCES)
+        own = self._label(thing)
+        natural = [source for source in origin.items if self._label(source) != own]
+        itself = [source for source in origin.items if self._label(source) == own]
+        mined = set(origin.items) | set(origin.rare)
+        recipes = [recipe for recipe in self._real_recipes(thing)
+                   if not (len(recipe.inputs) == 1 and mined & set(recipe.inputs[0].alternatives))]
+        answer.in_world = bool(itself)
+        answer.world_note = origin.notes.get(itself[0], "") if itself else ""
+        answer.notes = origin.notes
+        if recipes:
+            recipe = min(recipes, key=lambda found: self.planner._recipe_cost(found, frozenset()))
+            answer.station = recipe.station
+            # Из взаимозаменяемых вариантов называется самый доступный: печь делается и из
+            # чернита, но игроку полезнее услышать про булыжник.
+            answer.made_of = [
+                (min(ingredient.alternatives,
+                     key=lambda item: (self.planner._item_cost(item), item)), ingredient.quantity)
+                for ingredient in recipe.inputs if ingredient.alternatives][:MAX_ABOUT + 1]
+        elif natural:
+            answer.items = natural[:MAX_ABOUT]
+        elif not itself:
+            answer.rare = origin.rare[:MAX_ABOUT]
+
+        answer.station_for = len({
+            recipe.produces for found in self.kb.index_recipes().values() for recipe in found
+            if STATION_ITEMS.get(recipe.station) == thing})
+
+        used = self.uses(thing)
+        answer.uses, answer.uses_total = used.items[:MAX_ABOUT], used.total
+
+        dropped = self.drops(thing)
+        answer.drops = (dropped.items + dropped.rare)[:MAX_ABOUT + 1]
+
+        answer.explanation.append(
+            f"«{self._label(thing)}»: вид — {KIND_RU.get(kind or '', 'не указан')}, рецептов "
+            f"{len(recipes)}, входит в рецепты {used.total} предметов, оборудование для "
+            f"{answer.station_for}")
+        return answer
+
     # --- что собирается прямо сейчас ---
 
     def available(self, inventory: Optional[Dict[str, int]] = None) -> WorldAnswer:
@@ -208,6 +276,31 @@ def render_answer(answer: WorldAnswer, kb: KnowledgeBase) -> str:
     more = answer.total - len(answer.items)
     tail = f" и ещё {more}" if more > 0 else ""
 
+    if answer.question == ABOUT:
+        kind = KIND_RU.get(answer.kind or "")
+        parts = [f"{_cap(subject)} — {kind}." if kind else f"{_cap(subject)}."]
+        if answer.in_world:
+            parts.append(f"Встречается в мире, добывается: {answer.world_note}."
+                         if answer.world_note else "Встречается в мире.")
+        if answer.made_of:
+            where = STATION_RU.get(answer.station or "", "")
+            made = ", ".join(f"{name(item)} ×{count}" for item, count in answer.made_of)
+            parts.append(f"Изготавливается {where}: {made}.".replace("  ", " "))
+        elif answer.items:
+            parts.append(f"Источники: {listed(answer.items, notes=True)}.")
+        elif answer.rare:
+            parts.append(f"Источники (выпадает не каждый раз): {listed(answer.rare, notes=True)}.")
+        if answer.station_for:
+            parts.append(f"Служит оборудованием для изготовления предметов: {answer.station_for}.")
+        if answer.uses:
+            parts.append(f"Входит в рецепты предметов ({answer.uses_total}), например: "
+                         f"{listed(answer.uses)}.")
+        if answer.drops:
+            parts.append(f"Выпадает: {listed(answer.drops)}.")
+        if len(parts) == 1:
+            parts.append("Рецептов и источников добычи для него в базе знаний нет.")
+        return " ".join(parts)
+
     if answer.question == USES:
         if not answer.items:
             return f"{_cap(subject)} ни в один рецепт не входит."
@@ -254,4 +347,6 @@ def _cap(text: str) -> str:
 
 def essentials(answer: WorldAnswer, kb: KnowledgeBase) -> List[str]:
     """Названия, которые пересказ обязан сохранить: всё перечисленное в ответе."""
-    return [kb.label(thing) or thing for thing in answer.items + answer.rare]
+    named = (answer.items + answer.rare + [item for item, _ in answer.made_of]
+             + answer.uses + answer.drops)
+    return [kb.label(thing) or thing for thing in dict.fromkeys(named)]

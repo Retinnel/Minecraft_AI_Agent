@@ -13,8 +13,8 @@ from orchestrator import Pipeline, Proposal
 from orchestrator.extractor import ACTION_HINTS, build_prompt
 from orchestrator.responder import MODEL, TEMPLATE, Responder
 from solver.validator import ACT, CLARIFY, REJECT, SURVIVAL
-from solver.worldfacts import (AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS, WorldFacts,
-                               render_answer)
+from solver.worldfacts import (ABOUT, AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS,
+                               WorldFacts, render_answer)
 
 KB_PATH = Path(__file__).resolve().parent.parent / "data" / "kb" / "game.ttl"
 
@@ -96,11 +96,53 @@ class WorldFactsTests(unittest.TestCase):
         self.assertNotIn(mc("iron_pickaxe"), short.items)
 
 
+    # --- что это такое ---
+
+    def about(self, name):
+        return render_answer(self.facts.about(mc(name)), self.kb)
+
+    def test_about_a_crafted_block_names_recipe_and_role(self):
+        text = self.about("furnace")
+        self.assertIn("Печь — блок", text)
+        self.assertIn("на верстаке: булыжник ×8", text)      # самый доступный вариант состава
+        self.assertIn("Служит оборудованием", text)
+        self.assertIn("коптильня", text)
+
+    def test_about_a_mined_item_names_the_ore_not_the_smelting(self):
+        """Алмаз формально выплавляется из алмазной руды — игроку важно, что его добывают."""
+        text = self.about("diamond")
+        self.assertIn("Источники: алмазная руда (железная кирка и выше)", text)
+        self.assertNotIn("Изготавливается", text)
+
+    def test_about_an_ore_does_not_name_itself_as_its_source(self):
+        text = self.about("iron_ore")
+        self.assertIn("Встречается в мире, добывается: каменная кирка и выше", text)
+        self.assertNotIn("Источники: железная руда", text)
+        self.assertIn("рудное железо", text)
+
+    def test_about_a_creature_names_its_drops(self):
+        text = self.about("creeper")
+        self.assertIn("Крипер — существо", text)
+        self.assertIn("порох", text)
+
+    def test_about_something_bare_says_so(self):
+        self.assertIn("в базе знаний нет", self.about("ender_dragon"))
+
+
 @unittest.skipUnless(KB_PATH.exists(), "база знаний не собрана: запусти kb.build")
 class WorldPipelineTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.kb = KnowledgeBase.load(KB_PATH)
+
+    def test_what_is_this_is_answered_for_item_block_and_creature(self):
+        for said, thing in (("наковальня", "anvil"), ("крипер", "creeper"), ("алмаз", "diamond")):
+            with self.subTest(said=said):
+                turn = self.ask(ABOUT, said)
+                self.assertEqual(turn.outcome, ACT)
+                self.assertEqual(turn.target, mc(thing))
+                self.assertIsNone(turn.command)
+        self.assertEqual(self.ask(ABOUT, None).outcome, CLARIFY)
 
     def ask(self, action, target=None, **kwargs):
         return Pipeline(Scripted(action, target), self.kb).handle("…", **kwargs)
