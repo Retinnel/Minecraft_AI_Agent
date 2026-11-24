@@ -5,8 +5,9 @@
 снимает страницу целиком при масштабе 1,5. Модель отвечает по-настоящему, поэтому тексты
 ответов от снимка к снимку различаются; снимок поиска тратит один кредит Tavily.
 
-Сервер должен быть запущен. После съёмки сессия возвращается в исходное состояние:
-творческий режим, Minecraft, пустой инвентарь, кампании нет.
+Сервер должен быть запущен. Каждый снимок делается в собственном мире (api/worlds.py),
+чтобы разговор для снимка не попал в историю настоящего мира; после съёмки сервер
+возвращается в прежний мир, а миры съёмки удаляются.
 
     .venv/Scripts/python.exe scripts/shoot_pages.py                 # все снимки
     .venv/Scripts/python.exe scripts/shoot_pages.py search tree     # выборочно
@@ -106,25 +107,33 @@ class Page:
         return target
 
 
-async def reset(page: Page) -> None:
-    """Исходное состояние сессии и пустой журнал страницы чата."""
-    await page.open("/chat")
+SHOT_WORLDS: list[str] = []
+
+
+async def reset(page: Page, name: str = "") -> None:
+    """Новый мир для снимка, исходное состояние сессии и пустой журнал страницы чата."""
+    world = f"report-shot:{name}:{int(time.time())}"
+    SHOT_WORLDS.append(world)
+    await page.open("/chat?fresh")
     await page.js("""(async () => {
         const post = (url, body) => fetch(url, {method: "POST",
             headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+        await post("/api/worlds/enter", {id: "WORLD_ID", name: "Снимки для записки"});
         await post("/api/rp/mode", {mode: "creative"});
         await post("/api/rp/game", {game: "Minecraft"});
         await post("/api/campaign/cancel", {});
         inventory = {};
         await sendInventory();
         for (let i = 0; i < 5; i++) await fetch("/api/rp/");   // накопленные объявления
-    })()""")
+    })()""".replace("WORLD_ID", world))
     await page.ask("персонаж: кузнец")
-    await page.open("/chat")        # журнал реплик живёт в странице: перезагрузка его очищает
+    # Журнал реплик живёт в странице: перезагрузка его очищает; «?fresh» не даёт странице
+    # вернуть сохранённый разговор мира.
+    await page.open("/chat?fresh")
 
 
 async def chat(page: Page) -> None:
-    await reset(page)
+    await reset(page, "chat")
     for text in ["мне бы 10 наковален", "дай меч", "алмазный", "призови дракона края",
                  "как сделать алмазную кирку"]:
         await page.ask(text)
@@ -132,7 +141,7 @@ async def chat(page: Page) -> None:
 
 
 async def events(page: Page) -> None:
-    await reset(page)
+    await reset(page, "events")
     await page.ask("режим выживания")
     await page.ask("веди меня к каменной кирке")
     await asyncio.sleep(6)                     # объявление первого этапа приходит опросом
@@ -149,7 +158,7 @@ async def events(page: Page) -> None:
 
 
 async def tree(page: Page) -> None:
-    await reset(page)
+    await reset(page, "tree")
     await page.open("/tree")
     await page.js("""(async () => {
         inventory = {"minecraft:stone_pickaxe": 1, "minecraft:crafting_table": 1,
@@ -164,7 +173,7 @@ async def tree(page: Page) -> None:
 
 
 async def search(page: Page) -> None:
-    await reset(page)
+    await reset(page, "search")
     for text in ["я играю в Elden Ring", "как победить Маргита", "дай мне меч"]:
         await page.ask(text)
     await page.shoot("ui_search", selector="#log")
@@ -209,11 +218,22 @@ async def run(names: list[str], base: str) -> None:
             await page.send("Page.enable")
             await page.send("Emulation.setDeviceMetricsOverride", width=WIDTH, height=900,
                             deviceScaleFactor=SCALE, mobile=False)
+            previous = json.load(urllib.request.urlopen(
+                base.rstrip("/") + "/api/worlds/"))["current"] or {"id": "web", "name": "Без игры"}
             try:
                 for name in names:
                     await SCENARIOS[name](page)
             finally:
-                await reset(page)
+                # Вернуть сервер в мир, где он был, и убрать миры съёмки.
+                await page.js("""(async () => {
+                    const post = (url, body) => fetch(url, {method: "POST",
+                        headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+                    await post("/api/campaign/cancel", {});
+                    await post("/api/worlds/enter", PREVIOUS);
+                    for (const id of SHOTS) await post("/api/worlds/forget", {id});
+                })()""".replace("PREVIOUS", json.dumps(
+                    {"id": previous["id"], "name": previous["name"]}, ensure_ascii=False))
+                    .replace("SHOTS", json.dumps(SHOT_WORLDS)))
     finally:
         process.terminate()
         try:

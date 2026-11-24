@@ -303,6 +303,22 @@ def listing() -> List[Dict[str, Any]]:
     return sorted(found, key=lambda world: world.get("last_seen") or "", reverse=True)
 
 
+def forget(world_id: str) -> bool:
+    """Удаляет сохранённое состояние мира. Текущий мир забыть нельзя: в нём идёт работа."""
+    import shutil
+
+    world_id = " ".join(str(world_id or "").split())[:MAX_ID]
+    if not world_id or (_current and _current["id"] == world_id):
+        return False
+    directory = _dir(world_id)
+    meta = _read(directory / "meta.json", None)
+    # Папка должна быть папкой именно этого мира: удаляется только то, что создал модуль.
+    if not isinstance(meta, dict) or meta.get("id") != world_id:
+        return False
+    shutil.rmtree(directory, ignore_errors=True)
+    return True
+
+
 # --- HTTP ---
 
 @router.get("/")
@@ -317,6 +333,13 @@ async def enter_world(payload: Dict[str, Any]) -> Dict[str, Any]:
         return enter(str(payload.get("id") or ""), payload.get("name"))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.post("/forget")
+async def forget_world(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Забыть мир: нужен, например, съёмке страниц для записки, которая работает в
+    собственном мире и убирает его за собой."""
+    return {"ok": forget(str(payload.get("id") or ""))}
 
 
 @router.get("/history")

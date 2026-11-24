@@ -265,9 +265,12 @@ function showGame(game, knowledgeBase) {
 
 // --- мир: у каждого своя история, она переживает перезапуск сервера (api/worlds.py) ---
 let knownWorld = null;
+// «?fresh» — страница без прошлого разговора: так её открывает съёмка для записки.
+const SKIP_PAST = new URLSearchParams(location.search).has("fresh");
 
 function showHistory(state) {
   node("log").innerHTML = "";
+  if (SKIP_PAST) return;
   for (const m of state.history || []) {
     add((m.role === "user" ? "player" : "bot") + " past", escapeHtml(m.text));
   }

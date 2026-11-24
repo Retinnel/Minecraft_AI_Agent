@@ -150,6 +150,16 @@ class WorldStoreTests(WorldStateCase):
         self.assertEqual(Path(worlds.current()["dir"]).resolve().parent, store)
         self.assertNotEqual(worlds.folder_name("a/b"), worlds.folder_name("a_b"))
 
+    async def test_forgetting_removes_a_world_but_never_the_current_one(self):
+        worlds.enter("sp:Лишний", "Лишний")
+        worlds.record_exchange("привет", {"response": "Привет!", "outcome": "none"})
+        self.assertFalse(worlds.forget("sp:Лишний"))          # в нём идёт работа
+        worlds.enter("sp:Тест", "Тест")
+        self.assertFalse(worlds.forget("sp:Не было такого"))
+        self.assertTrue(worlds.forget("sp:Лишний"))
+        self.assertEqual([world["id"] for world in worlds.listing()], ["sp:Тест"])
+        self.assertTrue(worlds.enter("sp:Лишний", "Лишний")["world"]["new"])
+
     async def test_routine_tips_stay_out_of_the_history(self):
         worlds.enter("sp:Тест", "Тест")
         worlds.record_proactive({"response": "Здоровье в норме.", "source": "assistant"})
