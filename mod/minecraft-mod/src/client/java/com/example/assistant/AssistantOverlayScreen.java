@@ -32,6 +32,7 @@ public class AssistantOverlayScreen extends Screen {
     private Button planTabButton;
     private Button campaignTabButton;
     private Button treeTabButton;
+    private Button historyTabButton;
     private Button cancelCampaignButton;
     private Button whyButton;
     private Button modeButton;
@@ -61,8 +62,13 @@ public class AssistantOverlayScreen extends Screen {
         RECIPES,
         PLAN,
         CAMPAIGN,
-        TREE
+        TREE,
+        HISTORY
     }
+
+    // Вкладка истории: разговор в этом мире, сохранённый сервером между запусками.
+    private HttpAssistantClient.WorldResponse lastHistory;
+    private int historyScroll = -1;   // -1 — показать конец разговора
 
     private Tab activeTab = Tab.STATUS;
     
@@ -226,7 +232,7 @@ public class AssistantOverlayScreen extends Screen {
 
         // Вкладки
         int tabY = top - 24;
-        int tabW = (panelW - 16) / 5;
+        int tabW = (panelW - 20) / 6;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
         }).bounds(left, tabY, tabW, 20).build();
@@ -254,6 +260,13 @@ public class AssistantOverlayScreen extends Screen {
             fetchTree();
         }).bounds(left + (tabW + 4) * 4, tabY, tabW, 20).build();
         addRenderableWidget(treeTabButton);
+
+        historyTabButton = Button.builder(Component.literal("§fИстория"), btn -> {
+            setActiveTab(Tab.HISTORY);
+            historyScroll = -1;
+            fetchHistory();
+        }).bounds(left + (tabW + 4) * 5, tabY, tabW, 20).build();
+        addRenderableWidget(historyTabButton);
 
         // Отмена кампании — та же команда, что фраза в чате: решает сервер, не мод.
         cancelCampaignButton = Button.builder(Component.literal("§cОтменить кампанию"), btn -> {
@@ -337,6 +350,10 @@ public class AssistantOverlayScreen extends Screen {
         if (treeTabButton != null) {
             treeTabButton.setMessage(Component.literal(activeTab == Tab.TREE ? "§b§lДрево" : "§fДрево"));
         }
+        if (historyTabButton != null) {
+            historyTabButton.setMessage(Component.literal(
+                    activeTab == Tab.HISTORY ? "§b§lИстория" : "§fИстория"));
+        }
         if (whyButton != null) {
             whyButton.visible = isPlan;
             whyButton.active = isPlan;
@@ -414,6 +431,8 @@ public class AssistantOverlayScreen extends Screen {
             renderCampaignTab(graphics, left, top, panelW, panelH);
         } else if (activeTab == Tab.TREE) {
             renderTreeTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.HISTORY) {
+            renderHistoryTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
@@ -851,6 +870,68 @@ public class AssistantOverlayScreen extends Screen {
     private static final int TREE_OPEN = 0xFF5b6b82;
     private static final int TREE_LOCKED = 0xFF2a3140;
 
+    // --- вкладка истории ---
+
+    private void fetchHistory() {
+        runtime.getHttpClient().getWorldHistory(120).thenAccept(data -> {
+            Minecraft.getInstance().execute(() -> {
+                if (data != null) {
+                    lastHistory = data;
+                }
+            });
+        });
+    }
+
+    private void renderHistoryTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        int textLeft = left + 15;
+        int maxWidth = panelW - 30;
+        String world = lastHistory != null && lastHistory.world != null ? lastHistory.world.name : null;
+        graphics.drawString(font, "§lИстория", textLeft, top + 34, COLOR_HEADER);
+        if (world != null) {
+            String title = font.plainSubstrByWidth("мир: " + world, maxWidth - 70);
+            graphics.drawString(font, title, left + panelW - 15 - font.width(title), top + 34, COLOR_MUTED);
+        }
+
+        int y = top + 50;
+        int bottom = top + panelH - 14;
+        if (lastHistory == null) {
+            graphics.drawString(font, "Загрузка…", textLeft, y, COLOR_MUTED);
+            return;
+        }
+        if (lastHistory.history == null || lastHistory.history.isEmpty()) {
+            graphics.drawString(font, "В этом мире разговора ещё не было.", textLeft, y, COLOR_MUTED);
+            return;
+        }
+
+        // Сообщения разворачиваются в строки с переносом; у каждой строки цвет говорящего.
+        java.util.List<String> rows = new java.util.ArrayList<>();
+        java.util.List<Integer> colors = new java.util.ArrayList<>();
+        for (HttpAssistantClient.WorldResponse.WorldMessage message : lastHistory.history) {
+            if (message == null || message.text == null) {
+                continue;
+            }
+            boolean player = "user".equals(message.role);
+            String text = message.text.replace('\n', ' ').replace('\r', ' ');
+            for (String row : fitLine((player ? "Ты: " : "AI: ") + text, maxWidth)) {
+                rows.add(row);
+                colors.add(player ? COLOR_SUCCESS : COLOR_TEXT);
+            }
+        }
+
+        int visible = Math.max(1, (bottom - y) / (font.lineHeight + 1));
+        int last = Math.max(0, rows.size() - visible);
+        historyScroll = historyScroll < 0 ? last : Math.min(historyScroll, last);
+        for (int i = historyScroll; i < rows.size() && i < historyScroll + visible; i++) {
+            graphics.drawString(font, rows.get(i), textLeft, y, colors.get(i));
+            y += font.lineHeight + 1;
+        }
+        if (rows.size() > visible) {
+            graphics.drawString(font, "колесо мыши: " + (historyScroll + 1) + "–"
+                    + Math.min(rows.size(), historyScroll + visible) + " из " + rows.size(),
+                    left + panelW - 150, top + panelH - 11, COLOR_MUTED);
+        }
+    }
+
     private void fetchTree() {
         lastTreeFetchTime = System.currentTimeMillis();
         runtime.getHttpClient().getTree().thenAccept(data -> {
@@ -1009,6 +1090,11 @@ public class AssistantOverlayScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (activeTab == Tab.PLAN) {
             planScroll = Math.max(0, planScroll - (int) Math.signum(delta) * 3);
+            return true;
+        }
+        if (activeTab == Tab.HISTORY) {
+            // Граница прокрутки уточняется при отрисовке: там известно число строк.
+            historyScroll = Math.max(0, historyScroll - (int) Math.signum(delta) * 3);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);

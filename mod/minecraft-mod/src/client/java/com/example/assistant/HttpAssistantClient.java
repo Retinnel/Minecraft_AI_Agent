@@ -324,6 +324,74 @@ public final class HttpAssistantClient {
         return getJson("/api/tree/plan?item=" + query, TreePlanResponse.class);
     }
 
+    /**
+     * Вход в мир: сервер поднимает его историю разговора, сессию, задания и кампанию и
+     * возвращает последние сообщения и последний план.
+     */
+    public CompletableFuture<WorldResponse> enterWorld(String id, String name) {
+        Map<String, String> payload = new java.util.LinkedHashMap<>();
+        payload.put("id", id);
+        payload.put("name", name);
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/worlds/enter"))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(
+                        GSON.toJson(payload).getBytes(StandardCharsets.UTF_8)))
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenApply(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] /api/worlds/enter failed: HTTP " + resp.statusCode());
+                        return (WorldResponse) null;
+                    }
+                    try {
+                        return GSON.fromJson(resp.body(), WorldResponse.class);
+                    } catch (Exception e) {
+                        System.out.println("[AI Assistant] /api/worlds/enter parse error: " + e);
+                        return (WorldResponse) null;
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.out.println("[AI Assistant] /api/worlds/enter exception: " + ex);
+                    return null;
+                });
+    }
+
+    /** История разговора в текущем мире — для вкладки оверлея. */
+    public CompletableFuture<WorldResponse> getWorldHistory(int limit) {
+        return getJson("/api/worlds/history?limit=" + limit, WorldResponse.class);
+    }
+
+    public static final class WorldResponse {
+        public WorldInfo world;
+        public int messages;
+        public java.util.List<WorldMessage> history;
+        public WorldPlan plan;
+        public String assistant_mode;
+
+        public static final class WorldInfo {
+            public String id;
+            public String name;
+            @com.google.gson.annotations.SerializedName("new")
+            public boolean isNew;
+        }
+
+        public static final class WorldMessage {
+            public String time;
+            public String role;
+            public String text;
+            public String source;
+        }
+
+        public static final class WorldPlan {
+            public String tree;
+            public String summary;
+            public String alternatives;
+            public java.util.List<String> explanation;
+        }
+    }
+
     private <T> CompletableFuture<T> getJson(String path, Class<T> type) {
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))

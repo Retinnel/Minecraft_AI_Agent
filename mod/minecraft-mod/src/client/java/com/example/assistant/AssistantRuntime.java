@@ -1,6 +1,8 @@
 package com.example.assistant;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -63,6 +65,14 @@ public final class AssistantRuntime {
     private volatile String assistantMode = "creative";
 
     private boolean startupDone;
+
+    // Мир, о котором серверу уже сообщено. У каждого мира своя история разговора, задания
+    // и кампания; пока сервер не поднял состояние мира, телеметрия не отправляется —
+    // иначе снимок инвентаря пришёл бы раньше и был бы стёрт загрузкой.
+    private String currentWorldKey;
+    private volatile boolean worldReady;
+    private static final int RECALLED_MESSAGES = 4;
+    private static final int RECALLED_LENGTH = 110;
 
     public AssistantRuntime(AssistantConfig cfg) {
         this.cfg = cfg;
@@ -149,6 +159,17 @@ public final class AssistantRuntime {
 
     public void onClientTick(Minecraft client) {
         if (client == null || client.player == null) {
+            // Игрок вышел из мира: при следующем входе мир объявляется серверу заново.
+            currentWorldKey = null;
+            worldReady = false;
+            return;
+        }
+
+        if (currentWorldKey == null) {
+            currentWorldKey = worldKey(client);
+            enterWorld(client, currentWorldKey, worldName(client));
+        }
+        if (!worldReady) {
             return;
         }
 
@@ -287,6 +308,102 @@ public final class AssistantRuntime {
             inventoryScanTickCountdown = 40;
             sendInventorySnapshot(client, false);
         }
+    }
+
+    // --- мир ---
+
+    /**
+     * Чем мир отличается от других. В одиночной игре — имя папки сохранения: оно
+     * уникально, а название мира может повторяться. В сетевой — адрес сервера.
+     */
+    private String worldKey(Minecraft mc) {
+        try {
+            if (mc.getSingleplayerServer() != null) {
+                java.nio.file.Path root = mc.getSingleplayerServer()
+                        .getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+                return "sp:" + root.getFileName();
+            }
+            ServerData server = mc.getCurrentServer();
+            if (server != null && server.ip != null && !server.ip.isBlank()) {
+                return "mp:" + server.ip;
+            }
+        } catch (RuntimeException error) {
+            System.out.println("[AI Assistant] worldKey failed: " + error);
+        }
+        return "unknown";
+    }
+
+    private String worldName(Minecraft mc) {
+        try {
+            if (mc.getSingleplayerServer() != null) {
+                return mc.getSingleplayerServer().getWorldData().getLevelName();
+            }
+            ServerData server = mc.getCurrentServer();
+            if (server != null && server.name != null && !server.name.isBlank()) {
+                return server.name;
+            }
+        } catch (RuntimeException error) {
+            System.out.println("[AI Assistant] worldName failed: " + error);
+        }
+        return "Неизвестный мир";
+    }
+
+    /**
+     * Сообщает серверу, в какой мир вошёл игрок, и продолжает с того места, где в этом
+     * мире остановились: последний план возвращается в оверлей, последние реплики — в чат.
+     */
+    private void enterWorld(Minecraft client, String key, String name) {
+        worldReady = false;
+        http.enterWorld(key, name).whenComplete((world, error) -> client.execute(() -> {
+            // Прежний мир мог оставить свой план: в новом мире он был бы чужим.
+            lastPlanTree = null;
+            lastPlanSummary = null;
+            lastPlanAlternatives = null;
+            lastExplanation = java.util.List.of();
+            lastOutcome = null;
+            if (world != null) {
+                recallWorld(client, world);
+            }
+            // Сервер поднял состояние мира (или недоступен) — телеметрию можно отправлять.
+            startupDone = false;
+            worldReady = true;
+        }));
+    }
+
+    private void recallWorld(Minecraft client, HttpAssistantClient.WorldResponse world) {
+        setAssistantMode(world.assistant_mode);
+        if (world.plan != null && world.plan.tree != null && !world.plan.tree.isBlank()) {
+            lastPlanTree = world.plan.tree;
+            lastPlanSummary = world.plan.summary;
+            lastPlanAlternatives = world.plan.alternatives;
+            lastExplanation = world.plan.explanation == null ? java.util.List.of() : world.plan.explanation;
+        }
+        if (client.player == null || world.world == null) {
+            return;
+        }
+        String name = world.world.name == null ? "" : world.world.name;
+        if (world.history == null || world.history.isEmpty()) {
+            client.player.displayClientMessage(Component.literal(
+                    "§7[AI] Мир «" + name + "»: разговора здесь ещё не было."), false);
+            return;
+        }
+        client.player.displayClientMessage(Component.literal(
+                "§7[AI] Мир «" + name + "»: в истории сообщений — " + world.messages
+                        + ". Последнее:"), false);
+        int from = Math.max(0, world.history.size() - RECALLED_MESSAGES);
+        for (HttpAssistantClient.WorldResponse.WorldMessage message : world.history.subList(from, world.history.size())) {
+            if (message == null || message.text == null) {
+                continue;
+            }
+            String text = message.text.replace('\n', ' ');
+            if (text.length() > RECALLED_LENGTH) {
+                text = text.substring(0, RECALLED_LENGTH - 1) + "…";
+            }
+            client.player.displayClientMessage(Component.literal(
+                    "§8  " + ("user".equals(message.role) ? "ты: " : "AI: ") + text), false);
+        }
+        client.player.displayClientMessage(Component.literal(
+                "§7Вся история и последний план — в оверлее, клавиша O."), false);
     }
 
     private void sendStartup(Minecraft client) {
