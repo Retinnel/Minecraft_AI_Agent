@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections import Counter
 from functools import cached_property
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from math import ceil
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -103,6 +103,9 @@ class Step:
     rare: bool = False
     # Во что обходится сам этот шаг, без учёта вложенных. Складывается при сравнении планов.
     weight: int = 0
+    # Группа взаимозаменяемых предметов, из которой выбран предмет шага: тег рецепта либо
+    # перечень вариантов через запятую. Рецепту годится любой из них — см. solver/groups.py.
+    group: Optional[str] = None
     children: Tuple["Step", ...] = ()
 
     def walk(self):
@@ -171,6 +174,9 @@ class Plan:
     root: Step
     # Только те предметы, где способов получения было больше одного.
     decisions: Tuple[Decision, ...] = ()
+    # Что было у игрока до плана. Шаг «есть» бывает и запасом игрока, и остатком
+    # предыдущего шага; называются они по-разному (solver/groups.py).
+    owned: frozenset = frozenset()
 
     @property
     def feasible(self) -> bool:
@@ -229,7 +235,8 @@ class Planner:
         # В ответе остаются только настоящие развилки: там, где способ был один,
         # объяснять нечего.
         decisions = tuple(decision for decision in self._decisions if len(decision.options) > 1)
-        return Plan(goal=goal, count=count, root=root, decisions=decisions)
+        owned = frozenset(item for item, have in (inventory or {}).items() if have and have > 0)
+        return Plan(goal=goal, count=count, root=root, decisions=decisions, owned=owned)
 
     @property
     def budget_exhausted(self) -> bool:
@@ -345,6 +352,10 @@ class Planner:
                 satisfied = False
                 continue
             child = self._resolve(choice, ingredient.quantity * runs, stock, stack, depth + 1)
+            if len(ingredient.alternatives) > 1:
+                # Выбран самый доступный вариант, но рецепту подошёл бы любой из группы.
+                child = replace(child, group=ingredient.tag
+                                or ",".join(sorted(ingredient.alternatives)))
             children.append(child)
             satisfied = satisfied and child.satisfied
 

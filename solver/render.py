@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from kb.graph import KnowledgeBase
+from solver import groups
 from solver.planner import (CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, SMITH, STONECUT,
                             Decision, Option, Plan, Step)
 
@@ -31,9 +32,18 @@ TIER_RU = {"wood": "деревянная", "gold": "золотая", "stone": "�
            "iron": "железная", "diamond": "алмазная", "netherite": "незеритовая"}
 
 
-def _describe(step: Step, kb: KnowledgeBase) -> str:
-    name = kb.label(step.item) or step.item
-    head = f"{name} ×{step.count}"
+def _name(step: Step, kb: KnowledgeBase, generic: Optional[Dict[int, str]] = None) -> str:
+    """Название шага: имя группы, если рецепту годится любой её предмет, иначе предмет."""
+    group = (generic or {}).get(id(step))
+    if group:
+        return groups.label(group) or group
+    return kb.label(step.item) or step.item
+
+
+def _describe(step: Step, kb: KnowledgeBase, generic: Optional[Dict[int, str]] = None) -> str:
+    name = _name(step, kb, generic)
+    grouped = id(step) in (generic or {})
+    head = f"{name[:1].upper() + name[1:]} ×{step.count}"
 
     if step.kind == HAVE:
         return f"{head} — есть"
@@ -47,7 +57,10 @@ def _describe(step: Step, kb: KnowledgeBase) -> str:
             tool = TOOL_KIND_RU.get(step.tool_kind, step.tool_kind)
             tier = TIER_RU.get(step.tool_tier or "")
             suffix = f" ({tier + ' ' + tool if tier else tool} и выше)" if tier else f" ({tool})"
-        return f"{head} — добыть из «{source}»{suffix}{_where(step, kb)}"
+        # Источник не называется, когда он ничего не добавляет: «железная руда из
+        # железной руды» и «любое бревно из берёзового бревна».
+        origin = "" if grouped or source == (kb.label(step.item) or step.item) else f" из «{source}»"
+        return f"{head} — добыть{origin}{suffix}{_where(step, kb)}"
     if step.kind == HUNT:
         source = kb.label(step.source) or step.source
         return f"{head} — выбить из «{source}»{_where(step, kb)}"
@@ -64,13 +77,14 @@ def _where(step: Step, kb: KnowledgeBase) -> str:
 def render_tree(plan: Plan, kb: KnowledgeBase) -> str:
     """Дерево плана с отметками наличия — то, что показывается в оверлее."""
     lines: List[str] = []
+    generic = groups.in_plan(plan)
 
     def walk(step: Step, prefix: str, is_last: bool, root: bool = False) -> None:
         if root:
-            lines.append(_describe(step, kb))
+            lines.append(_describe(step, kb, generic))
             child_prefix = ""
         else:
-            lines.append(f"{prefix}{'└── ' if is_last else '├── '}{_describe(step, kb)}")
+            lines.append(f"{prefix}{'└── ' if is_last else '├── '}{_describe(step, kb, generic)}")
             child_prefix = prefix + ("    " if is_last else "│   ")
         for index, child in enumerate(step.children):
             walk(child, child_prefix, index == len(step.children) - 1)
@@ -121,9 +135,12 @@ def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
 
     parts = []
     if mined:
-        names = list(dict.fromkeys(_inline(kb.label(s.item) or s.item) for s in mined))
+        generic = groups.in_plan(plan)
+        names = list(dict.fromkeys(_inline(_name(s, kb, generic)) for s in mined))
         listed = ", ".join(names[:3]) + (" и другое" if len(names) > 3 else "")
-        parts.append(f"добыть {listed}")
+        # Двоеточие — чтобы названия стояли в именительном падеже: «добыть железная руда»
+        # без него читалось как ошибка.
+        parts.append(f"добыть: {listed}")
     if crafted:
         parts.append(f"изготовить {len(crafted)} "
                      f"{_plural(len(crafted), 'предмет', 'предмета', 'предметов')}")

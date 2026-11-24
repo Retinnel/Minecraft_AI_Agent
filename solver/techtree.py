@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from kb.graph import KnowledgeBase
+from solver import groups
 from solver.planner import HAVE, HUNT, MINE, MISSING, STATION_ITEMS, Plan, Planner, Step
 
 SHOWCASE_PATH = Path(__file__).resolve().parent.parent / "kb" / "showcase.json"
@@ -50,6 +51,7 @@ class Node:
     remote: Optional[str] = None        # nether | end | deep | ... для источника
     tier: int = 0                       # сколько ступеней кирки нужно пройти
     depth: int = 0                      # длина самой длинной цепочки до узла
+    group: Optional[str] = None         # группа взаимозаменяемых предметов, за которую стоит узел
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ class TechTree:
                 if goal in self.showcase:
                     result.skipped.append(goal)
                 continue
+            generic = groups.in_plan(plan)
             for step in plan.root.walk():
                 if step.kind == MISSING:
                     continue
@@ -113,6 +116,11 @@ class TechTree:
                 if node is None:
                     node = result.nodes[step.item] = Node(
                         id=step.item, label=self.kb.label(step.item) or step.item)
+                group = generic.get(id(step))
+                if group and not node.group and step.item not in self.showcase:
+                    # Узел стоит за любой предмет группы: рецептам выше годится каждый.
+                    name = groups.label(group) or node.label
+                    node.group, node.label = group, name[:1].upper() + name[1:]
                 if step.kind == HAVE or node.how:
                     # Способ получения берётся из первого вхождения: дальше предмет уже
                     # «есть» как остаток предыдущих шагов.
@@ -178,6 +186,8 @@ class TechTree:
         states: Dict[str, NodeState] = {}
         for item, node in self.structure().nodes.items():
             count = stock.get(item, 0)
+            if node.group:
+                count = sum(stock.get(member, 0) for member in groups.members(node.group, self.kb))
             if count > 0:
                 states[item] = NodeState(HAVE_IT, count=count)
                 continue
