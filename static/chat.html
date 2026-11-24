@@ -59,6 +59,9 @@
   .gamebar input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 14px; width: 220px; }
   .gamebar button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; font-size: 14px; cursor: pointer; }
   .gamebar button:hover { border-color: var(--accent); }
+  .gamebar select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 14px; max-width: 320px; }
+  .msg.past { opacity: 0.62; }
+  .msg.divider { text-align: center; font-size: 12px; color: var(--muted); background: transparent; border: none; }
   .gamebar .kb { color: var(--good); }
   .gamebar .web { color: var(--accent); }
   .msg .sources a { color: var(--accent); margin-right: 10px; }
@@ -91,6 +94,11 @@
       <label><input type="checkbox" id="voice"> озвучивать ответы</label>
       <label>голос <select id="voice-pick"><option value="">по говорящему</option></select></label>
       <span id="voice-engine"></span>
+    </div>
+    <div class="gamebar">
+      <span>мир:</span>
+      <select id="world" title="У каждого мира своя история разговора, задания и кампания"></select>
+      <span id="world-info"></span>
     </div>
     <div class="gamebar">
       <span>игра:</span>
@@ -253,6 +261,61 @@ function showGame(game, knowledgeBase) {
   node("game-source").innerHTML = knowledgeBase
     ? '<span class="kb">база знаний, планы и выдача</span>'
     : '<span class="web">только ответы из сети с источниками</span>';
+}
+
+// --- мир: у каждого своя история, она переживает перезапуск сервера (api/worlds.py) ---
+let knownWorld = null;
+
+function showHistory(state) {
+  node("log").innerHTML = "";
+  for (const m of state.history || []) {
+    add((m.role === "user" ? "player" : "bot") + " past", escapeHtml(m.text));
+  }
+  if ((state.history || []).length) {
+    add("divider", "— выше: сохранённый разговор в мире «" + escapeHtml(state.world.name) + "» —");
+  }
+  if (state.plan && state.plan.tree) {
+    node("plan").textContent = state.plan.tree;
+    if (state.plan.explanation && state.plan.explanation.length) {
+      node("explanation").textContent = state.plan.explanation.join("\n");
+    }
+  }
+}
+
+async function refreshWorld(reload) {
+  try {
+    const list = await (await fetch("/api/worlds/")).json();
+    const select = node("world");
+    select.innerHTML = "";
+    for (const w of list.worlds || []) {
+      const option = document.createElement("option");
+      option.value = w.id;
+      option.textContent = w.name;
+      option.selected = w.current;
+      select.appendChild(option);
+    }
+    const current = list.current;
+    if (!current) return;
+    // Мир сменился не здесь, а в игре (мод вошёл в другой мир) — показываем его разговор.
+    if (reload || knownWorld !== current.id) {
+      knownWorld = current.id;
+      const state = await (await fetch("/api/worlds/history?limit=60")).json();
+      showHistory(state);
+      node("world-info").textContent = "сообщений в истории: " + state.messages;
+      refreshCampaign();
+      refreshGame();
+    }
+  } catch (e) { /* сервер ещё не поднялся */ }
+}
+
+async function enterWorld() {
+  const id = node("world").value;
+  const name = node("world").selectedOptions[0] ? node("world").selectedOptions[0].textContent : id;
+  await fetch("/api/worlds/enter", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name })
+  });
+  refreshWorld(true);
 }
 
 async function refreshGame() {
@@ -588,6 +651,9 @@ document.addEventListener("assistant-mode", (e) => {
 });
 refreshCampaign();
 refreshGame();
+refreshWorld(true);
+setInterval(() => refreshWorld(false), 5000);
+node("world").addEventListener("change", enterWorld);
 loadWindows();
 refreshVision();
 setInterval(refreshVision, 3000);
