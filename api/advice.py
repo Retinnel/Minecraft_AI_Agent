@@ -1172,6 +1172,31 @@ def _screen_facts():
         return None
 
 
+def _gaze_facts(message: ChatMessage) -> Optional[str]:
+    """На что игрок смотрит и что держит — по сведениям мода, названиями из базы знаний.
+
+    Идентификатор, которого нет в базе знаний, отбрасывается: в промпт попадают только
+    названия известных сущностей, а не произвольная строка из запроса.
+    """
+    kb = _assistant_pipeline().kb
+
+    def name(thing: Optional[str]) -> Optional[str]:
+        thing = (thing or "").strip().lower()
+        if not thing or thing == "minecraft:air" or not kb.exists(thing):
+            return None
+        return kb.label(thing)
+
+    parts = []
+    looked = name(message.look_at)
+    if looked:
+        what = "существо" if message.look_kind == "entity" else "блок"
+        parts.append(f"игрок смотрит на {what}: {looked}")
+    held = name(message.held)
+    if held:
+        parts.append(f"в руке: {held}")
+    return "; ".join(parts) or None
+
+
 def _game_command(text: str) -> Optional[str]:
     """Название игры из команды «я играю в …» или None."""
     match = GAME_COMMAND.match(text or "")
@@ -1371,12 +1396,15 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
 
     # Экран — до чтения игры сессии: разбор кадра может её сменить.
     screen = await asyncio.to_thread(_screen_facts)
+    # Сведения игры стоят первыми: они точные, а снимок экрана — распознанный.
+    gaze = _gaze_facts(message)
+    seen = "; ".join(part for part in (gaze, screen.as_prompt() if screen else None) if part)
 
     try:
         turn = await asyncio.to_thread(
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
-            game=session.game, screen=screen.as_prompt() if screen else None)
+            game=session.game, screen=seen or None)
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
@@ -1406,6 +1434,8 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if screen is not None:
         result.screen = screen.to_dict()
         result.explanation.insert(0, f"по снимку экрана: {screen.summary or screen.as_prompt()}")
+    if gaze:
+        result.explanation.insert(0, f"по сведениям игры: {gaze}")
     if narrated is not None:
         result.campaign = _campaign_brief()
     _safe_console_log(f"[Chat] {turn.outcome} {turn.action} {turn.target}: {result.response}",

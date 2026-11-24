@@ -11,6 +11,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -465,7 +466,7 @@ public final class AssistantRuntime {
 
         System.out.println("[AI Assistant] sendChatMessage called with: " + text);
         
-        http.sendChat(text).thenAccept(rpResponse -> {
+        http.sendChat(text, gazeFacts(Minecraft.getInstance())).thenAccept(rpResponse -> {
             System.out.println("[AI Assistant] Chat response received: " + (rpResponse != null ? "not null" : "null"));
 
             if (rpResponse == null) {
@@ -666,6 +667,45 @@ public final class AssistantRuntime {
             return 1;
         }
         return Math.min(count, 64);
+    }
+
+    /** Дальше этого расстояния блок под прицелом не считается тем, на что смотрит игрок. */
+    private static final double GAZE_REACH = 24.0;
+
+    /**
+     * На что смотрит игрок и что держит — точные идентификаторы из самой игры.
+     * Существо берётся из прицела игры (в пределах досягаемости), блок — лучом подальше:
+     * спросить «что это» можно и о том, до чего не дотянуться.
+     */
+    private Map<String, String> gazeFacts(Minecraft mc) {
+        Map<String, String> facts = new LinkedHashMap<>();
+        if (mc.player == null || mc.level == null) {
+            return facts;
+        }
+        try {
+            HitResult hit = mc.hitResult;
+            if (hit instanceof EntityHitResult entityHit) {
+                facts.put("look_at", BuiltInRegistries.ENTITY_TYPE
+                        .getKey(entityHit.getEntity().getType()).toString());
+                facts.put("look_kind", "entity");
+            } else {
+                if (!(hit instanceof BlockHitResult) || hit.getType() != HitResult.Type.BLOCK) {
+                    hit = mc.player.pick(GAZE_REACH, 1.0f, false);
+                }
+                if (hit instanceof BlockHitResult blockHit && hit.getType() == HitResult.Type.BLOCK) {
+                    facts.put("look_at", BuiltInRegistries.BLOCK
+                            .getKey(mc.level.getBlockState(blockHit.getBlockPos()).getBlock()).toString());
+                    facts.put("look_kind", "block");
+                }
+            }
+            ItemStack held = mc.player.getMainHandItem();
+            if (!held.isEmpty()) {
+                facts.put("held", BuiltInRegistries.ITEM.getKey(held.getItem()).toString());
+            }
+        } catch (RuntimeException error) {
+            System.out.println("[AI Assistant] gazeFacts failed: " + error);
+        }
+        return facts;
     }
 
     private int normalizeSummonCount(int count) {

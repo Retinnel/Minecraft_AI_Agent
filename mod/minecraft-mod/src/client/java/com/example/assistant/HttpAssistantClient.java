@@ -182,9 +182,21 @@ public final class HttpAssistantClient {
     }
 
     public CompletableFuture<RPResponse> sendChat(String text) {
+        return sendChat(text, Map.of());
+    }
+
+    /**
+     * Реплика игрока и то, что игра знает о его взгляде: блок или существо под прицелом,
+     * предмет в руке. Сервер по этим сведениям отвечает на «что это передо мной».
+     */
+    public CompletableFuture<RPResponse> sendChat(String text, Map<String, String> gaze) {
         System.out.println("[AI Assistant] HttpAssistantClient.sendChat called with: " + text);
         
-        Map<String, String> payload = Map.of("text", text);
+        Map<String, String> payload = new java.util.LinkedHashMap<>();
+        payload.put("text", text);
+        if (gaze != null) {
+            payload.putAll(gaze);
+        }
         String json = GSON.toJson(payload);
         byte[] body = json.getBytes(StandardCharsets.UTF_8);
         

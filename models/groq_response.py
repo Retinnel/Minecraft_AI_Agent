@@ -37,3 +37,8 @@ class GroqAdvice(BaseModel):
 class ChatMessage(BaseModel):
     """Chat message from player."""
     text: str
+    # Сведения самой игры на момент реплики; их присылает мод. Точнее распознавания экрана:
+    # игра знает, на какой блок смотрит игрок и что у него в руке.
+    look_at: Optional[str] = None     # идентификатор блока или существа под прицелом
+    look_kind: Optional[str] = None   # block | entity
+    held: Optional[str] = None        # идентификатор предмета в руке
