@@ -576,10 +576,15 @@ class Planner:
         return min(pool, key=lambda item: (self._item_cost(item, stack), item))
 
     def _makeable(self, item: str, stock: Counter) -> bool:
-        """Есть ли рецепт предмета, все составляющие которого уже лежат в инвентаре."""
+        """Есть ли рецепт предмета, все составляющие которого уже есть под рукой.
+
+        Под рукой — в инвентаре или в известном хранилище: дубовые брёвна в сундуке тоже
+        делают дубовые доски выгоднее берёзовых, за которыми нужно идти в лес.
+        """
         for recipe in self.kb.recipes_for(item):
             if recipe.inputs and all(
-                    any(stock.get(alternative, 0) >= ingredient.quantity
+                    any(stock.get(alternative, 0) + stock.get(_stored(alternative), 0)
+                        >= ingredient.quantity
                         for alternative in ingredient.alternatives)
                     for ingredient in recipe.inputs):
                 return True

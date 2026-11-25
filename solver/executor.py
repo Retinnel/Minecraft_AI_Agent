@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from math import ceil
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -181,7 +181,7 @@ class ExecutionPlanner:
         if step.kind == MINE:
             return self._mine(step, context, plan)
         if step.kind == TAKE:
-            return self._take(step, context)
+            return self._take(step, context, plan)
         if step.kind in (CRAFT, SMELT):
             station = step.station or "inventory"
             station_item = STATIONS.get(station)
@@ -240,7 +240,14 @@ class ExecutionPlanner:
         return self._task(TASK_MINE, step.item, count, blocks=blocks, position=position,
                           where=where, goal_step=f"добыть «{self._label(step.item)}» ×{count}")
 
-    def _take(self, step: Step, context: Context):
+    def _take(self, step: Step, context: Context, plan: Optional[Plan] = None):
+        # Всё, что плану нужно взять из хранилищ того же предмета, — за один поход к сундуку.
+        count = step.count
+        if plan is not None:
+            count = sum(other.count for other in plan.root.walk()
+                        if other.kind == TAKE and other.item == step.item
+                        and not other.children) or step.count
+        step = replace(step, count=count)
         position, where = None, step.where
         if context.container_of is not None:
             found = context.container_of(step.item)
