@@ -10,5 +10,26 @@
     "max_facts": 5000,
     "screen_facts": true,
     "recall_limit": 10
+  },
+  "autopilot": {
+    "enabled": false,
+    "require_confirmation": true,
+    "singleplayer_only": true,
+    "max_effort": 30,
+    "max_run_minutes": 10,
+    "timeouts_s": {
+      "mine": 120,
+      "craft": 15,
+      "smelt": 90
+    },
+    "allowed_kinds": [
+      "mine",
+      "craft",
+      "smelt",
+      "place_station",
+      "take_from_container"
+    ],
+    "use_baritone": true,
+    "min_health": 6
   }
 }

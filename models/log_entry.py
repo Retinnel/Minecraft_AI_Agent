@@ -21,3 +21,5 @@ class Settings(BaseModel):
     # Раздел памяти мира: радиус и частота сканера, лимит фактов (memory/config.py).
     # Хранится здесь, чтобы сохранение настроек со страницы его не стирало.
     memory: Optional[Dict[str, Any]] = None
+    # Раздел «Сделай сам»: включён ли, пределы, тайм-ауты (api/autopilot.py). По умолчанию выключен.
+    autopilot: Optional[Dict[str, Any]] = None

@@ -33,6 +33,7 @@ class GroqAdvice(BaseModel):
     game: Optional[str] = None                 # игра, о которой идёт разговор
     screen: Optional[dict] = None              # что ассистент видел на экране при ответе
     memory: List[dict] = Field(default_factory=list)      # факты памяти, на которых построен ответ
+    autopilot: Optional[dict] = None           # «Сделай сам»: {run_id, status, step, total}
 
 
 class ChatMessage(BaseModel):
@@ -43,3 +44,7 @@ class ChatMessage(BaseModel):
     look_at: Optional[str] = None     # идентификатор блока или существа под прицелом
     look_kind: Optional[str] = None   # block | entity
     held: Optional[str] = None        # идентификатор предмета в руке
+    # Для «Сделай сам»: одиночная игра не в LAN, есть ли в моде автопилот и Baritone.
+    singleplayer: Optional[bool] = None
+    autopilot_available: Optional[bool] = None
+    baritone: Optional[bool] = None

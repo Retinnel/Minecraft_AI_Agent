@@ -743,6 +743,17 @@ async def get_rp_response() -> GroqAdvice:
     if isinstance(pending_reward, dict):
         return GroqAdvice(**pending_reward)
 
+    # Ход «Сделай сам» — шаблонные отчёты без модели (B.11): шаг, ожидание, пауза, итог.
+    from api import autopilot
+    progress = autopilot.shared().consume_announcement()
+    if isinstance(progress, dict):
+        return GroqAdvice(
+            response=_clip(_assistant_responder().autopilot_line(progress)),
+            confidence=0.9, level="INFO", threats=[], source="autopilot", mode="chat",
+            execute=False, outcome="act", assistant_mode=_assistant_session().mode,
+            autopilot=_autopilot_brief(),
+        )
+
     announcement = campaigns.consume_announcement()
     if isinstance(announcement, dict):
         session = _assistant_session()
@@ -1310,7 +1321,102 @@ def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqA
         sources=turn.web.sources() if found_online else [],
         game=session.game,
         memory=_memory_views(turn),
+        autopilot=_autopilot_brief(),
     )
+
+
+# --- «Сделай сам» ---
+
+# Ответы на вопрос «Начать?» и управление запуском разбираются без модели, как смена режима.
+AUTOPILOT_YES = re.compile(r"^(да|ага|угу|давай|начинай|поехали|го|yes)\b", re.IGNORECASE)
+AUTOPILOT_NO = re.compile(r"^(нет|не надо|не нужно|отмена|отмени|не начинай)\b", re.IGNORECASE)
+AUTOPILOT_STOP = re.compile(r"^(стоп|хватит|остановись|останови|прекрати)\b", re.IGNORECASE)
+AUTOPILOT_RESUME = re.compile(r"^(продолжай|продолжи|продолжаем|дальше)\b", re.IGNORECASE)
+
+
+def _autopilot_brief() -> Optional[Dict[str, Any]]:
+    from api import autopilot
+    try:
+        return autopilot.shared().brief()
+    except Exception as error:
+        logger.warning(f"[Autopilot] Состояние недоступно: {error}")
+        return None
+
+
+def _autopilot_context(message: Optional[ChatMessage] = None,
+                       payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Сведения для проверки запуска: настройки сервера и что прислал мод."""
+    from api.autopilot import settings
+    config = settings()
+    source = payload if payload is not None else (message.model_dump() if message else {})
+    singleplayer = source.get("singleplayer")
+    if not config["singleplayer_only"] and singleplayer is not None:
+        singleplayer = True
+    return {"enabled": config["enabled"], "singleplayer": singleplayer,
+            "available": bool(source.get("autopilot_available")),
+            "baritone": bool(source.get("baritone")) and config["use_baritone"],
+            "max_effort": config["max_effort"]}
+
+
+def _autopilot_command(text: str) -> Optional[str]:
+    """Ответ на «да» / «нет» / «стоп» / «продолжай», если они относятся к запуску."""
+    from api import autopilot
+    service = autopilot.shared()
+    run = service.state()
+    if run is None:
+        return None
+    phrase = text.strip()
+    changed = None
+    if run.status == autopilot.PENDING:
+        if AUTOPILOT_YES.match(phrase):
+            changed = service.confirm(run.run_id)
+        elif AUTOPILOT_NO.match(phrase):
+            changed = service.stop(run_id=run.run_id)
+    elif run.status in (autopilot.RUNNING, autopilot.PAUSED) and AUTOPILOT_STOP.match(phrase):
+        changed = service.stop("по твоей просьбе", run.run_id)
+    elif run.status in (autopilot.PAUSED, autopilot.STOPPED) and AUTOPILOT_RESUME.match(phrase):
+        changed = service.resume()
+    if changed is None:
+        return None
+    # Объявление уже сказано ответом чата — в опросе мода его повторять не нужно.
+    announcement = service.consume_announcement()
+    return (announcement or {}).get("response") or changed.message or "Хорошо."
+
+
+def _persist_execution(turn, context: Dict[str, Any]) -> Optional[str]:
+    """Принятый «Сделай сам» становится запуском, ждущим «да»."""
+    from api import autopilot
+    service = autopilot.shared()
+    info = turn.autopilot or {}
+    run = service.start(turn.target, int(turn.count or 1), label=turn.label,
+                        total=int(info.get("total") or 0), baritone=context.get("baritone"))
+    if run.status == autopilot.RUNNING:
+        announcement = service.consume_announcement()
+        return (announcement or {}).get("response")
+    return None
+
+
+async def autopilot_start(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """POST /api/autopilot/start: та же проверка, что у «сделай сам» в чате, без модели."""
+    from solver.validator import EXECUTE_PLAN
+    session = _assistant_session()
+    pipeline = _assistant_pipeline()
+    goal = str(payload.get("goal") or "").strip()
+    resolution = pipeline.resolver.resolve(goal, action=EXECUTE_PLAN) if goal else None
+    target = resolution.thing if resolution is not None and resolution.ok else goal
+    context = _autopilot_context(payload=payload)
+    pipeline._autopilot = context
+    verdict = pipeline.validator.validate(EXECUTE_PLAN, target or None, payload.get("count", 1),
+                                          session.mode)
+    if not verdict.allowed:
+        return {"ok": False, "reason": verdict.reason, "explanation": verdict.explanation}
+    turn = await asyncio.to_thread(pipeline._build_execution, verdict, _inventory_counts(), {},
+                                   memory=_world_memory("Minecraft"), position=_player_position())
+    if turn.outcome != "act":
+        return {"ok": False, "reason": turn.reason, "explanation": turn.explanation}
+    _persist_execution(turn, context)
+    return {"ok": True, "response": turn.autopilot_summary, "plan_tree": turn.plan_tree,
+            "autopilot": _autopilot_brief()}
 
 
 def _persist_quest(turn):
@@ -1433,6 +1539,13 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
             response=f"Хорошо. Дальше с тобой говорит {name}.",
             last=last, source="chat", confidence=0.9, mode="chat"), text)
 
+    autopilot_reply = _autopilot_command(text)
+    if autopilot_reply:
+        result = _build_chat_result(response=autopilot_reply, last=last, source="autopilot",
+                                    confidence=0.9, mode="chat")
+        result.autopilot = _autopilot_brief()
+        return await _store_chat_result(result, text)
+
     if CAMPAIGN_CANCEL.search(text):
         from api import campaign as campaigns
         cancelled = campaigns.cancel_campaign()
@@ -1464,7 +1577,7 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
             game=session.game, screen=seen or None, memory=_world_memory(session.game),
-            position=_player_position())
+            position=_player_position(), autopilot=_autopilot_context(message))
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
@@ -1476,6 +1589,10 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
 
     if turn.outcome == "act" and turn.action == "create_quest":
         turn = _persist_quest(turn)
+
+    started = None
+    if turn.outcome == "act" and turn.action == "execute_plan":
+        started = _persist_execution(turn, _autopilot_context(message))
 
     narrated = None
     if turn.outcome == "act" and turn.action == "start_campaign":
@@ -1490,7 +1607,8 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
         reply = narrated
     session.record(text, turn, reply.text)
 
-    result = _advice_from_turn(turn, reply.text, last, source=reply.source)
+    result = _advice_from_turn(turn, (reply.text + " " + started) if started else reply.text,
+                               last, source=reply.source)
     if screen is not None:
         result.screen = screen.to_dict()
         result.explanation.insert(0, f"по снимку экрана: {screen.summary or screen.as_prompt()}")

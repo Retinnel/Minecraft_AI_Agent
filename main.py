@@ -17,6 +17,7 @@ from api import voice
 from api import worlds
 from api import vision
 from api import memory
+from api import autopilot
 from api.llm_config_manager import get_llm_config
 
 app = FastAPI(title="AI Assistant Admin")
@@ -51,6 +52,7 @@ app.include_router(voice.router)
 app.include_router(vision.router)
 app.include_router(worlds.router)
 app.include_router(memory.router)
+app.include_router(autopilot.router)
 
 
 @app.on_event("startup")

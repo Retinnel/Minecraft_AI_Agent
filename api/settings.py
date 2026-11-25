@@ -27,6 +27,8 @@ async def update_settings(settings: Settings):
     # Страница настроек раздела памяти не знает: без него сохраняется прежний.
     if settings.memory is None:
         settings.memory = current_settings.memory
+    if settings.autopilot is None:
+        settings.autopilot = current_settings.autopilot
     current_settings = settings
     # Сохранение в файл
     payload = settings.dict() if hasattr(settings, "dict") else settings.model_dump()
