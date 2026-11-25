@@ -36,10 +36,29 @@ function dimension (bot) {
   return name.includes(':') ? name : NS + name.replace(/^the_/, 'the_')
 }
 
+// Станции, которые помощник поставил сам: к ним можно вернуться издалека, а не ставить
+// новую (на новый верстак ушли бы ещё доски).
+const placed = new Map()
+const RETURN_RADIUS = 64
+
+function rememberStation (station, position) {
+  placed.set(station, position.clone ? position.clone() : position)
+}
+
 function findStation (bot, station, radius = STATION_RADIUS) {
   const block = bot.registry.blocksByName[STATION_BLOCKS[station] || station]
   if (!block) return null
-  return bot.findBlock({ matching: block.id, maxDistance: radius })
+  const near = bot.findBlock({ matching: block.id, maxDistance: radius })
+  if (near || radius < STATION_RADIUS) return near
+  const known = placed.get(station)
+  if (!known || known.distanceTo(bot.entity.position) > RETURN_RADIUS) return null
+  const there = bot.blockAt(known)
+  if (there && there.type !== block.id) {
+    placed.delete(station)
+    return null
+  }
+  // Чанк со станцией может быть не загружен — тогда верим памяти, проверим на месте.
+  return there || { position: known, name: block.name, type: block.id }
 }
 
 function stations (bot) {
@@ -59,12 +78,20 @@ function snapshot (bot, extra = {}) {
 }
 
 // Путь к цели; прерывание задачи останавливает поиск пути.
-async function goto (bot, goal, job) {
-  try {
-    await job.race(bot.pathfinder.goto(goal), () => bot.pathfinder.setGoal(null))
-  } catch (error) {
-    if (job.stopped) throw job.stopped
-    throw new TaskFailed('blocked', `не дойти: ${error.message}`)
+async function goto (bot, goal, job, attempts = 2) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await job.race(bot.pathfinder.goto(goal), () => bot.pathfinder.setGoal(null))
+      return
+    } catch (error) {
+      if (job.stopped) throw job.stopped
+      // Поиск пути упёрся во время (большой перепад, свежие чанки) — ещё одна попытка.
+      if (attempt < attempts && /long|timeout|stopped/i.test(error.message)) {
+        await job.sleep(500)
+        continue
+      }
+      throw new TaskFailed('blocked', `не дойти: ${error.message}`)
+    }
   }
 }
 
@@ -84,6 +111,6 @@ async function resync (bot) {
 }
 
 module.exports = {
-  resync, NS, STATION_BLOCKS, STATION_RADIUS, strip, full, inventory, count, position, snapshot,
+  resync, rememberStation, NS, STATION_BLOCKS, STATION_RADIUS, strip, full, inventory, count, position, snapshot,
   findStation, stations, goto, approach
 }

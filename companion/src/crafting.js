@@ -28,6 +28,9 @@ function gridSlots (window) {
 function layout (recipe, width) {
   const cells = []
   if (recipe.inShape) {
+    if (recipe.inShape.length > width || recipe.inShape.some(row => row.length > width)) {
+      throw new CraftError('рецепт не помещается в сетку')
+    }
     recipe.inShape.forEach((row, y) => row.forEach((ingredient, x) => {
       const id = typeof ingredient === 'object' && ingredient !== null ? ingredient.id : ingredient
       if (id !== -1 && id !== null && id !== undefined) cells.push({ slot: 1 + x + width * y, id })

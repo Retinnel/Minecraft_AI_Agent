@@ -46,7 +46,11 @@ function start (config) {
   const timers = []
   let runner = null
 
-  bot.once('spawn', () => {
+  bot.once('spawn', async () => {
+    // Пока чанки вокруг не пришли, путь не строится («слишком долго решал»).
+    try {
+      await Promise.race([bot.waitForChunksToLoad(), new Promise(resolve => setTimeout(resolve, 15000))])
+    } catch (_) {}
     log(`в игре: ${bot.username} на ${config.host}:${config.port}, ${world.position(bot).x} ${world.position(bot).y} ${world.position(bot).z}`)
     bot.pathfinder.setMovements(movements(bot))
     bot.pathfinder.thinkTimeout = 10000

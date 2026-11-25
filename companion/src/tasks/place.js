@@ -3,7 +3,7 @@
 
 const { Vec3 } = require('vec3')
 const { TaskFailed } = require('../job')
-const { strip, findStation, resync } = require('../world')
+const { strip, findStation, resync, rememberStation } = require('../world')
 
 const AIR = new Set(['air', 'cave_air'])
 
@@ -54,6 +54,7 @@ async function place (ctx, task, job) {
     const placed = bot.blockAt(spot.target)
     const found = findStation(bot, station, 4)
     if ((placed && placed.name === name) || (found && (!before || !found.position.equals(before.position)))) {
+      rememberStation(station, placed && placed.name === name ? spot.target : found.position)
       await bot.waitForTicks(2)
       await resync(bot)
       return
