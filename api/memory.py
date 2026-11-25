@@ -1,8 +1,11 @@
 """HTTP-слой памяти мира.
 
     GET    /api/memory/?kind=&q=        факты текущего мира (для игры разговора)
+    POST   /api/memory/observations     пакет наблюдений от сканера мода
+    POST   /api/memory/containers       содержимое хранилища
     POST   /api/memory/note             заметка или отметка места
     DELETE /api/memory/{id}             забыть факт
+    GET    /api/memory/scan-list        какие блоки сканировать, радиус и частота
 
 Наблюдения мода (сканер, хранилища) принимает `memory.adapters.minecraft`, его точки
 подключены здесь же. Все значения — координаты, количества — приходят от мода или из
@@ -64,6 +67,53 @@ async def list_memory(kind: Optional[str] = None, q: Optional[str] = None,
         found = sorted(store.facts(kind), key=lambda fact: fact.last_seen, reverse=True)[:limit]
     return {"game": game, "world": store.world, "total": len(store.facts()),
             "facts": [fact_view(fact, origin=origin, names=names) for fact in found]}
+
+
+def _kb():
+    try:
+        from api.advice import _assistant_pipeline
+        return _assistant_pipeline().kb
+    except Exception:
+        return None
+
+
+def _minecraft_store():
+    """Наблюдения мода относятся к Minecraft, о чём бы ни шёл разговор."""
+    return memory.shared(memory.DEFAULT_GAME)
+
+
+@router.get("/scan-list")
+async def get_scan_list() -> Dict[str, Any]:
+    from memory.adapters.minecraft import scan_list
+    from memory.config import settings
+    return scan_list(settings(), _kb())
+
+
+@router.post("/observations")
+async def post_observations(payload: Dict[str, Any]) -> Dict[str, Any]:
+    from memory.adapters.minecraft import observations
+    from memory.config import settings
+    if not settings()["enabled"]:
+        return {"ok": False, "disabled": True}
+    store = _minecraft_store()
+    result = observations(store, payload if isinstance(payload, dict) else {}, _kb())
+    if result["added"] or result["updated"] or result["stale"]:
+        store.save()
+    return {"ok": True, **result}
+
+
+@router.post("/containers")
+async def post_container(payload: Dict[str, Any]) -> Dict[str, Any]:
+    from memory.adapters.minecraft import container
+    from memory.config import settings
+    if not settings()["enabled"]:
+        return {"ok": False, "disabled": True}
+    store = _minecraft_store()
+    fact = container(store, payload if isinstance(payload, dict) else {}, _kb())
+    if fact is None:
+        raise HTTPException(status_code=400, detail="Не хранилище или нет координат.")
+    store.save()
+    return {"ok": True, "fact": fact_view(fact, names=label_of())}
 
 
 @router.post("/note")
