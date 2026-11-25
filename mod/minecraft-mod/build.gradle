@@ -11,11 +11,18 @@ base {
 }
 
 repositories {
-	// Add repositories to retrieve artifacts from in here.
-	// You should only use this when depending on other mods because
-	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
-	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
-	// for more information about repositories.
+	// Baritone публикуется только в релизах GitHub, не в Maven: берём API-jar оттуда как
+	// ivy-артефакт. Нужен лишь для компиляции BaritoneBridge — в jar мода не попадает,
+	// игрок ставит Baritone отдельно (LGPL-3.0), без него автопилот работает без добычи.
+	ivy {
+		name = "BaritoneReleases"
+		url = "https://github.com/cabaletta/baritone/releases/download"
+		patternLayout {
+			artifact "v[revision]/[module]-[revision].[ext]"
+		}
+		metadataSources { artifact() }
+		content { includeGroup "cabaletta" }
+	}
 }
 
 loom {
@@ -39,7 +46,27 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	implementation "com.google.code.gson:gson:2.10.1"
+
+	// Необязательная зависимость: только компиляция, проверка контрольной суммы — в verification-metadata нет,
+	// поэтому сверяем SHA-1 вручную задачей verifyBaritoneApi.
+	modCompileOnly "cabaletta:baritone-api-fabric:${project.baritone_version}"
 }
+
+// SHA-1 из checksums.txt релиза v1.10.1 — защита от подмены артефакта в релизе.
+def baritoneSha1 = "0f04d68a4ea47246b122370e10e8ad661437aa62"
+tasks.register("verifyBaritoneApi") {
+	doLast {
+		def jar = configurations.modCompileOnly.resolve().find { it.name.startsWith("baritone-api-fabric") }
+		if (jar == null) {
+			throw new GradleException("baritone-api-fabric не найден среди зависимостей")
+		}
+		def actual = jar.bytes.digest("SHA-1")
+		if (actual != baritoneSha1) {
+			throw new GradleException("Контрольная сумма Baritone не совпала: ${actual}")
+		}
+	}
+}
+tasks.named("compileClientJava") { dependsOn "verifyBaritoneApi" }
 
 processResources {
 	inputs.property "version", project.version

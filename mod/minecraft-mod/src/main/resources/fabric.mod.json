@@ -29,6 +29,6 @@
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"another-mod": "*"
+		"baritone": ">=1.10.1"
 	}
 }
