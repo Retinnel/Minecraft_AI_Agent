@@ -1,0 +1,184 @@
+[
+  {
+    "goal": "stone_pickaxe",
+    "config": "player_sim",
+    "status": "done",
+    "success": true,
+    "replans": 12,
+    "steps": 11,
+    "seconds": null,
+    "simulated": true
+  },
+  {
+    "goal": "stone_pickaxe",
+    "config": "companion",
+    "summary": "Сделает помощник Helper. План: Каменная кирка: добыть: любое бревно, булыжник любого вида; изготовить 5 предметов. Всего 8 шагов. Шагов около 8, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Каменная кирка ×1. Шагов: 11. Положил в сундук.",
+    "seconds": 47.1,
+    "replans": 12,
+    "steps": 11,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:dirt": 2,
+      "minecraft:acacia_planks": 3,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:stone_pickaxe": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "success": true
+  },
+  {
+    "goal": "stone_pickaxe",
+    "config": "companion_memory",
+    "memory_facts": 15,
+    "summary": "Сделает помощник Helper. План: Каменная кирка: взять из хранилища: дубовое бревно ×1, дубовое бревно ×1; добыть: булыжник любого вида; изготовить 5 предметов. Всего 6 шагов. Шагов около 8, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Каменная кирка ×1. Шагов: 11. Положил в сундук.",
+    "seconds": 36.1,
+    "replans": 12,
+    "steps": 11,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:dirt": 4,
+      "minecraft:oak_planks": 3,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:stone_pickaxe": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "companion_facts": 25,
+    "success": true
+  },
+  {
+    "goal": "furnace",
+    "config": "player_sim",
+    "status": "done",
+    "success": true,
+    "replans": 12,
+    "steps": 11,
+    "seconds": null,
+    "simulated": true
+  },
+  {
+    "goal": "furnace",
+    "config": "companion",
+    "summary": "Сделает помощник Helper. План: Печь: добыть: булыжник любого вида, любое бревно; изготовить 5 предметов. Всего 8 шагов. Шагов около 8, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Печь ×1. Шагов: 11. Положил в сундук.",
+    "seconds": 495.5,
+    "replans": 12,
+    "steps": 11,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:dirt": 9,
+      "minecraft:oak_planks": 3,
+      "minecraft:stick": 2,
+      "minecraft:furnace": 1,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:furnace": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "success": true
+  },
+  {
+    "goal": "furnace",
+    "config": "companion_memory",
+    "memory_facts": 15,
+    "summary": "Сделает помощник Helper. План: Печь: взять из хранилища: дубовое бревно ×1, дубовое бревно ×1; добыть: булыжник любого вида; изготовить 5 предметов. Всего 6 шагов. Шагов около 8, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Печь ×1. Шагов: 11. Положил в сундук.",
+    "seconds": 52.1,
+    "replans": 12,
+    "steps": 11,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:dirt": 8,
+      "minecraft:oak_planks": 3,
+      "minecraft:stick": 2,
+      "minecraft:furnace": 1,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:furnace": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "companion_facts": 27,
+    "success": true
+  },
+  {
+    "goal": "iron_ingot",
+    "config": "player_sim",
+    "status": "done",
+    "success": true,
+    "replans": 17,
+    "steps": 16,
+    "seconds": null,
+    "simulated": true
+  },
+  {
+    "goal": "iron_ingot",
+    "config": "companion",
+    "summary": "Сделает помощник Helper. План: Железный слиток: добыть: рудное железо, любое бревно, булыжник любого вида; изготовить 6 предметов. Всего 10 шагов. Шагов около 10, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Железный слиток ×1. Шагов: 14. Положил в сундук.",
+    "seconds": 88.2,
+    "replans": 15,
+    "steps": 14,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:cobblestone": 3,
+      "minecraft:acacia_planks": 3,
+      "minecraft:stone_pickaxe": 1,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:iron_ingot": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "success": true
+  },
+  {
+    "goal": "iron_ingot",
+    "config": "companion_memory",
+    "memory_facts": 15,
+    "summary": "Сделает помощник Helper. План: Железный слиток: взять из хранилища: дубовое бревно ×1, дубовое бревно ×1; добыть: рудное железо, булыжник любого вида; изготовить 6 предметов. Всего 8 шагов. Шагов около 10, примерно 3 мин. Готовое положит в сундук. Начать? Остановить — «помощник, стоп».",
+    "status": "done",
+    "message": "Помощник: Готово: Железный слиток ×1. Шагов: 15. Положил в сундук.",
+    "seconds": 87.2,
+    "replans": 16,
+    "steps": 15,
+    "delivered": true,
+    "excluded": [],
+    "bot_inventory": {
+      "minecraft:cobblestone": 21,
+      "minecraft:oak_planks": 2,
+      "minecraft:iron_ingot": 1,
+      "minecraft:dirt": 2,
+      "minecraft:stone_pickaxe": 1,
+      "minecraft:wooden_pickaxe": 1
+    },
+    "chest": {
+      "minecraft:iron_ingot": 1
+    },
+    "failed_tasks": 0,
+    "interrupted_tasks": 0,
+    "companion_facts": 26,
+    "success": true
+  }
+]
