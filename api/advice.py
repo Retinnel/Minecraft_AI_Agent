@@ -744,14 +744,15 @@ async def get_rp_response() -> GroqAdvice:
         return GroqAdvice(**pending_reward)
 
     # Ход «Сделай сам» — шаблонные отчёты без модели (B.11): шаг, ожидание, пауза, итог.
-    from api import autopilot
-    progress = autopilot.shared().consume_announcement()
+    # Сначала автопилот мода, затем помощник: у каждого своя очередь объявлений.
+    from api import autopilot, companion
+    progress = autopilot.shared().consume_announcement() or companion.shared().consume_announcement()
     if isinstance(progress, dict):
         return GroqAdvice(
             response=_clip(_assistant_responder().autopilot_line(progress)),
             confidence=0.9, level="INFO", threats=[], source="autopilot", mode="chat",
             execute=False, outcome="act", assistant_mode=_assistant_session().mode,
-            autopilot=_autopilot_brief(),
+            autopilot=_autopilot_brief(), companion=_companion_brief(),
         )
 
     announcement = campaigns.consume_announcement()
@@ -1322,6 +1323,7 @@ def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqA
         game=session.game,
         memory=_memory_views(turn),
         autopilot=_autopilot_brief(),
+        companion=_companion_brief(),
     )
 
 
@@ -1343,6 +1345,19 @@ def _autopilot_brief() -> Optional[Dict[str, Any]]:
         return None
 
 
+def _companion_brief() -> Optional[Dict[str, Any]]:
+    from api import companion
+    try:
+        return companion.shared().brief()
+    except Exception as error:
+        logger.warning(f"[Companion] Состояние недоступно: {error}")
+        return None
+
+
+# Обращение к помощнику в начале реплики: «помощник, стоп», «бот, продолжай».
+COMPANION_ADDRESS = re.compile(r"^\s*(помощник\w*|бот|компаньон\w*)[\s,!:.-]+", re.IGNORECASE)
+
+
 def _autopilot_context(message: Optional[ChatMessage] = None,
                        payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Сведения для проверки запуска: настройки сервера и что прислал мод."""
@@ -1352,20 +1367,43 @@ def _autopilot_context(message: Optional[ChatMessage] = None,
     singleplayer = source.get("singleplayer")
     if not config["singleplayer_only"] and singleplayer is not None:
         singleplayer = True
+    from api import companion
     return {"enabled": config["enabled"], "singleplayer": singleplayer,
             "available": bool(source.get("autopilot_available")),
             "baritone": bool(source.get("baritone")) and config["use_baritone"],
-            "max_effort": config["max_effort"]}
+            "max_effort": config["max_effort"], "companion": companion.context()}
 
 
 def _autopilot_command(text: str) -> Optional[str]:
-    """Ответ на «да» / «нет» / «стоп» / «продолжай», если они относятся к запуску."""
+    """Ответ на «да» / «нет» / «стоп» / «продолжай», если они относятся к запуску.
+
+    Запусков может быть два: автопилот мода и помощник. «Помощник, стоп» относится к
+    помощнику; без обращения ответ относится к запуску, который его ждёт (последнему, если
+    ждут оба).
+    """
+    from api import autopilot, companion
+    phrase = text.strip()
+    addressed = COMPANION_ADDRESS.match(phrase)
+    if addressed:
+        phrase = phrase[addressed.end():].strip()
+        services = [companion.shared()]
+    else:
+        candidates = [(service, service.state()) for service in (companion.shared(), autopilot.shared())]
+        candidates = [(service, run) for service, run in candidates if run is not None]
+        candidates.sort(key=lambda pair: pair[1].started_at or "", reverse=True)
+        services = [service for service, _ in candidates]
+    for service in services:
+        reply = _run_command(service, phrase)
+        if reply:
+            return reply
+    return None
+
+
+def _run_command(service, phrase: str) -> Optional[str]:
     from api import autopilot
-    service = autopilot.shared()
     run = service.state()
     if run is None:
         return None
-    phrase = text.strip()
     changed = None
     if run.status == autopilot.PENDING:
         if AUTOPILOT_YES.match(phrase):
@@ -1385,11 +1423,17 @@ def _autopilot_command(text: str) -> Optional[str]:
 
 def _persist_execution(turn, context: Dict[str, Any]) -> Optional[str]:
     """Принятый «Сделай сам» становится запуском, ждущим «да»."""
-    from api import autopilot
-    service = autopilot.shared()
+    from api import autopilot, companion
     info = turn.autopilot or {}
-    run = service.start(turn.target, int(turn.count or 1), label=turn.label,
-                        total=int(info.get("total") or 0), baritone=context.get("baritone"))
+    if info.get("executor") == autopilot.COMPANION:
+        service = companion.shared()
+        run = service.start(turn.target, int(turn.count or 1), label=turn.label,
+                            total=int(info.get("total") or 0),
+                            delivery=companion.delivery(_world_memory("Minecraft")))
+    else:
+        service = autopilot.shared()
+        run = service.start(turn.target, int(turn.count or 1), label=turn.label,
+                            total=int(info.get("total") or 0), baritone=context.get("baritone"))
     if run.status == autopilot.RUNNING:
         announcement = service.consume_announcement()
         return (announcement or {}).get("response")
@@ -1406,6 +1450,7 @@ async def autopilot_start(payload: Dict[str, Any]) -> Dict[str, Any]:
     target = resolution.thing if resolution is not None and resolution.ok else goal
     context = _autopilot_context(payload=payload)
     pipeline._autopilot = context
+    pipeline._executor_kind = "companion" if payload.get("executor") == "companion" else "player"
     verdict = pipeline.validator.validate(EXECUTE_PLAN, target or None, payload.get("count", 1),
                                           session.mode)
     if not verdict.allowed:
@@ -1416,7 +1461,8 @@ async def autopilot_start(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "reason": turn.reason, "explanation": turn.explanation}
     _persist_execution(turn, context)
     return {"ok": True, "response": turn.autopilot_summary, "plan_tree": turn.plan_tree,
-            "autopilot": _autopilot_brief()}
+            "autopilot": _companion_brief() if pipeline._executor_kind == "companion"
+            else _autopilot_brief()}
 
 
 def _persist_quest(turn):
@@ -1544,6 +1590,7 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
         result = _build_chat_result(response=autopilot_reply, last=last, source="autopilot",
                                     confidence=0.9, mode="chat")
         result.autopilot = _autopilot_brief()
+        result.companion = _companion_brief()
         return await _store_chat_result(result, text)
 
     if CAMPAIGN_CANCEL.search(text):

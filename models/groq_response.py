@@ -34,6 +34,7 @@ class GroqAdvice(BaseModel):
     screen: Optional[dict] = None              # что ассистент видел на экране при ответе
     memory: List[dict] = Field(default_factory=list)      # факты памяти, на которых построен ответ
     autopilot: Optional[dict] = None           # «Сделай сам»: {run_id, status, step, total}
+    companion: Optional[dict] = None           # помощник — отдельный игрок: то же, что autopilot
 
 
 class ChatMessage(BaseModel):

@@ -61,6 +61,10 @@ EXECUTE_CUES = re.compile(r"\b(сделай|скрафти|добудь|собе
                           r"|\bза\s+меня\b", re.IGNORECASE)
 
 # «Как сделать», «что нужно для» — просьба о плане, а не об исполнении.
+# Обращение к помощнику — отдельному игроку под управлением сервера (companion/):
+# «пусть помощник сделает…», «помощник, принеси…», «бот, добудь…».
+COMPANION_CUES = re.compile(r"\bпомощник\w*|\bбот(а|у|ом)?\b|\bкомпаньон\w*", re.IGNORECASE)
+
 HOWTO_CUES = re.compile(r"\bкак\b|\bчто\s+нужно\b|\bчем\b|\bплан\b|\bрецепт", re.IGNORECASE)
 
 # Что доступно в игре без онтологии: память мира работает в любой игре — заметки игрока и
@@ -223,6 +227,7 @@ class Pipeline:
         self._locator = None
         self._executor = None
         self._autopilot: Dict[str, Any] = {}
+        self._executor_kind = "player"
 
     @property
     def planner(self) -> Planner:
@@ -295,7 +300,10 @@ class Pipeline:
         game = game or DEFAULT_GAME
         # Сведения для «Сделай сам»: включён ли режим, одиночная ли игра, на связи ли мод.
         self._autopilot = dict(autopilot or {})
-        actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")))
+        self._executor_kind = "player"
+        companion = self._autopilot.get("companion") or {}
+        actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")
+                                                    or companion.get("enabled")))
 
         if (game.lower() == DEFAULT_GAME.lower() and mode == CREATIVE
                 and EXECUTE_CUES.search(utterance or "")):
@@ -370,8 +378,12 @@ class Pipeline:
         # «Сделай сам» против «как сделать» — главный риск разбора (B.11). Явные слова игрока
         # важнее догадки модели: «сделай сам» — исполнение, «как сделать» без «сам» — план.
         if EXECUTE_PLAN in actions and proposal.action in (PLAN_GOAL, EXECUTE_PLAN):
-            asked_to_do = bool(EXECUTE_CUES.search(utterance or ""))
+            to_companion = bool(companion.get("enabled") and COMPANION_CUES.search(utterance or ""))
             asked_how = bool(HOWTO_CUES.search(utterance or ""))
+            asked_to_do = bool(EXECUTE_CUES.search(utterance or "")) or (to_companion and not asked_how)
+            # Кто исполняет: помощник, если к нему обратились или автопилот мода выключен.
+            if to_companion or (companion.get("enabled") and not self._autopilot.get("enabled")):
+                self._executor_kind = "companion"
             if proposal.action == PLAN_GOAL and asked_to_do:
                 proposal = replace(proposal, action=EXECUTE_PLAN)
                 stages["rule"] = "execute_cue"
@@ -576,8 +588,16 @@ class Pipeline:
         from solver.executor import Context
 
         context_flags = self._autopilot
+        companion = context_flags.get("companion") or {}
+        by_companion = self._executor_kind == "companion"
+        if by_companion:
+            # План считается от инвентаря и места помощника, а не игрока.
+            from memory.model import Position
+            inventory = dict(companion.get("inventory") or {})
+            position = Position.parse(companion.get("position") or {}) or position
         executor = self.executor
-        executor.max_effort = int(context_flags.get("max_effort") or executor.max_effort)
+        limits = companion if by_companion else context_flags
+        executor.max_effort = int(limits.get("max_effort") or executor.max_effort)
         storage, where, known = {}, {}, {}
         if memory is not None:
             storage, where = self.locator.storage(memory, position)
@@ -596,11 +616,18 @@ class Pipeline:
                         explanation=verdict.explanation + ["цель уже в инвентаре"],
                         stages=stages)
         problems = executor.check(plan)
-        checked = self.validator.validate_execution(
-            verdict, problems, enabled=bool(context_flags.get("enabled")),
-            singleplayer=context_flags.get("singleplayer"),
-            available=bool(context_flags.get("available")))
-        stages["autopilot"] = {"outcome": checked.outcome, "problems": problems}
+        if by_companion:
+            checked = self.validator.validate_companion(
+                verdict, problems, enabled=bool(companion.get("enabled")),
+                connected=bool(companion.get("connected")),
+                name=str(companion.get("name") or "помощник"))
+        else:
+            checked = self.validator.validate_execution(
+                verdict, problems, enabled=bool(context_flags.get("enabled")),
+                singleplayer=context_flags.get("singleplayer"),
+                available=bool(context_flags.get("available")))
+        stages["autopilot"] = {"outcome": checked.outcome, "problems": problems,
+                               "executor": self._executor_kind}
         if not checked.allowed:
             return Turn(outcome=REJECT, action=EXECUTE_PLAN, target=verdict.target, label=label,
                         count=verdict.count, reason=checked.reason,
@@ -611,19 +638,27 @@ class Pipeline:
         # Около 20 секунд на шаг: дойти, добыть или открыть станцию и забрать результат.
         minutes = max(1, round(total * 20 / 60))
         mining = any(step.kind == "mine" for step in actions)
-        note = ""
-        if mining and not context_flags.get("baritone"):
-            note = (" Baritone не установлен: добывать буду просить тебя, "
-                    "остальное сделаю сам.")
-        summary = (f"План: {render_summary(plan, self.kb)} Шагов около {total}, "
-                   f"примерно {minutes} мин.{note} Начать? Остановить — клавиша K "
-                   f"или любое движение.")
+        if by_companion:
+            name = companion.get("name") or "помощник"
+            handover = {"drop": " Готовое принесёт тебе.", "chest": " Готовое положит в сундук.",
+                        "none": " Готовое оставит у себя."}.get(companion.get("delivery"), "")
+            summary = (f"Сделает помощник {name}. План: {render_summary(plan, self.kb)} "
+                       f"Шагов около {total}, примерно {minutes} мин.{handover} Начать? "
+                       f"Остановить — «помощник, стоп».")
+        else:
+            note = ""
+            if mining and not context_flags.get("baritone"):
+                note = (" Baritone не установлен: добывать буду просить тебя, "
+                        "остальное сделаю сам.")
+            summary = (f"План: {render_summary(plan, self.kb)} Шагов около {total}, "
+                       f"примерно {minutes} мин.{note} Начать? Остановить — клавиша K "
+                       f"или любое движение.")
         return Turn(outcome=ACT, action=EXECUTE_PLAN, target=verdict.target, label=label,
                     count=verdict.count, explanation=checked.explanation, stages=stages,
                     plan=plan, plan_tree=render_tree(plan, self.kb),
                     plan_summary=render_summary(plan, self.kb),
                     autopilot={"status": "pending_confirm", "total": total,
-                               "effort": plan.effort},
+                               "effort": plan.effort, "executor": self._executor_kind},
                     autopilot_summary=summary)
 
     def _build_quest(self, utterance: str, proposal: Proposal, actions: Sequence[str],

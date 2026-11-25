@@ -207,6 +207,39 @@ class Validator:
         return Verdict(ACT, EXECUTE_PLAN, target=verdict.target, count=verdict.count,
                        game_id=verdict.game_id, clamped=verdict.clamped, explanation=trace)
 
+    def validate_companion(self, verdict: Verdict, problems: Sequence[str], *,
+                           enabled: bool, connected: bool, name: str = "помощник") -> Verdict:
+        """Допуск запуска для помощника — отдельного игрока (companion/).
+
+        Одиночная игра здесь не требуется: помощник и есть второй игрок в мире, открытом
+        для сети. Требуется, чтобы он был включён и на связи, а план — по силам исполнителю
+        (те же проверки solver/executor.py, что у автопилота).
+        """
+        if not verdict.allowed:
+            return verdict
+        trace = list(verdict.explanation)
+        label = self.kb.label(verdict.target) or verdict.target
+
+        def reject(reason: str, note: str) -> Verdict:
+            return Verdict(REJECT, EXECUTE_PLAN, target=verdict.target, count=verdict.count,
+                           reason=reason, explanation=trace + [note])
+
+        if not enabled:
+            return reject("Помощник выключен в настройках (раздел companion). Могу построить "
+                          "план — скажи «как сделать …».", "помощник выключен в настройках")
+        if not connected:
+            return reject(f"Помощника ({name}) нет в игре: открой мир для сети и запусти его "
+                          "(страница /chat или «npm start» в папке companion).",
+                          "помощник не на связи")
+        trace.append(f"помощник {name} в игре и на связи")
+        if problems:
+            return reject(f"Не возьмусь за «{label}»: " + "; ".join(problems)
+                          + ". Могу построить план или начать кампанию.",
+                          "план помощнику не по силам: " + "; ".join(problems))
+        trace.append("план выполним помощником")
+        return Verdict(ACT, EXECUTE_PLAN, target=verdict.target, count=verdict.count,
+                       game_id=verdict.game_id, clamped=verdict.clamped, explanation=trace)
+
     @staticmethod
     def _is_carryable(kinds: Sequence[str]) -> bool:
         """Может ли сущность оказаться в инвентаре.
