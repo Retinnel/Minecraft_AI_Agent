@@ -18,6 +18,7 @@ from api import worlds
 from api import vision
 from api import memory
 from api import autopilot
+from api import companion
 from api.llm_config_manager import get_llm_config
 
 app = FastAPI(title="AI Assistant Admin")
@@ -53,6 +54,7 @@ app.include_router(vision.router)
 app.include_router(worlds.router)
 app.include_router(memory.router)
 app.include_router(autopilot.router)
+app.include_router(companion.router)
 
 
 @app.on_event("startup")
@@ -64,6 +66,7 @@ async def restore_world():
 @app.on_event("shutdown")
 async def save_world():
     worlds.save()
+    companion.shutdown_on_exit()
 
 # Статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")

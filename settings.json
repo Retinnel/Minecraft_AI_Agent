@@ -31,5 +31,34 @@
     ],
     "use_baritone": true,
     "min_health": 6
+  },
+  "companion": {
+    "enabled": false,
+    "username": "Helper",
+    "host": "127.0.0.1",
+    "port": 25565,
+    "version": "1.20.1",
+    "delivery": "drop",
+    "delivery_chest": null,
+    "require_confirmation": true,
+    "max_effort": 30,
+    "max_run_minutes": 15,
+    "timeouts_s": {
+      "mine": 180,
+      "craft": 20,
+      "smelt": 120,
+      "place_station": 20,
+      "take_from_container": 90,
+      "deliver": 120
+    },
+    "allowed_kinds": [
+      "mine",
+      "craft",
+      "smelt",
+      "place_station",
+      "take_from_container"
+    ],
+    "min_health": 6,
+    "scan_radius": 24
   }
 }

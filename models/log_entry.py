@@ -23,3 +23,5 @@ class Settings(BaseModel):
     memory: Optional[Dict[str, Any]] = None
     # Раздел «Сделай сам»: включён ли, пределы, тайм-ауты (api/autopilot.py). По умолчанию выключен.
     autopilot: Optional[Dict[str, Any]] = None
+    # Помощник — отдельный игрок (companion/): имя, адрес мира, доставка, пределы (api/companion.py).
+    companion: Optional[Dict[str, Any]] = None

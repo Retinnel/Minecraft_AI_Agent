@@ -29,6 +29,8 @@ async def update_settings(settings: Settings):
         settings.memory = current_settings.memory
     if settings.autopilot is None:
         settings.autopilot = current_settings.autopilot
+    if settings.companion is None:
+        settings.companion = current_settings.companion
     current_settings = settings
     # Сохранение в файл
     payload = settings.dict() if hasattr(settings, "dict") else settings.model_dump()
