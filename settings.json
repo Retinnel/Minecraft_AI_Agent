@@ -2,5 +2,13 @@
   "analysis_interval": 5000,
   "threat_threshold": 0.7,
   "enable_voice": false,
-  "max_threats_display": 3
+  "max_threats_display": 3,
+  "memory": {
+    "enabled": true,
+    "scan_radius": 24,
+    "scan_interval_s": 5,
+    "max_facts": 5000,
+    "screen_facts": true,
+    "recall_limit": 10
+  }
 }

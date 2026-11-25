@@ -385,6 +385,8 @@ def forget(world_id: str) -> bool:
     if not isinstance(meta, dict) or meta.get("id") != world_id:
         return False
     shutil.rmtree(directory, ignore_errors=True)
+    import memory
+    memory.reset()
     return True
 
 

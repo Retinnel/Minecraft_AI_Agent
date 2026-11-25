@@ -277,6 +277,20 @@ def _inline(label: str) -> str:
     return label[:1].lower() + label[1:] if label else label
 
 
+_LAYER: Optional[Dict[str, Any]] = None
+
+
+def cause_label(cause: str) -> str:
+    """Причина гибели словами — класс угрозы из `kb/threats.json`: «огонь или лава»."""
+    global _LAYER
+    if _LAYER is None:
+        _LAYER = json.loads(THREATS_PATH.read_text(encoding="utf-8"))
+    causes = _LAYER.get("causes") or {}
+    key = str(cause or "").strip()
+    threat = causes.get(key) or causes.get(key.split(".")[0]) or OTHER
+    return ((_LAYER.get("threats") or {}).get(threat) or {}).get("label") or "неизвестная причина"
+
+
 def render_postmortem(result: PostMortem, kb: KnowledgeBase) -> str:
     """Разбор словами — из тех же фактов, без модели."""
     def name(item: str) -> str:

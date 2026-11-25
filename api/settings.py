@@ -24,6 +24,9 @@ async def get_settings():
 @router.put("/", response_model=Settings)
 async def update_settings(settings: Settings):
     global current_settings
+    # Страница настроек раздела памяти не знает: без него сохраняется прежний.
+    if settings.memory is None:
+        settings.memory = current_settings.memory
     current_settings = settings
     # Сохранение в файл
     payload = settings.dict() if hasattr(settings, "dict") else settings.model_dump()

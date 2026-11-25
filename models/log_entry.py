@@ -18,3 +18,6 @@ class Settings(BaseModel):
     threat_threshold: float = 0.7
     enable_voice: bool = False
     max_threats_display: int = 3
+    # Раздел памяти мира: радиус и частота сканера, лимит фактов (memory/config.py).
+    # Хранится здесь, чтобы сохранение настроек со страницы его не стирало.
+    memory: Optional[Dict[str, Any]] = None

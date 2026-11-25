@@ -53,6 +53,24 @@ async def add_log(entry: LogEntry):
         # Счётчики убийств и последняя гибель из игры не восстанавливаются.
         from api import worlds
         worlds.save_player()
+    if entry.event_type == "death":
+        _remember_death()
     if len(logs_db) > 10000:  # Ограничение
         logs_db.pop(0)
     return {"status": "added"}
+
+
+def _remember_death() -> None:
+    """Гибель уходит в память мира: на «где я умер» отвечает она, с местом и временем."""
+    import memory
+    from api.player_state import get_player_state
+    from memory.adapters.minecraft import record_death
+    from solver.postmortem import cause_label
+
+    try:
+        store = memory.shared()
+        record_death(store, get_player_state().get("last_death") or {}, cause_label=cause_label)
+        store.save()
+    except Exception as error:   # память — дополнение: событие гибели принимается и без неё
+        import logging
+        logging.getLogger(__name__).warning(f"[Memory] Гибель не записана в память: {error}")

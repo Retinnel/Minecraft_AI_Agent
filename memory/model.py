@@ -105,3 +105,134 @@ class Position:
             return "совсем рядом"
         direction = self.direction_from(origin)
         return f"около {distance} блоков {direction}" if direction else f"около {distance} блоков"
+
+
+# --- факт памяти ---
+
+# Виды фактов.
+PLACE = "place"            # отмеченное место: «запомни, тут портал»
+RESOURCE = "resource"      # увиденные ценные блоки: руды, порталы, спаунеры
+CONTAINER = "container"    # хранилище и его содержимое
+DEATH = "death"            # место и обстоятельства гибели
+NOTE = "note"              # заметка игрока без места
+DIALOGUE = "dialogue"      # реплика персонажа, распознанная на экране
+KINDS = (PLACE, RESOURCE, CONTAINER, DEATH, NOTE, DIALOGUE)
+
+# Откуда факт и насколько ему верить. Ответ называет источник: распознанному с экрана
+# доверия меньше, чем сообщению мода.
+MOD = "mod"
+PLAYER = "player"
+SCREEN = "screen"
+CONFIDENCE = {MOD: 1.0, PLAYER: 0.9, SCREEN: 0.6}
+
+# Состояние факта.
+ACTIVE = "active"
+STALE = "stale"            # при повторном визите не подтвердился: блок добыт или пропал
+REMOVED = "removed"        # игрок попросил забыть
+STATUSES = (ACTIVE, STALE, REMOVED)
+
+MAX_LABEL = 80
+MAX_TEXT = 500
+MAX_BLOCKS = 64
+
+
+def now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class Fact:
+    """Одна запись памяти. Значения — координаты, количества — ставит система."""
+
+    id: str
+    game: str
+    world: str
+    kind: str
+    subject: Optional[str] = None        # в Minecraft — сущность онтологии, в других играх — текст
+    label: Optional[str] = None
+    position: Optional[Position] = None
+    contents: Dict[str, int] = None      # для хранилищ: предмет → количество
+    text: Optional[str] = None           # заметка или реплика персонажа
+    source: str = MOD
+    confidence: float = 1.0
+    first_seen: str = ""
+    last_seen: str = ""
+    seen_count: int = 1
+    status: str = ACTIVE
+    # Для руд: координаты блоков участка 16×16 — по ним видно, сколько блоков и какие пропали.
+    blocks: list = None
+
+    def __post_init__(self) -> None:
+        if self.contents is None:
+            self.contents = {}
+        if self.blocks is None:
+            self.blocks = []
+
+    @property
+    def active(self) -> bool:
+        return self.status == ACTIVE
+
+    @property
+    def amount(self) -> int:
+        """Сколько блоков у ресурса; у прочих фактов — 0."""
+        return len(self.blocks)
+
+    def to_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "id": self.id, "game": self.game, "world": self.world, "kind": self.kind,
+            "subject": self.subject, "label": self.label,
+            "position": self.position.to_dict() if self.position else None,
+            "contents": dict(self.contents), "text": self.text,
+            "source": self.source, "confidence": self.confidence,
+            "first_seen": self.first_seen, "last_seen": self.last_seen,
+            "seen_count": self.seen_count, "status": self.status,
+        }
+        if self.blocks:
+            payload["blocks"] = [list(block) for block in self.blocks]
+        return payload
+
+    @classmethod
+    def from_dict(cls, payload: Any) -> Optional["Fact"]:
+        """Запись из файла; повреждённая или чужая строка даёт None, а не исключение."""
+        if not isinstance(payload, dict) or not payload.get("id"):
+            return None
+        kind = payload.get("kind")
+        if kind not in KINDS:
+            return None
+        contents = {}
+        for key, value in (payload.get("contents") or {}).items():
+            try:
+                count = int(value)
+            except (TypeError, ValueError):
+                continue
+            if count > 0:
+                contents[str(key)] = count
+        blocks = []
+        for block in payload.get("blocks") or []:
+            if isinstance(block, (list, tuple)) and len(block) == 3:
+                coordinates = [_number(value) for value in block]
+                if None not in coordinates:
+                    blocks.append(tuple(coordinates))
+        source = payload.get("source") if payload.get("source") in CONFIDENCE else MOD
+        try:
+            confidence = float(payload.get("confidence", CONFIDENCE[source]))
+        except (TypeError, ValueError):
+            confidence = CONFIDENCE[source]
+        try:
+            seen_count = max(1, int(payload.get("seen_count") or 1))
+        except (TypeError, ValueError):
+            seen_count = 1
+        return cls(
+            id=str(payload["id"]), game=str(payload.get("game") or ""),
+            world=str(payload.get("world") or ""), kind=kind,
+            subject=payload.get("subject") or None, label=payload.get("label") or None,
+            position=Position.parse(payload.get("position")),
+            contents=contents, text=payload.get("text") or None,
+            source=source, confidence=confidence,
+            first_seen=str(payload.get("first_seen") or ""),
+            last_seen=str(payload.get("last_seen") or ""),
+            seen_count=seen_count,
+            status=payload.get("status") if payload.get("status") in STATUSES else ACTIVE,
+            blocks=blocks,
+        )
