@@ -80,6 +80,7 @@ public final class AssistantRuntime {
 
     // «Сделай сам»: исполнение задач плана по одной.
     private final AutopilotController autopilot;
+    private volatile HttpAssistantClient.AutopilotBrief companionBrief;
 
     public AssistantRuntime(AssistantConfig cfg) {
         this.cfg = cfg;
@@ -108,6 +109,20 @@ public final class AssistantRuntime {
      */
     public HttpAssistantClient getHttpClient() {
         return http;
+    }
+
+    /** Последнее известное состояние запуска помощника (для вкладки «План»). */
+    public HttpAssistantClient.AutopilotBrief getCompanionBrief() {
+        return companionBrief;
+    }
+
+    /** Кнопка «Стоп помощника»: запуск останавливает сервер, помощник бросает задачу по пульсу. */
+    public void stopCompanion() {
+        http.postCompanionStop("по твоей просьбе").thenAccept(state -> {
+            if (state != null) {
+                companionBrief = state.briefFromRun();
+            }
+        });
     }
 
     public AutopilotController getAutopilot() {
@@ -160,6 +175,9 @@ public final class AssistantRuntime {
     private void rememberForOverlay(HttpAssistantClient.RPResponse rpResponse) {
         setAssistantMode(rpResponse.assistant_mode);
         autopilot.onBrief(rpResponse.autopilot);
+        if (rpResponse.companion != null) {
+            companionBrief = rpResponse.companion;
+        }
         if (rpResponse.outcome == null) {
             return;
         }
@@ -203,6 +221,11 @@ public final class AssistantRuntime {
             http.getAutopilotState().thenAccept(state -> {
                 if (state != null) {
                     client.execute(() -> autopilot.onBrief(state.briefFromRun()));
+                }
+            });
+            http.getCompanionState().thenAccept(state -> {
+                if (state != null) {
+                    companionBrief = state.briefFromRun();
                 }
             });
         }

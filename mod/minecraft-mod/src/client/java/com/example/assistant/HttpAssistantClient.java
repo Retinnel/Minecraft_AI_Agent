@@ -471,6 +471,19 @@ public final class HttpAssistantClient {
         return getJson("/api/autopilot/state", AutopilotState.class);
     }
 
+    // --- помощник ---
+
+    /** Запуск помощника: тот же ответ, что у автопилота (run, brief). */
+    public CompletableFuture<AutopilotState> getCompanionState() {
+        return getJson("/api/companion/state", AutopilotState.class);
+    }
+
+    public CompletableFuture<AutopilotState> postCompanionStop(String reason) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("reason", reason);
+        return postJson("/api/companion/stop", payload, AutopilotState.class);
+    }
+
     private <T> CompletableFuture<T> postJson(String path, Map<String, Object> payload, Class<T> type) {
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
@@ -632,6 +645,8 @@ public final class HttpAssistantClient {
         public java.util.List<String> options;
         // «Сделай сам»: состояние запуска после этого ответа.
         public AutopilotBrief autopilot;
+        // Помощник — отдельный игрок, исполняющий тот же план (companion/).
+        public AutopilotBrief companion;
     }
 
     public static final class ModeResponse {

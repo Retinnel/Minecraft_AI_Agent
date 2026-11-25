@@ -38,6 +38,7 @@ public class AssistantOverlayScreen extends Screen {
     private Button cancelCampaignButton;
     private Button whyButton;
     private Button autopilotStopButton;
+    private Button companionStopButton;
     private Button modeButton;
 
     // Вкладка плана: прокрутка длинного дерева и переключение на объяснение выбора.
@@ -316,6 +317,12 @@ public class AssistantOverlayScreen extends Screen {
             runtime.getAutopilot().stopByPlayer(Minecraft.getInstance());
         }).bounds(left + panelW - 200, top + 30, 65, 18).build();
         addRenderableWidget(autopilotStopButton);
+
+        // Помощник: остановка его запуска на сервере (то же, что «помощник, стоп» в чате).
+        companionStopButton = Button.builder(Component.literal("§c■ Помощник"), btn -> {
+            runtime.stopCompanion();
+        }).bounds(left + panelW - 290, top + 30, 85, 18).build();
+        addRenderableWidget(companionStopButton);
         
         int btnY = top + panelH + 3;
         int spacing = 6;
@@ -405,6 +412,11 @@ public class AssistantOverlayScreen extends Screen {
             boolean stoppable = isPlan && runtime.getAutopilot().isActive();
             autopilotStopButton.visible = stoppable;
             autopilotStopButton.active = stoppable;
+        }
+        if (companionStopButton != null) {
+            boolean stoppable = isPlan && companionActive();
+            companionStopButton.visible = stoppable;
+            companionStopButton.active = stoppable;
         }
         if (campaignTabButton != null) {
             campaignTabButton.setMessage(Component.literal(isCampaign ? "§b§lКампания" : "§fКампания"));
@@ -844,8 +856,56 @@ public class AssistantOverlayScreen extends Screen {
         }
     }
 
+    private boolean companionActive() {
+        HttpAssistantClient.AutopilotBrief brief = runtime.getCompanionBrief();
+        return brief != null && brief.status != null
+                && ("running".equals(brief.status) || "paused".equals(brief.status)
+                    || "pending_confirm".equals(brief.status));
+    }
+
+    /** Ход запуска помощника: та же строка, что у «Сделай сам», со своим заголовком. */
+    private int renderCompanionProgress(GuiGraphics graphics, int x, int y, int maxWidth) {
+        if (companionStopButton != null) {
+            boolean stoppable = activeTab == Tab.PLAN && companionActive();
+            companionStopButton.visible = stoppable;
+            companionStopButton.active = stoppable;
+        }
+        HttpAssistantClient.AutopilotBrief brief = runtime.getCompanionBrief();
+        if (brief == null || brief.status == null) {
+            return y;
+        }
+        String goal = brief.label != null ? brief.label : (brief.goal != null ? brief.goal : "");
+        String head = "§l▶ Помощник: §r" + goal + " — " + statusLabel(brief.status);
+        if (brief.total > 0) {
+            head += "§r, шаг " + Math.min(brief.step + ("running".equals(brief.status) ? 1 : 0), brief.total)
+                    + " из " + brief.total;
+        }
+        graphics.drawString(font, font.plainSubstrByWidth(head, maxWidth), x, y, COLOR_TEXT);
+        y += font.lineHeight + 2;
+        String detail = brief.current != null ? "Сейчас: " + brief.current : brief.message;
+        if (detail != null && !detail.isBlank()) {
+            graphics.drawString(font, font.plainSubstrByWidth("§7" + detail, maxWidth), x, y, COLOR_MUTED);
+            y += font.lineHeight + 2;
+        }
+        return y + 4;
+    }
+
+    private static String statusLabel(String status) {
+        return switch (status) {
+            case "pending_confirm" -> "§eждёт «да»";
+            case "running" -> "§aвыполняю";
+            case "waiting" -> "§eжду, пока принесёшь";
+            case "paused" -> "§6пауза";
+            case "done" -> "§aготово";
+            case "failed" -> "§cне вышло";
+            case "stopped" -> "§7остановлен";
+            default -> status;
+        };
+    }
+
     /** Ход «Сделай сам» над планом: статус, шаг из скольких, что делается сейчас. */
     private int renderAutopilotProgress(GuiGraphics graphics, int x, int y, int maxWidth) {
+        y = renderCompanionProgress(graphics, x, y, maxWidth);
         AutopilotController autopilot = runtime.getAutopilot();
         if (autopilotStopButton != null) {
             boolean stoppable = activeTab == Tab.PLAN && autopilot.isActive();
