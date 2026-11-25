@@ -28,7 +28,7 @@ from solver.planner import Plan, Planner
 from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
-from solver.validator import ACT, CLARIFY, CREATIVE, REJECT, Validator
+from solver.validator import ACT, CLARIFY, CREATIVE, MEMORY_ACTIONS, REJECT, Validator
 from solver.worldfacts import (ABOUT, AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS,
                                WorldAnswer, WorldFacts, essentials as world_essentials,
                                render_answer)
@@ -40,6 +40,9 @@ START_CAMPAIGN = "start_campaign"
 PROPOSE_GOAL = "propose_goal"
 SHOW_PROGRESS = "show_progress"
 SEARCH_WEB = "search_web"
+REMEMBER = "remember"
+RECALL = "recall"
+FORGET_FACT = "forget_fact"
 
 # Игра, для которой есть онтология. Для любой другой игры знаний в базе нет, и модели
 # предъявляется только поиск: выдавать, планировать и проверять там нечем.
@@ -48,7 +51,12 @@ DEFAULT_GAME = "Minecraft"
 # Действия, которые может предложить модель. Остальные действия реестра (например, получение
 # награды за задание) выполняются системой сами и модели не предъявляются.
 PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
-              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS, SEARCH_WEB)
+              START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS, SEARCH_WEB,
+              *MEMORY_ACTIONS)
+
+# Что доступно в игре без онтологии: память мира работает в любой игре — заметки игрока и
+# факты с экрана, — а остальное ищется в сети.
+OTHER_GAME_ACTIONS = (SEARCH_WEB, *MEMORY_ACTIONS)
 
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
@@ -74,6 +82,25 @@ REMOVAL_CUES = re.compile(
     r"(забер|забир|убер|убир|удал|выброс|выкин|очист|сотр|clear|remove|delete|take\s)",
     re.IGNORECASE,
 )
+
+# Признаки просьбы забыть. Забытое из ответов и планов уходит насовсем, поэтому, как и с
+# удалением предмета, одного слова модели мало.
+FORGET_CUES = re.compile(r"(забуд|забыв|забыть|удали|сотри|стери|убери\s+(отметк|заметк)|forget|delete)",
+                         re.IGNORECASE)
+
+# «Тут», «здесь»: отметить место по позиции игрока, а не просто записать заметку.
+HERE_CUES = re.compile(r"(\bтут\b|\bздесь\b|\bэто\s+место|\bна\s+этом\s+месте|\bhere\b)",
+                       re.IGNORECASE)
+
+# Вопрос о гибели: отвечает последняя запись о смерти, а не поиск по словам.
+DEATH_CUES = re.compile(r"(умер|погиб|смерт|сдох|died|death)", re.IGNORECASE)
+
+# Начало реплики «запомни, …» — сама заметка идёт после него.
+REMEMBER_PREFIX = re.compile(r"^\s*(пожалуйста\s+)?(запомни|запиши|отметь|remember|note)\s*(что|это)?[\s,:—-]*",
+                             re.IGNORECASE)
+
+# Сколько фактов называть в ответе; остальные — во вкладке «Память».
+RECALL_SPOKEN = 3
 
 # Признаки просьбы о цели. Кампания начинается сразу, поэтому одного слова модели мало:
 # малая модель, не разобрав «дай», выбирала предложение цели, и игрок получал кампанию,
@@ -154,6 +181,11 @@ class Turn:
     # Заполняется только для search_web: найденные фрагменты и источники.
     web: Optional[Any] = None
     game: Optional[str] = None
+    # Заполняется только для действий памяти: факты, ответ словами и числа (координаты),
+    # которые пересказ обязан сохранить.
+    memory: Sequence[Any] = ()
+    memory_summary: Optional[str] = None
+    memory_numbers: Sequence[int] = ()
 
 
 class Pipeline:
@@ -199,7 +231,7 @@ class Pipeline:
     def actions_for(self, mode: str, game: Optional[str] = None) -> Sequence[str]:
         """Действия, которые предъявляются модели в данном режиме и для данной игры."""
         if game and game.lower() != DEFAULT_GAME.lower():
-            return (SEARCH_WEB,)
+            return OTHER_GAME_ACTIONS
         allowed = set(self.validator.available_actions(mode))
         return tuple(action for action in PROPOSABLE if action in allowed)
 
@@ -209,7 +241,9 @@ class Pipeline:
                context: Optional[str] = None,
                state: Optional[str] = None,
                game: Optional[str] = None,
-               screen: Optional[str] = None) -> Turn:
+               screen: Optional[str] = None,
+               memory: Optional[Any] = None,
+               position: Optional[Any] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -221,6 +255,9 @@ class Pipeline:
         screen — что видно на экране игрока, факты модели зрения одной строкой. Они только
         поясняют реплику («что это за предмет»): действие выбирается по реплике и, как
         всегда, проходит валидатор.
+        memory — память мира для игры разговора (`memory.store.MemoryStore`), position —
+        последняя позиция игрока по сведениям мода. Координаты в ответах и отметках
+        берутся только отсюда.
         """
         mode = mode or self.mode
         game = game or DEFAULT_GAME
@@ -248,6 +285,9 @@ class Pipeline:
 
         if proposal.action == SEARCH_WEB and SEARCH_WEB in actions:
             return self._search_web(utterance, proposal, game, stages)
+
+        if proposal.action in MEMORY_ACTIONS and proposal.action in actions:
+            return self._memory_turn(utterance, proposal, game, memory, position, actions, stages)
 
         # Второй рубеж для чужой игры: модели предъявлен только поиск, но если она всё же
         # предложит выдачу или план, валидатор об игре не знает и пропустил бы команду
@@ -677,6 +717,171 @@ class Pipeline:
                          + ", ".join(hit.site for hit in answer.hits)],
             stages=stages, web=answer, game=game,
         )
+
+    # --- память мира ---
+
+    def _label_of(self, game: str):
+        if game.lower() != DEFAULT_GAME.lower():
+            return lambda thing: None
+        return lambda thing: self.kb.label(thing) if thing and self.kb.exists(thing) else None
+
+    def _memory_turn(self, utterance: str, proposal: Proposal, game: str, memory: Optional[Any],
+                     position: Optional[Any], actions: Sequence[str],
+                     stages: Dict[str, Any]) -> Turn:
+        """Запомнить, вспомнить, забыть.
+
+        Модель определила только вид просьбы и назвала предмет словами игрока. Что
+        записать, где и что ответить, решает система: позиция — из сведений мода, факты —
+        из памяти, координаты в ответ ставит шаблон. Факт памяти ни на одном шаге не
+        превращается в команду игре.
+        """
+        action = proposal.action
+        if memory is None:
+            return Turn(outcome=REJECT, action=action, game=game, stages=stages,
+                        reason="Память мира сейчас недоступна.",
+                        explanation=["память мира не подключена"])
+        is_minecraft = game.lower() == DEFAULT_GAME.lower()
+        if action == REMEMBER:
+            return self._remember(utterance, proposal, game, memory,
+                                  position if is_minecraft else None, stages)
+        if action == FORGET_FACT:
+            return self._forget(utterance, proposal, game, memory, position, stages)
+        return self._recall(utterance, proposal, game, memory,
+                            position if is_minecraft else None, actions, stages)
+
+    def _remember(self, utterance: str, proposal: Proposal, game: str, memory: Any,
+                  position: Optional[Any], stages: Dict[str, Any]) -> Turn:
+        from memory.model import PLAYER
+
+        # Заметка — слова игрока после «запомни», без «тут»: место ставит система.
+        text = REMEMBER_PREFIX.sub("", utterance or "")
+        text = " ".join(HERE_CUES.sub(" ", text).split()).strip(" .,!:—-") or None
+        label = str(proposal.target or "").strip() or text
+        if not label:
+            return Turn(outcome=CLARIFY, action=REMEMBER, game=game, stages=stages,
+                        reason="Что запомнить? Скажи, например: «запомни, тут база».",
+                        explanation=["в просьбе запомнить не названо, что именно"])
+        here = bool(HERE_CUES.search(utterance or ""))
+        explanation = []
+        place = position if here else None
+        if here and position is None:
+            explanation.append("игрок просил отметить место, но мод координат не присылал — "
+                               "записана заметка без места")
+        same = text is not None and text.lower().replace("ё", "е") == label.lower().replace("ё", "е")
+        fact = memory.note(label, None if same else text, position=place,
+                           source=PLAYER)
+        memory.save()
+        stages["memory"] = {"action": REMEMBER, "fact": fact.id, "kind": fact.kind}
+        summary = f"Запомнил: {fact.label}"
+        numbers: List[int] = []
+        if fact.position is not None:
+            summary += f", {fact.position.describe()}"
+            numbers = [fact.position.x, fact.position.y, fact.position.z]
+            explanation.append(f"отметка «{fact.label}» по позиции игрока: {fact.position.describe()}")
+        else:
+            explanation.append(f"заметка «{fact.label}» записана словами игрока")
+        summary += "."
+        if fact.kind != "place" and game.lower() != DEFAULT_GAME.lower():
+            summary += f" Спроси «где {fact.label}» — напомню."
+        return Turn(outcome=ACT, action=REMEMBER, label=fact.label, game=game, stages=stages,
+                    explanation=explanation, memory=(fact,), memory_summary=summary,
+                    memory_numbers=tuple(numbers))
+
+    def _subjects(self, target: Optional[str]) -> List[str]:
+        """Сущности онтологии, которые игрок назвал: сам предмет и блоки, из которых он
+        добывается, — «где алмазы» ищет алмазную руду."""
+        if not str(target or "").strip():
+            return []
+        resolution = self.resolver.resolve(str(target))
+        if not resolution.ok:
+            return []
+        subjects = [resolution.thing]
+        subjects.extend(source.id for source in self.kb.sources_of(resolution.thing)
+                        if source.kind != "creature")
+        return subjects
+
+    def _recall(self, utterance: str, proposal: Proposal, game: str, memory: Any,
+                position: Optional[Any], actions: Sequence[str], stages: Dict[str, Any]) -> Turn:
+        from memory.model import DEATH
+        from memory.recall import describe, numbers as fact_numbers, recall
+
+        label_of = self._label_of(game)
+        target = str(proposal.target or "").strip() or None
+        death = bool(DEATH_CUES.search(utterance or ""))
+        subjects = [] if death or game.lower() != DEFAULT_GAME.lower() else self._subjects(target)
+        if death:
+            last = memory.last_death()
+            facts = [last] if last is not None else []
+        else:
+            matches = recall(memory, target or utterance, subjects=subjects, position=position,
+                             label_of=label_of)
+            facts = [match.fact for match in matches]
+        stages["memory"] = {"action": RECALL, "query": target, "subjects": subjects,
+                            "death": death, "found": [fact.id for fact in facts]}
+
+        if not facts:
+            # В другой игре память — первый источник, поиск — второй, как и раньше.
+            if game.lower() != DEFAULT_GAME.lower() and SEARCH_WEB in actions and not death:
+                stages["memory"]["fallback"] = SEARCH_WEB
+                return self._search_web(utterance, proposal, game, stages)
+            what = "о гибели" if death else (f"про «{target}»" if target else "об этом")
+            return Turn(outcome=REJECT, action=RECALL, query=target, game=game, stages=stages,
+                        reason=f"В памяти этого мира ничего нет {what}.",
+                        explanation=[f"память: фактов {what} не найдено"])
+
+        spoken = facts[:RECALL_SPOKEN]
+        lines = [describe(fact, origin=position, label_of=label_of) for fact in spoken]
+        summary = "; ".join(lines) + "."
+        if len(facts) > len(spoken):
+            summary += f" Ещё {len(facts) - len(spoken)} — во вкладке «Память»."
+        numbers: List[int] = []
+        for fact in spoken:
+            numbers.extend(fact_numbers(fact))
+        explanation = [f"память: найдено фактов {len(facts)}, названо {len(spoken)}"]
+        explanation.extend(f"факт {fact.kind} «{fact.label or fact.subject}», источник {fact.source}"
+                           for fact in spoken)
+        return Turn(outcome=ACT, action=RECALL, query=target, game=game, stages=stages,
+                    label=spoken[0].label, explanation=explanation, memory=tuple(facts),
+                    memory_summary=summary, memory_numbers=tuple(numbers))
+
+    def _forget(self, utterance: str, proposal: Proposal, game: str, memory: Any,
+                position: Optional[Any], stages: Dict[str, Any]) -> Turn:
+        from memory.recall import recall
+
+        target = str(proposal.target or "").strip() or None
+        if not FORGET_CUES.search(utterance or ""):
+            return Turn(outcome=CLARIFY, action=FORGET_FACT, query=target, game=game, stages=stages,
+                        reason="Забыть это? Если да, скажи прямо: «забудь …».",
+                        explanation=["забыть предложено моделью, но в реплике нет просьбы забыть"])
+        if not target:
+            return Turn(outcome=CLARIFY, action=FORGET_FACT, game=game, stages=stages,
+                        reason="Что забыть? Назови отметку или заметку.",
+                        explanation=["в просьбе забыть не названо, что именно"])
+        subjects = self._subjects(target) if game.lower() == DEFAULT_GAME.lower() else []
+        matches = recall(memory, target, subjects=subjects, position=position,
+                         label_of=self._label_of(game))
+        stages["memory"] = {"action": FORGET_FACT, "query": target,
+                            "found": [match.fact.id for match in matches]}
+        if not matches:
+            return Turn(outcome=REJECT, action=FORGET_FACT, query=target, game=game, stages=stages,
+                        reason=f"Про «{target}» в памяти ничего нет — забывать нечего.",
+                        explanation=[f"память: фактов про «{target}» не найдено"])
+        best = matches[0].score
+        tied = [match.fact for match in matches if match.score == best]
+        if len(tied) > 1 and len({(fact.label or "").lower() for fact in tied}) > 1:
+            names = ", ".join(f"«{fact.label}»" for fact in tied[:RECALL_SPOKEN])
+            return Turn(outcome=CLARIFY, action=FORGET_FACT, query=target, game=game,
+                        stages=stages, reason=f"Что именно забыть: {names}?",
+                        explanation=[f"под «{target}» подходят несколько записей — забывание "
+                                     f"необратимо, поэтому нужен выбор"])
+        for fact in tied:
+            memory.forget(fact.id)
+        memory.save()
+        label = tied[0].label or target
+        return Turn(outcome=ACT, action=FORGET_FACT, label=label, query=target, game=game,
+                    stages=stages, memory=tuple(tied),
+                    memory_summary=f"Забыл отметку «{label}».",
+                    explanation=[f"забыто записей: {len(tied)}, «{label}»"])
 
     def _show_progress(self, inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:
         """Ступень развития игрока — целиком вывод решателя, модель его только озвучит.

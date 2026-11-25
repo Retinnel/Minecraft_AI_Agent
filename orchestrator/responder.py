@@ -134,6 +134,8 @@ class Responder:
                 return turn.progress_summary or "Ступень определить не удалось."
             if turn.world_summary:
                 return turn.world_summary
+            if turn.memory_summary:
+                return turn.memory_summary
             if turn.action == START_CAMPAIGN and turn.campaign:
                 # Обычно кампанию озвучивает рассказчик; шаблон — на случай, если его нет.
                 return (f"Кампания к цели «{turn.label or turn.target}»: "
@@ -258,6 +260,10 @@ class Responder:
         """
         if turn.outcome == ACT and turn.action in ACTION_VERBS:
             return str(turn.count) in text
+        if turn.outcome == ACT and turn.memory_summary is not None:
+            # Координаты из памяти ставит система: пересказ, потерявший или изменивший
+            # хоть одно число, заменяется шаблоном.
+            return keeps_numbers(text, turn.memory_numbers)
         if turn.outcome == ACT and turn.world is not None:
             # Ответ о мире — перечень из базы знаний. Пересказ, потерявший хоть одно
             # название, неполон; добавить своё модель может, но тогда уйдёт шаблон —

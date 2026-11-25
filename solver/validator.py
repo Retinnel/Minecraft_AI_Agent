@@ -28,12 +28,16 @@ MODE_ACTIONS = {
     CREATIVE: ("give_item", "remove_item", "summon_entity", "plan_goal",
                "create_quest", "claim_quest_reward", "start_campaign", "propose_goal",
                "show_progress", "ask_uses", "ask_sources", "ask_drops", "ask_available",
-               "ask_about", "search_web"),
+               "ask_about", "search_web", "remember", "recall", "forget_fact"),
     SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward",
                "start_campaign", "propose_goal", "show_progress",
                "ask_uses", "ask_sources", "ask_drops", "ask_available", "ask_about",
-               "search_web"),
+               "search_web", "remember", "recall", "forget_fact"),
 }
+
+# Действия памяти мира: ничего не меняют в игре и доступны в обоих режимах. Забыть факт —
+# действие необратимое, поэтому конвейер требует для него явных слов (FORGET_CUES).
+MEMORY_ACTIONS = ("remember", "recall", "forget_fact")
 
 # Действие требует, чтобы целью был предмет либо существо.
 ACTION_SUBJECT = {

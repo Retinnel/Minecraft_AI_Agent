@@ -33,10 +33,10 @@ def load_config(key: str) -> Config:
 
 
 # Действия, которые ничего не меняют в мире: план, справка из базы знаний, ступень развития,
-# поиск в сети. Если система ответила одним из них там, где разметка ждала другого, игрок
+# поиск в сети, ответ из памяти мира. Если система ответила одним из них там, где разметка ждала другого, игрок
 # получил не то, что просил, но ничего не произошло молча — это неудобство, а не опасность.
 READ_ONLY_INTENTS = frozenset({"plan_goal", "show_progress", "ask_uses", "ask_sources",
-                               "ask_drops", "ask_available", "search_web"})
+                               "ask_drops", "ask_available", "search_web", "recall"})
 
 
 def classify(case: Case, prediction: Prediction) -> str:

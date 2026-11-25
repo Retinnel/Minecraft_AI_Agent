@@ -51,6 +51,15 @@ ACTION_HINTS = {
                    "любой вопрос о другой игре. Вопросы «как сделать», «из чего», «откуда "
                    "берётся», «что выпадает» сюда не относятся — для них есть свои действия. "
                    "В \"target\" — тема словами игрока"),
+    "remember": ("игрок просит запомнить место или сведения: «запомни, тут портал», «запомни: "
+                 "ключ у благодати»; в \"target\" — короткое название того, что запомнить "
+                 "(«портал в Незер», «ключ-меч»)"),
+    "recall": ("игрок спрашивает, где он что-то видел или оставил, что лежит в его сундуке, "
+               "где он погиб, что ему говорил персонаж, что он просил запомнить: «где я видел "
+               "алмазы», «что в сундуке у базы», «где я умер», «где портал»; в \"target\" — "
+               "то, что ищет, словами игрока"),
+    "forget_fact": ("игрок просит забыть отметку или заметку: «забудь про базу», «удали "
+                    "отметку портала»; в \"target\" — что забыть"),
 }
 
 EXTRACTABLE = tuple(ACTION_HINTS)
@@ -62,6 +71,10 @@ EXTRACTABLE = tuple(ACTION_HINTS)
 OTHER_GAME_SEARCH_HINT = ("любой вопрос об игре: предметы и их назначение, рецепты, где что "
                           "найти, прохождение, боссы, диалоги и выборы, советы. В \"target\" — "
                           "тема словами игрока")
+# Рядом с действиями памяти поиск не должен забирать просьбы «запомни» и «что я просил
+# запомнить»: на них отвечает память, а если она пуста — поиск всё равно будет.
+OTHER_GAME_MEMORY_NOTE = (". Просьба запомнить, вопрос о том, что игрок просил запомнить или "
+                          "что ему говорил персонаж, сюда не относятся")
 OTHER_GAME_NONE_HINT = ('- "none" — только приветствие, благодарность или разговор не об игре; '
                         'просьбы выдать предмет или что-то сделать в игре — тоже "none".')
 
@@ -151,7 +164,8 @@ def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
     if search:
         rules += SEARCH_RULES
     other_game = bool(game) and game.lower() != "minecraft"
-    hints = {action: (OTHER_GAME_SEARCH_HINT if other_game and action == "search_web"
+    search_hint = OTHER_GAME_SEARCH_HINT + (OTHER_GAME_MEMORY_NOTE if "recall" in usable else "")
+    hints = {action: (search_hint if other_game and action == "search_web"
                       else ACTION_HINTS[action]) for action in usable}
     return PROMPT.format(
         game=game or "Minecraft",

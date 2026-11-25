@@ -32,6 +32,7 @@ class GroqAdvice(BaseModel):
     sources: List[dict] = Field(default_factory=list)     # откуда взят ответ, найденный в сети
     game: Optional[str] = None                 # игра, о которой идёт разговор
     screen: Optional[dict] = None              # что ассистент видел на экране при ответе
+    memory: List[dict] = Field(default_factory=list)      # факты памяти, на которых построен ответ
 
 
 class ChatMessage(BaseModel):

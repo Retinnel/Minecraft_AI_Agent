@@ -1193,6 +1193,35 @@ def _screen_facts():
         return None
 
 
+def _world_memory(game: str):
+    """Память мира для игры разговора; без неё действия памяти отвечают отказом."""
+    from memory.config import settings
+    if not settings()["enabled"]:
+        return None
+    try:
+        import memory
+        return memory.shared(game)
+    except Exception as error:   # память — дополнение: разговор идёт и без неё
+        logger.warning(f"[Memory] Память недоступна: {error}")
+        return None
+
+
+def _player_position():
+    from api.player_state import current_position
+    return current_position()
+
+
+def _memory_views(turn) -> List[Dict[str, Any]]:
+    """Факты, на которых построен ответ, — для карточки «Память» на /chat и в оверлее."""
+    facts = getattr(turn, "memory", None) or ()
+    if not facts:
+        return []
+    from api.memory import fact_view, label_of
+    names = label_of() if (turn.game or "Minecraft").lower() == "minecraft" else None
+    origin = _player_position()
+    return [fact_view(fact, origin=origin, names=names) for fact in facts[:10]]
+
+
 def _gaze_facts(message: ChatMessage) -> Optional[str]:
     """На что игрок смотрит и что держит — по сведениям мода, названиями из базы знаний.
 
@@ -1280,6 +1309,7 @@ def _advice_from_turn(turn, reply_text: str, last: Any, *, source: str) -> GroqA
         options=[option.label for option in (turn.options or [])],
         sources=turn.web.sources() if found_online else [],
         game=session.game,
+        memory=_memory_views(turn),
     )
 
 
@@ -1433,7 +1463,8 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
         turn = await asyncio.to_thread(
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
-            game=session.game, screen=seen or None)
+            game=session.game, screen=seen or None, memory=_world_memory(session.game),
+            position=_player_position())
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(
