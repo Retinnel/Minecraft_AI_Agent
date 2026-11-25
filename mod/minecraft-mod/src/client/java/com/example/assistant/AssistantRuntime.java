@@ -432,12 +432,28 @@ public final class AssistantRuntime {
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("health", (double) health);
         eventData.put("food", food);
+        putPosition(client, eventData);
         payload.put("event_data", eventData);
         payload.put("level", health <= 6.0f ? "WARNING" : "INFO");
         payload.put("message", "state: health=" + health + ", food=" + food);
         payload.put("player_health", (double) health);
 
         http.postLog(payload);
+    }
+
+    /**
+     * Измерение и координаты блока, на котором стоит игрок. По ним сервер отмечает места
+     * по «запомни, тут …», считает расстояние до найденного и называет место гибели.
+     */
+    static void putPosition(Minecraft client, Map<String, Object> eventData) {
+        if (client.player == null || client.level == null) {
+            return;
+        }
+        net.minecraft.core.BlockPos pos = client.player.blockPosition();
+        eventData.put("dimension", client.level.dimension().location().toString());
+        eventData.put("x", pos.getX());
+        eventData.put("y", pos.getY());
+        eventData.put("z", pos.getZ());
     }
 
     private void sendInventorySnapshot(Minecraft client, boolean force) {
@@ -927,6 +943,7 @@ public final class AssistantRuntime {
         payload.put("event_type", "death");
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("cause", cause);
+        putPosition(client, eventData);
         payload.put("event_data", eventData);
         payload.put("level", "ERROR");
         payload.put("message", "death: cause=" + cause);
