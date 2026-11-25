@@ -33,7 +33,23 @@ def _watcher() -> watchers.ScreenWatcher:
     watcher = watchers.shared()
     if watcher.on_game is None:
         watcher.on_game = _follow_game
+    if watcher.on_facts is None:
+        watcher.on_facts = _remember_screen
     return watcher
+
+
+def _remember_screen(facts) -> None:
+    """Реплика персонажа с кадра — в память мира текущей игры, если это разрешено настройками."""
+    import memory
+    from api.advice import _assistant_session
+    from memory.adapters.screen import enabled, remember_scene
+    from memory.config import settings
+
+    if not enabled(settings()):
+        return
+    store = memory.shared(_assistant_session().game)
+    if remember_scene(store, facts):
+        store.save()
 
 
 def _follow_game(game: str) -> None:

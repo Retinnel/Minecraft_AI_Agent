@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from collections import Counter
@@ -31,6 +32,8 @@ from vision import frames
 from vision.capture import WindowCapture
 from vision.guard import Detection, running_anticheat
 from vision.scene import Description, SceneFacts, VisionModel, VisionUnavailable
+
+logger = logging.getLogger(__name__)
 
 CONTINUOUS = "continuous"
 ON_DEMAND = "on_demand"
@@ -88,6 +91,8 @@ class ScreenWatcher:
         self._thread: Optional[threading.Thread] = None
         self._capture = None
         self.on_game: Optional[Callable[[str], None]] = None
+        # Получает каждый новый разобранный кадр — например, чтобы сохранить реплику в память.
+        self.on_facts: Optional[Callable[[SceneFacts], None]] = None
         self.reset()
 
     # --- состояние ---
@@ -229,6 +234,12 @@ class ScreenWatcher:
                 self._save(save_dir, frame, description)
             if game and self.on_game is not None:
                 self.on_game(game)
+            if self.on_facts is not None:
+                try:
+                    self.on_facts(description.facts)
+                except Exception as error:
+                    # Сбой памяти не должен останавливать наблюдение за экраном.
+                    logger.warning(f"[Vision] Факты кадра не сохранены: {error}")
             return description
 
     @staticmethod
