@@ -383,7 +383,8 @@ class Autopilot:
             if report.task_id and task and report.task_id != task.get("task_id"):
                 return {"status": RUNNING, "task": task}
             run.current_task = None
-            if report.stations:
+            # Пустой список — тоже сведения: помощник ушёл от верстака, и план должен это знать.
+            if report.stations or "stations" in report.model_fields_set:
                 run.stations = list(report.stations)
             inventory = dict(report.inventory or {})
             key = f"{task.get('kind')}:{task.get('item')}"

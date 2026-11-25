@@ -60,7 +60,8 @@ DEFAULTS: Dict[str, Any] = {
     "require_confirmation": True,
     "max_effort": 30,
     "max_run_minutes": 15,
-    "timeouts_s": {"mine": 180, "craft": 20, "smelt": 120, "place_station": 20,
+    # Помощник сам ходит к верстаку и печи, поэтому крафту и плавке нужен запас на дорогу.
+    "timeouts_s": {"mine": 180, "craft": 60, "smelt": 150, "place_station": 30,
                    "take_from_container": 90, "deliver": 120},
     "allowed_kinds": list(AUTOPILOT_DEFAULTS["allowed_kinds"]),
     "use_baritone": False,
