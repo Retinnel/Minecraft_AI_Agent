@@ -221,6 +221,9 @@ class ExecutionPlanner:
 
     def _mine(self, step: Step, context: Context, plan: Optional[Plan] = None):
         blocks = self._blocks(step, context.excluded)
+        if not blocks:
+            # Все годные блоки исключены после неудач — добывать нечего, запуск остановится.
+            return None
         count = step.count
         if plan is not None:
             # Всё, что плану нужно из того же источника и что уже можно добыть, — за один раз.
