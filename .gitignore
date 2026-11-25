@@ -95,3 +95,6 @@ data/vision_frames/
 
 # Состояние по мирам: история разговора, сессия, задания, кампания (api/worlds.py)
 data/worlds/
+
+# Помощник (companion/): зависимости Node и журнал процесса
+companion/node_modules/
