@@ -184,6 +184,19 @@ class ExecutorTests(unittest.TestCase):
         problems = self.check("minecraft:quartz")
         self.assertTrue(any("Незер" in problem for problem in problems), problems)
 
+    def test_deep_ores_are_refused(self):
+        # Сценарий из спецификации: алмазная кирка — отказ, потому что опасно и глубоко.
+        problems = self.check("minecraft:diamond_pickaxe")
+        self.assertTrue(any("на глубине" in problem for problem in problems), problems)
+        self.assertEqual(self.check("minecraft:iron_ingot"), [])
+
+    def test_deepslate_variants_only_when_nothing_else(self):
+        _, task = self.executor.next_task(
+            "minecraft:iron_ingot", 1, Context(inventory={"minecraft:stone_pickaxe": 1}))
+        self.assertEqual(task.kind, TASK_MINE)
+        self.assertIn("minecraft:iron_ore", task.blocks)
+        self.assertNotIn("minecraft:deepslate_iron_ore", task.blocks)
+
     def test_effort_limit(self):
         problems = self.check("minecraft:netherite_ingot")
         self.assertTrue(any("трудоёмкость" in problem for problem in problems), problems)

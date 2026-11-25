@@ -45,6 +45,10 @@ FORBIDDEN_REMOTE = {"nether": "путь идёт через Незер — ав�
                     "end": "путь идёт через Край — автопилот туда не ходит",
                     "unnatural": "нужен блок, который в мире сам не встречается"}
 
+# Руды, которым нужна железная кирка или лучше (алмазы, золото, редстоун, изумруды), лежат
+# глубоко, рядом с лавой и пещерами: в v1 автопилот за ними не спускается.
+DANGEROUS_TIERS = {"iron": "железной киркой", "diamond": "алмазной киркой"}
+
 # Топливо печи: сколько предметов переплавляет одна штука.
 FUEL = (("minecraft:coal", 8.0), ("minecraft:charcoal", 8.0), ("minecraft:coal_block", 80.0))
 FUEL_GROUPS = (("minecraft:logs_that_burn", 1.5), ("minecraft:planks", 1.5))
@@ -144,6 +148,11 @@ class ExecutionPlanner:
                 remote = self._remote(step.source)
                 if remote in FORBIDDEN_REMOTE:
                     problems.append(FORBIDDEN_REMOTE[remote])
+                tier = self._source(step.source, step.item).tool_tier
+                if tier in DANGEROUS_TIERS:
+                    label = self.kb.label(step.item) or step.item
+                    problems.append(f"«{label}» добывается {DANGEROUS_TIERS[tier]} на глубине — "
+                                    f"это опасно")
             kind = self._task_kind(step)
             if kind and kind not in self.allowed_kinds:
                 problems.append(f"задачи вида «{kind}» выключены в настройках")
@@ -312,7 +321,10 @@ class ExecutionPlanner:
                 candidates.append(source.id)
         if step.source:
             candidates = [step.source] + [block for block in candidates if block != step.source]
-        return self._natural_blocks(candidates, excluded, already_blocks=True)
+        blocks = self._natural_blocks(candidates, excluded, already_blocks=True)
+        # Глубинные разновидности (глубинный сланец) — только если других нет: незачем копать вниз.
+        shallow = [block for block in blocks if self._remote(block) != "deep"]
+        return shallow or blocks
 
     def _natural_blocks(self, items: Sequence[str], excluded: Sequence[str], *,
                         already_blocks: bool = False) -> List[str]:
