@@ -206,6 +206,7 @@ class Pipeline:
         self._planner: Optional[Planner] = None
         self._campaigns: Optional[CampaignBuilder] = None
         self._world: Optional[WorldFacts] = None
+        self._locator = None
 
     @property
     def planner(self) -> Planner:
@@ -213,6 +214,13 @@ class Pipeline:
         if self._planner is None:
             self._planner = Planner(self.kb)
         return self._planner
+
+    @property
+    def locator(self):
+        if self._locator is None:
+            from solver.locator import Locator
+            self._locator = Locator(self.kb)
+        return self._locator
 
     @property
     def campaigns(self) -> CampaignBuilder:
@@ -266,7 +274,7 @@ class Pipeline:
         # Продолжение уточнения достраивает действие Minecraft («какой меч?» → «алмазный»)
         # и в разговоре о другой игре дало бы команду в обход проверки игры ниже.
         if game.lower() == DEFAULT_GAME.lower():
-            follow_up = self._follow_up(utterance, pending, mode, inventory)
+            follow_up = self._follow_up(utterance, pending, mode, inventory, memory, position)
             if follow_up is not None:
                 return follow_up
 
@@ -287,7 +295,8 @@ class Pipeline:
             return self._search_web(utterance, proposal, game, stages)
 
         if proposal.action in MEMORY_ACTIONS and proposal.action in actions:
-            return self._memory_turn(utterance, proposal, game, memory, position, actions, stages)
+            return self._memory_turn(utterance, proposal, game, memory, position, actions, stages,
+                                     inventory)
 
         # Второй рубеж для чужой игры: модели предъявлен только поиск, но если она всё же
         # предложит выдачу или план, валидатор об игре не знает и пропустил бы команду
@@ -400,7 +409,8 @@ class Pipeline:
                 stages=stages,
             )
 
-        return self._decide(proposal.action, resolution.thing, count, mode, inventory, stages)
+        return self._decide(proposal.action, resolution.thing, count, mode, inventory, stages,
+                            memory=memory, position=position)
 
     def _suggest(self, phrase: str, action: str, stages: Dict[str, Any]) -> List[Candidate]:
         """Одна попытка переформулировки, когда резолвер ничего не нашёл.
@@ -434,7 +444,8 @@ class Pipeline:
         return []
 
     def _follow_up(self, utterance: str, pending: Optional["Turn"], mode: str,
-                   inventory: Optional[Dict[str, int]]) -> Optional["Turn"]:
+                   inventory: Optional[Dict[str, int]], memory: Optional[Any] = None,
+                   position: Optional[Any] = None) -> Optional["Turn"]:
         """Ответ на уточняющий вопрос разбирается без модели.
 
         После «какой именно: алмазный, железный…?» реплика «алмазный» сама по себе ни о чём
@@ -452,7 +463,8 @@ class Pipeline:
             chosen = pending.options[0].thing
             stages = {"follow_up": {"question": pending.reason, "answer": utterance,
                                     "chosen": chosen}}
-            return self._decide(pending.action, chosen, pending.count, mode, inventory, stages)
+            return self._decide(pending.action, chosen, pending.count, mode, inventory, stages,
+                                memory=memory, position=position)
 
         for query in (f"{utterance} {pending.query or ''}".strip(), utterance):
             resolution = self.resolver.resolve(query, action=pending.action)
@@ -460,22 +472,25 @@ class Pipeline:
             if chosen in offered:
                 stages = {"follow_up": {"question": pending.reason, "answer": utterance,
                                         "chosen": chosen}}
-                return self._decide(pending.action, chosen, pending.count, mode, inventory, stages)
+                return self._decide(pending.action, chosen, pending.count, mode, inventory, stages,
+                                memory=memory, position=position)
         return None
 
     def _decide(self, action: str, thing: str, count: Any, mode: str,
-                inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> "Turn":
+                inventory: Optional[Dict[str, int]], stages: Dict[str, Any], *,
+                memory: Optional[Any] = None, position: Optional[Any] = None) -> "Turn":
         """Вердикт валидатора и, если действие допустимо, команда или план."""
         # Вопрос о мире ничего в игре не меняет, поэтому проверять здесь нечего: спросить
         # можно и о запрещённом к призыву драконе. Отвечает база знаний.
         if action in WORLD_ACTIONS:
-            return self._answer_world(action, thing, inventory, stages)
+            return self._answer_world(action, thing, inventory, stages, memory=memory,
+                                      position=position)
 
         verdict = self.validator.validate(action, thing, count, mode)
         stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
 
         if verdict.outcome == ACT and verdict.action == PLAN_GOAL:
-            return self._build_plan(verdict, inventory, stages)
+            return self._build_plan(verdict, inventory, stages, memory=memory, position=position)
         if verdict.outcome == ACT and verdict.action == START_CAMPAIGN:
             return self._build_campaign(verdict, mode, inventory, stages)
 
@@ -579,7 +594,8 @@ class Pipeline:
         return verdict, verdict.reason or "задание не прошло проверку"
 
     def _build_plan(self, verdict, inventory: Optional[Dict[str, int]],
-                    stages: Dict[str, Any]) -> Turn:
+                    stages: Dict[str, Any], *, memory: Optional[Any] = None,
+                    position: Optional[Any] = None) -> Turn:
         """План достижения цели от текущего инвентаря.
 
         Здесь символьная часть работает уже не арбитром, а исполнителем: ответ целиком
@@ -587,7 +603,13 @@ class Pipeline:
         отказ, а план с отметкой, на каком предмете вывод упёрся, — игроку важнее знать,
         чего не хватает, чем услышать «нельзя».
         """
-        plan = self.planner.plan(verdict.target, verdict.count, inventory)
+        storage, where, known = {}, {}, {}
+        if memory is not None:
+            locator = self.locator
+            storage, where = locator.storage(memory, position)
+            known = locator.known_sources(memory, position)
+        plan = self.planner.plan(verdict.target, verdict.count, inventory,
+                                 storage=storage, where=where, known=known)
         stages["planner"] = {
             "feasible": plan.feasible,
             "steps": len(plan.actions()),
@@ -601,6 +623,17 @@ class Pipeline:
             if plan.feasible else
             f"вывод упёрся на: {', '.join(plan.missing[:3])}"
         )
+        taken = [step for step in plan.taken() if not step.children]
+        if taken:
+            stages["planner"]["taken"] = {step.item: step.count for step in taken}
+            explanation.append("из хранилищ по памяти мира: " + ", ".join(
+                f"{self.kb.label(step.item) or step.item} ×{step.count}"
+                + (f" ({step.where})" if step.where else "") for step in taken))
+        seen = [step for step in plan.actions() if step.where]
+        if seen:
+            explanation.append("источники, которые ты видел: " + ", ".join(
+                dict.fromkeys(f"{self.kb.label(step.source) or step.source} — {step.where}"
+                              for step in seen)))
         return Turn(
             outcome=ACT,
             action=PLAN_GOAL,
@@ -654,7 +687,8 @@ class Pipeline:
         )
 
     def _answer_world(self, action: str, thing: Optional[str],
-                      inventory: Optional[Dict[str, int]], stages: Dict[str, Any]) -> Turn:
+                      inventory: Optional[Dict[str, int]], stages: Dict[str, Any], *,
+                      memory: Optional[Any] = None, position: Optional[Any] = None) -> Turn:
         """Вопрос о мире: что делается из предмета, откуда он, что падает, что доступно.
 
         Ответ — обратный запрос к онтологии. Модель определила только вид вопроса и назвала
@@ -674,13 +708,39 @@ class Pipeline:
             answer = self._world.drops(thing)
         stages["world"] = {"question": answer.question, "subject": thing,
                            "items": list(answer.items), "total": answer.total}
+        summary = render_answer(answer, self.kb)
+        explanation = list(answer.explanation)
+        facts: List[Any] = []
+        numbers: List[int] = []
+        # «Откуда берётся» и «что это» дополняются тем, где игрок такое уже видел.
+        if memory is not None and thing and action in (SOURCES, ABOUT):
+            located = self.locator.locate(thing, memory, inventory=inventory, position=position)
+            if located:
+                nearest = located[0]
+                facts = [entry.fact for entry in located]
+                summary += " Ты видел: " + self._seen_text(nearest, position) + "."
+                if nearest.fact.position is not None:
+                    numbers = [nearest.fact.position.x, nearest.fact.position.y,
+                               nearest.fact.position.z]
+                explanation.append(f"память мира: увиденных источников {len(located)}, "
+                                   f"ближайший — «{nearest.fact.label}»")
+                stages["world"]["seen"] = [entry.fact.id for entry in located]
         return Turn(
             outcome=ACT, action=action, target=thing,
             label=self.kb.label(thing) if thing else None,
-            explanation=list(answer.explanation), stages=stages,
-            world=answer, world_summary=render_answer(answer, self.kb),
+            explanation=explanation, stages=stages,
+            world=answer, world_summary=summary,
             world_essentials=tuple(world_essentials(answer, self.kb)),
+            memory=tuple(facts), memory_numbers=tuple(numbers),
         )
+
+    def _seen_text(self, entry, position: Optional[Any]) -> str:
+        from memory.recall import describe
+        from solver.locator import tool_sentence
+        text = describe(entry.fact, origin=position, label_of=self._label_of(DEFAULT_GAME),
+                        show_source=False)
+        sentence = tool_sentence(entry, self.kb)
+        return f"{text}. {sentence[:-1]}" if sentence else text
 
     def _search_web(self, utterance: str, proposal: Proposal, game: str,
                     stages: Dict[str, Any]) -> Turn:
@@ -727,7 +787,7 @@ class Pipeline:
 
     def _memory_turn(self, utterance: str, proposal: Proposal, game: str, memory: Optional[Any],
                      position: Optional[Any], actions: Sequence[str],
-                     stages: Dict[str, Any]) -> Turn:
+                     stages: Dict[str, Any], inventory: Optional[Dict[str, int]] = None) -> Turn:
         """Запомнить, вспомнить, забыть.
 
         Модель определила только вид просьбы и назвала предмет словами игрока. Что
@@ -747,7 +807,7 @@ class Pipeline:
         if action == FORGET_FACT:
             return self._forget(utterance, proposal, game, memory, position, stages)
         return self._recall(utterance, proposal, game, memory,
-                            position if is_minecraft else None, actions, stages)
+                            position if is_minecraft else None, actions, stages, inventory)
 
     def _remember(self, utterance: str, proposal: Proposal, game: str, memory: Any,
                   position: Optional[Any], stages: Dict[str, Any]) -> Turn:
@@ -801,7 +861,8 @@ class Pipeline:
         return subjects
 
     def _recall(self, utterance: str, proposal: Proposal, game: str, memory: Any,
-                position: Optional[Any], actions: Sequence[str], stages: Dict[str, Any]) -> Turn:
+                position: Optional[Any], actions: Sequence[str], stages: Dict[str, Any],
+                inventory: Optional[Dict[str, int]] = None) -> Turn:
         from memory.model import DEATH
         from memory.recall import describe, numbers as fact_numbers, recall
 
@@ -832,6 +893,16 @@ class Pipeline:
         spoken = facts[:RECALL_SPOKEN]
         lines = [describe(fact, origin=position, label_of=label_of) for fact in spoken]
         summary = "; ".join(lines) + "."
+        # Для руды — нужен ли инструмент и есть ли он: уровень из онтологии, инвентарь из игры.
+        if subjects and spoken[0].kind == "resource":
+            from solver.locator import tool_sentence
+            located = [entry for entry in self.locator.locate(subjects[0], memory,
+                                                                inventory=inventory,
+                                                                position=position)
+                       if entry.fact is spoken[0]]
+            sentence = tool_sentence(located[0], self.kb) if located else None
+            if sentence:
+                summary += " " + sentence
         if len(facts) > len(spoken):
             summary += f" Ещё {len(facts) - len(spoken)} — во вкладке «Память»."
         numbers: List[int] = []

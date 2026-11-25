@@ -270,7 +270,8 @@ class Responder:
             # проверить это по словам нельзя, поэтому перечень в шаблоне всегда полный.
             from resolver.text import name_stems
             said = set(name_stems(text))
-            return all(set(name_stems(name)) <= said for name in turn.world_essentials)
+            return (all(set(name_stems(name)) <= said for name in turn.world_essentials)
+                    and keeps_numbers(text, turn.memory_numbers))
         if turn.outcome == ACT and turn.action == SHOW_PROGRESS and turn.label:
             # Отчёт о ступени без названия следующей кирки теряет смысл «что дальше».
             from resolver.text import name_stems

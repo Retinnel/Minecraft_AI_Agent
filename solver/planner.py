@@ -1,8 +1,8 @@
 """Планировщик достижения цели.
 
 Отвечает на вопрос «как получить N штук предмета X, если у игрока сейчас вот это».
-Работает обратным выводом от цели: сначала пытается взять из инвентаря, затем изготовить,
-затем добыть. Если для добычи нужен инструмент, которого нет, план рекурсивно достраивает
+Работает обратным выводом от цели: сначала пытается взять из инвентаря, затем из
+известных хранилищ игрока, затем изготовить, затем добыть. Если для добычи нужен инструмент, которого нет, план рекурсивно достраивает
 и его.
 
 Планировщик обращается только к словарю ядра онтологии и не знает, что предметная область —
@@ -21,6 +21,7 @@ from kb.graph import KnowledgeBase, Recipe, Source
 
 # Как получен предмет на данном шаге.
 HAVE = "have"          # уже в инвентаре
+TAKE = "take"          # лежит в хранилище игрока — взять
 CRAFT = "craft"        # изготовить по рецепту
 SMELT = "smelt"        # переплавить
 STONECUT = "stonecut"  # вырезать камнерезом
@@ -83,6 +84,13 @@ WEIGHT_UNRELIABLE = 30   # выпадение может не случиться
 # раньше алмазной ступени.
 WEIGHT_REMOTE = {"deep": 1, "rare_biome": 3, "unnatural": 5, "nether": 13, "end": 16}
 UNNATURAL = "unnatural"
+# Взять из своего хранилища: дойти до сундука. Дешевле любого изготовления и добычи, но не
+# бесплатно, как инвентарь: при равных прочих лучше то, что уже с собой.
+WEIGHT_TAKE = 1
+# Источник, который игрок уже видел (память мира): искать его не нужно. Скидка мала и
+# служит только для выбора между равноценными источниками — железной рудой, которую игрок
+# видел, и глубинносланцевой, которую не видел.
+WEIGHT_KNOWN = 1
 
 
 @dataclass(frozen=True)
@@ -106,6 +114,9 @@ class Step:
     # Группа взаимозаменяемых предметов, из которой выбран предмет шага: тег рецепта либо
     # перечень вариантов через запятую. Рецепту годится любой из них — см. solver/groups.py.
     group: Optional[str] = None
+    # Где это взять или добыть по памяти мира: хранилище для «взять», увиденный источник
+    # для «добыть». Строку собирает память из координат мода.
+    where: Optional[str] = None
     children: Tuple["Step", ...] = ()
 
     def walk(self):
@@ -192,6 +203,10 @@ class Plan:
         """Все шаги, кроме уже имеющегося в инвентаре, в порядке обхода."""
         return [step for step in self.root.walk() if step.kind != HAVE]
 
+    def taken(self) -> List[Step]:
+        """Что взять из хранилищ игрока."""
+        return [step for step in self.root.walk() if step.kind == TAKE]
+
     def actions(self) -> List[Step]:
         """Только то, что игроку предстоит сделать: изготовить, добыть, выбить."""
         return [step for step in self.root.walk() if step.kind in
@@ -201,6 +216,15 @@ class Plan:
     def effort(self) -> int:
         """Суммарная трудоёмкость плана по тем же весам, по которым выбирался вариант."""
         return self.root.totals[1]
+
+
+def _stored(item: str) -> Tuple[str, str]:
+    """Ключ запаса хранилищ в общем счётчике.
+
+    Запасы хранилищ лежат в том же счётчике, что и инвентарь, под отдельными ключами: так
+    пробные ветки вывода копируют и откатывают их вместе, ничего не зная о хранилищах.
+    """
+    return (TAKE, item)
 
 
 def _fork(stock: Counter) -> Counter:
@@ -223,12 +247,28 @@ class Planner:
         self._cost_cache: Dict[str, int] = {}
         self._budget = 0
         self._decisions: List[Decision] = []
+        self._where: Dict[str, str] = {}
+        self._known: Dict[str, str] = {}
 
     # --- публичный интерфейс ---
 
     def plan(self, goal: str, count: int = 1,
-             inventory: Optional[Dict[str, int]] = None) -> Plan:
+             inventory: Optional[Dict[str, int]] = None,
+             storage: Optional[Dict[str, int]] = None,
+             where: Optional[Dict[str, str]] = None,
+             known: Optional[Dict[str, str]] = None) -> Plan:
+        """План от инвентаря.
+
+        storage — запасы известных хранилищ игрока (память мира), предмет → количество;
+        where — где лежит предмет, строкой для шага «взять»; known — источники добычи,
+        которые игрок видел, блок → где. Без них план тот же, что и раньше.
+        """
         stock = Counter(inventory or {})
+        for item, have in (storage or {}).items():
+            if have and have > 0:
+                stock[_stored(item)] = int(have)
+        self._where = dict(where or {})
+        self._known = dict(known or {})
         self._budget = self.max_expansions
         self._decisions = []
         root = self._resolve(goal, count, stock, frozenset(), 0)
@@ -254,10 +294,22 @@ class Planner:
         taken = min(stock.get(item, 0), count)
         if taken:
             stock[item] -= taken
-        remaining = count - taken
+        # Остальное, что найдётся в хранилищах игрока, — взять оттуда.
+        stored = min(stock.get(_stored(item), 0), count - taken)
+        if stored:
+            stock[_stored(item)] -= stored
+        remaining = count - taken - stored
 
         if remaining == 0:
-            return Step(kind=HAVE, item=item, count=taken, satisfied=True)
+            if not stored:
+                return Step(kind=HAVE, item=item, count=taken, satisfied=True)
+            take = self._take(item, stored)
+            if not taken:
+                return take
+            return Step(kind=TAKE, item=item, count=count, satisfied=True, weight=0,
+                        children=(Step(kind=HAVE, item=item, count=taken, satisfied=True), take))
+        if stored:
+            taken = (taken, stored)
 
         if depth >= self.max_depth:
             return self._missing(item, remaining, "превышена глубина вывода", taken)
@@ -301,16 +353,29 @@ class Planner:
 
         return self._merge_taken(item, count, step, taken)
 
-    @staticmethod
-    def _merge_taken(item: str, count: int, step: Step, taken: int) -> Step:
-        """Часть закрыта инвентарём, часть выводом — показываем оба шага."""
-        if not taken:
+    def _take(self, item: str, count: int) -> Step:
+        return Step(kind=TAKE, item=item, count=count, satisfied=True, weight=WEIGHT_TAKE,
+                    where=self._where.get(item))
+
+    def _prefix(self, item: str, taken) -> Tuple[Step, ...]:
+        """Шаги «есть» и «взять» для части, закрытой инвентарём и хранилищами."""
+        have, stored = taken if isinstance(taken, tuple) else (taken, 0)
+        steps: List[Step] = []
+        if have:
+            steps.append(Step(kind=HAVE, item=item, count=have, satisfied=True))
+        if stored:
+            steps.append(self._take(item, stored))
+        return tuple(steps)
+
+    def _merge_taken(self, item: str, count: int, step: Step, taken) -> Step:
+        """Часть закрыта инвентарём (и хранилищами), часть выводом — показываем все шаги."""
+        prefix = self._prefix(item, taken)
+        if not prefix:
             return step
         return Step(kind=step.kind, item=item, count=count, satisfied=step.satisfied,
                     station=step.station, source=step.source, tool_kind=step.tool_kind,
-                    tool_tier=step.tool_tier, reason=step.reason,
-                    children=(Step(kind=HAVE, item=item, count=taken, satisfied=True),
-                              *step.children))
+                    tool_tier=step.tool_tier, reason=step.reason, where=step.where,
+                    children=(*prefix, *step.children))
 
     def _try_recipes(self, item: str, count: int, stock: Counter,
                      stack: frozenset, depth: int) -> Optional[Step]:
@@ -415,9 +480,13 @@ class Planner:
                 children.append(tool_step)
                 satisfied = tool_step.satisfied
 
+        weight = self._source_weight(source)
+        where = self._known.get(source.id)
+        if where is not None:
+            weight = max(WEIGHT_STEP, weight - WEIGHT_KNOWN)
         return Step(kind=kind, item=item, count=count, satisfied=satisfied,
                     source=source.id, tool_kind=source.tool_kind, tool_tier=source.tool_tier,
-                    rare=source.rare, weight=self._source_weight(source),
+                    rare=source.rare, weight=weight, where=where,
                     children=tuple(children))
 
     @staticmethod
@@ -451,6 +520,12 @@ class Planner:
         for tool in suitable:
             if stock.get(tool.id, 0) > 0:
                 return Step(kind=HAVE, item=tool.id, count=1, satisfied=True)
+        # Подходящий инструмент лежит в хранилище — взять его, а не делать новый.
+        for tool in suitable:
+            if stock.get(_stored(tool.id), 0) > 0:
+                stock[_stored(tool.id)] -= 1
+                stock[tool.id] += 1
+                return self._take(tool.id, 1)
 
         # Берём минимальный достаточный уровень, а при равном уровне — самый дешёвый.
         #
@@ -480,7 +555,8 @@ class Planner:
         """
         if not alternatives:
             return None
-        available = [item for item in alternatives if stock.get(item, 0) > 0]
+        available = [item for item in alternatives
+                     if stock.get(item, 0) > 0 or stock.get(_stored(item), 0) > 0]
         # На шаг вперёд: вариант, который изготавливается прямо из инвентаря, лучше того,
         # за которым нужно идти в мир. Иначе при дубовых брёвнах в инвентаре доски
         # планировались бы из берёзы — она дешевле «вообще», но её у игрока нет.
@@ -626,11 +702,11 @@ class Planner:
 
     # --- вспомогательное ---
 
-    @staticmethod
-    def _missing(item: str, count: int, reason: str, taken: int) -> Step:
-        children = (Step(kind=HAVE, item=item, count=taken, satisfied=True),) if taken else ()
-        return Step(kind=MISSING, item=item, count=count + taken, satisfied=False,
-                    reason=reason, children=children)
+    def _missing(self, item: str, count: int, reason: str, taken) -> Step:
+        prefix = self._prefix(item, taken)
+        closed = sum(step.count for step in prefix)
+        return Step(kind=MISSING, item=item, count=count + closed, satisfied=False,
+                    reason=reason, children=prefix)
 
     @staticmethod
     def _score(step: Step) -> Tuple[int, int, int]:

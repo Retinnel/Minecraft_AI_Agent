@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 from kb.graph import KnowledgeBase
 from solver import groups
-from solver.planner import (CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, SMITH, STONECUT,
+from solver.planner import (CRAFT, HAVE, HUNT, MINE, MISSING, SMELT, SMITH, STONECUT, TAKE,
                             Decision, Option, Plan, Step)
 
 STATION_RU = {
@@ -47,6 +47,10 @@ def _describe(step: Step, kb: KnowledgeBase, generic: Optional[Dict[int, str]] =
 
     if step.kind == HAVE:
         return f"{head} — есть"
+    if step.kind == TAKE:
+        if step.children:
+            return f"{head} — часть есть, остальное взять из хранилища"
+        return f"{head} — взять из хранилища" + (f": {step.where}" if step.where else "")
     if step.kind in (CRAFT, SMELT, STONECUT, SMITH):
         return f"{head} — {'скрафтить' if step.kind == CRAFT else 'изготовить'} " \
                f"{STATION_RU.get(step.station, step.station or '')}".rstrip()
@@ -60,7 +64,8 @@ def _describe(step: Step, kb: KnowledgeBase, generic: Optional[Dict[int, str]] =
         # Источник не называется, когда он ничего не добавляет: «железная руда из
         # железной руды» и «любое бревно из берёзового бревна».
         origin = "" if grouped or source == (kb.label(step.item) or step.item) else f" из «{source}»"
-        return f"{head} — добыть{origin}{suffix}{_where(step, kb)}"
+        seen = f"; ты видел: {step.where}" if step.where else ""
+        return f"{head} — добыть{origin}{suffix}{_where(step, kb)}{seen}"
     if step.kind == HUNT:
         source = kb.label(step.source) or step.source
         return f"{head} — выбить из «{source}»{_where(step, kb)}"
@@ -127,13 +132,19 @@ def render_summary(plan: Plan, kb: KnowledgeBase) -> str:
         return text
 
     actions = plan.actions()
+    taken = [step for step in plan.taken() if not step.children]
+    took = ""
+    if taken:
+        names = ", ".join(f"{_inline(kb.label(step.item) or step.item)} ×{step.count}"
+                          for step in taken[:3])
+        took = f"взять из хранилища: {names}" + (" и другое" if len(taken) > 3 else "")
     if not actions:
-        return f"{goal} уже есть в инвентаре."
+        return f"{goal}: {took}." if took else f"{goal} уже есть в инвентаре."
 
     mined = [step for step in actions if step.kind in (MINE, HUNT)]
     crafted = [step for step in actions if step.kind in (CRAFT, SMELT, STONECUT, SMITH)]
 
-    parts = []
+    parts = [took] if took else []
     if mined:
         generic = groups.in_plan(plan)
         names = list(dict.fromkeys(_inline(_name(s, kb, generic)) for s in mined))
