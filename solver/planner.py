@@ -117,6 +117,9 @@ class Step:
     # Где это взять или добыть по памяти мира: хранилище для «взять», увиденный источник
     # для «добыть». Строку собирает память из координат мода.
     where: Optional[str] = None
+    # Рецепт, по которому изготавливается предмет (Recipe.id): по нему мод в режиме
+    # «Сделай сам» раскладывает крафт через книгу рецептов.
+    recipe: Optional[str] = None
     children: Tuple["Step", ...] = ()
 
     def walk(self):
@@ -249,6 +252,7 @@ class Planner:
         self._decisions: List[Decision] = []
         self._where: Dict[str, str] = {}
         self._known: Dict[str, str] = {}
+        self._excluded: frozenset = frozenset()
 
     # --- публичный интерфейс ---
 
@@ -256,12 +260,15 @@ class Planner:
              inventory: Optional[Dict[str, int]] = None,
              storage: Optional[Dict[str, int]] = None,
              where: Optional[Dict[str, str]] = None,
-             known: Optional[Dict[str, str]] = None) -> Plan:
+             known: Optional[Dict[str, str]] = None,
+             excluded_sources: Optional[Sequence[str]] = None) -> Plan:
         """План от инвентаря.
 
         storage — запасы известных хранилищ игрока (память мира), предмет → количество;
         where — где лежит предмет, строкой для шага «взять»; known — источники добычи,
         которые игрок видел, блок → где. Без них план тот же, что и раньше.
+        excluded_sources — блоки, из которых добыть не вышло (автопилот исключает источник
+        после повторных провалов); план ищет обход.
         """
         stock = Counter(inventory or {})
         for item, have in (storage or {}).items():
@@ -269,6 +276,7 @@ class Planner:
                 stock[_stored(item)] = int(have)
         self._where = dict(where or {})
         self._known = dict(known or {})
+        self._excluded = frozenset(excluded_sources or ())
         self._budget = self.max_expansions
         self._decisions = []
         root = self._resolve(goal, count, stock, frozenset(), 0)
@@ -375,7 +383,7 @@ class Planner:
         return Step(kind=step.kind, item=item, count=count, satisfied=step.satisfied,
                     station=step.station, source=step.source, tool_kind=step.tool_kind,
                     tool_tier=step.tool_tier, reason=step.reason, where=step.where,
-                    children=(*prefix, *step.children))
+                    recipe=step.recipe, children=(*prefix, *step.children))
 
     def _try_recipes(self, item: str, count: int, stock: Counter,
                      stack: frozenset, depth: int) -> Optional[Step]:
@@ -431,7 +439,7 @@ class Planner:
 
         return Step(kind=METHOD_STEPS.get(recipe.method, CRAFT), item=item, count=count,
                     satisfied=satisfied, station=recipe.station, weight=1,
-                    children=tuple(children))
+                    recipe=recipe.id, children=tuple(children))
 
     def _try_sources(self, item: str, count: int, stock: Counter,
                      stack: frozenset, depth: int) -> Optional[Step]:
@@ -462,7 +470,8 @@ class Planner:
         неоткуда, поэтому такой источник берётся только тогда, когда другого пути у
         предмета нет вовсе — ни настоящего источника, ни рецепта.
         """
-        sources = self.kb.sources_of(item)
+        sources = [source for source in self.kb.sources_of(item)
+                   if source.id not in self._excluded]
         natural = [source for source in sources if source.remote != UNNATURAL]
         if natural or self.kb.recipes_for(item):
             return natural
