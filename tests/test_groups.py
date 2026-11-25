@@ -56,8 +56,10 @@ class GroupNamesTests(unittest.TestCase):
 
     def test_source_is_not_repeated_when_it_adds_nothing(self):
         tree = self.tree("iron_pickaxe")
-        self.assertIn("Железная руда ×3 — добыть (каменная кирка и выше)", tree)
-        self.assertNotIn("из «Железная руда»", tree)
+        self.assertIn("Любое бревно ×1 — добыть (топор)", tree)
+        self.assertNotIn("из «Любое бревно»", tree)
+        # Руда без «Шёлкового касания» даёт необработанное железо — источник назван.
+        self.assertIn("Рудное железо ×3 — добыть из «Железная руда» (каменная кирка и выше)", tree)
 
     def test_summary_uses_the_same_names(self):
         summary = render_summary(self.planner.plan(mc("stone_pickaxe"), 1, {}), self.kb)

@@ -142,7 +142,7 @@ class QuestTests(unittest.TestCase):
         cls.checker = QuestChecker(cls.kb)
 
     def test_achievable_collect_quest_is_accepted(self):
-        verdict = self.checker.check(COLLECT, "minecraft:iron_ore", 10,
+        verdict = self.checker.check(COLLECT, "minecraft:raw_iron", 10,
                                      "minecraft:iron_pickaxe", 1,
                                      inventory={"minecraft:stone_pickaxe": 1})
         self.assertTrue(verdict.accepted)

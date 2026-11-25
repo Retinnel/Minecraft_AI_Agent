@@ -67,6 +67,10 @@ class Source:
     rare: bool = False
     # Где источник находится, если не в обычном Верхнем мире: deep | rare_biome | nether | end.
     remote: Optional[str] = None
+    # Блок выпадает сам собой только с «Шёлковым касанием»: у него есть обычное выпадение
+    # другим предметом (железная руда → необработанное железо, камень → булыжник).
+    # План на этом не строится, пока есть обычный путь, — в игре без чар придёт другое.
+    silk_touch: bool = False
 
     @property
     def remote_rank(self) -> int:
@@ -333,16 +337,20 @@ class KnowledgeBase:
             required = next(iter(self.graph.objects(source_uri, ont.TOOL_REQUIRED)), None)
 
             rare = (source_uri, ont.RARE_YIELD, target) in self.graph
+            silk_touch = source_id == item_id and any(
+                other != target and (source_uri, ont.RARE_YIELD, other) not in self.graph
+                for other in self.graph.objects(source_uri, ont.YIELDS))
             remote = next((str(value) for value in self.graph.objects(source_uri, ont.ACCESSIBILITY)),
                           None)
 
             sources.append(Source(id=source_id, kind=kind, tool_kind=tool_kind,
                                   tool_tier=tool_tier, tool_tier_rank=rank,
                                   tool_required=bool(required) if required is not None else False,
-                                  rare=rare, remote=remote))
+                                  rare=rare, remote=remote, silk_touch=silk_touch))
 
         # Сначала надёжные источники, затем то, что добыть проще, затем то, что ближе.
-        return sorted(sources, key=lambda s: (s.rare, s.tool_tier_rank, s.remote_rank, s.id))
+        return sorted(sources, key=lambda s: (s.rare, s.silk_touch, s.tool_tier_rank,
+                                              s.remote_rank, s.id))
 
     def accessibility(self, thing_id: str) -> Optional[str]:
         """Где сущность находится, если не в обычном Верхнем мире; None для обычного мира."""

@@ -510,7 +510,7 @@ class Planner:
             weight += WEIGHT_TOOL_TIER * (source.tool_tier_rank + 1)
         if source.kind == "creature":
             weight += WEIGHT_HUNT
-        if source.rare:
+        if source.rare or source.silk_touch:
             weight += WEIGHT_UNRELIABLE
         if source.remote:
             weight += WEIGHT_REMOTE.get(source.remote, 0)

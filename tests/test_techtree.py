@@ -78,8 +78,8 @@ class TechTreeTests(unittest.TestCase):
         # Нагрудник и кирка собираются из того, что лежит, без единой добычи.
         self.assertEqual(states[mc("iron_chestplate")].status, READY)
         self.assertEqual(states[mc("iron_pickaxe")].status, READY)
-        # Железная руда добывается каменной киркой, которая уже есть.
-        self.assertEqual(states[mc("iron_ore")].status, READY)
+        # Рудное железо добывается из руды каменной киркой, которая уже есть.
+        self.assertEqual(states[mc("raw_iron")].status, READY)
         # Алмаз ждёт железной кирки.
         self.assertEqual(states[mc("diamond")].status, LOCKED)
 
