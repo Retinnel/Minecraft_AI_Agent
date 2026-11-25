@@ -406,6 +406,16 @@ class AutopilotApiTests(Isolated):
         state = self.client.get("/api/autopilot/state").json()
         self.assertEqual(state["run"]["status"], DONE)
 
+    def test_http_next_takes_nearby_stations(self):
+        run = self.service.start(STONE_PICKAXE, 1, baritone=True)
+        self.service.confirm(run.run_id)
+        inventory = {"minecraft:stick": 2, "minecraft:wooden_pickaxe": 1, "minecraft:cobblestone": 3}
+        with patch.object(advice, "_inventory_counts", lambda: dict(inventory)):
+            reply = self.client.get("/api/autopilot/next",
+                                    params={"run_id": run.run_id, "stations": "crafting_table"}).json()
+        self.assertEqual(reply["task"]["kind"], "craft")
+        self.assertEqual(reply["task"]["station"], "crafting_table")
+
     def test_http_start_refuses_on_a_server(self):
         started = self.client.post("/api/autopilot/start", json={
             "goal": "каменная кирка", "singleplayer": False, "autopilot_available": True}).json()
@@ -459,3 +469,4 @@ class AutopilotApiTests(Isolated):
 
 if __name__ == "__main__":
     unittest.main()
+

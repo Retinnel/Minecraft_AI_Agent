@@ -429,12 +429,17 @@ async def post_confirm(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/next")
-async def get_next(run_id: Optional[str] = None) -> Dict[str, Any]:
+async def get_next(run_id: Optional[str] = None, stations: Optional[str] = None) -> Dict[str, Any]:
+    """stations — станции рядом с игроком через запятую (crafting_table,furnace) от мода."""
     from api.advice import _inventory_counts
     run = shared().state()
     if run is not None and run_id and run.run_id != run_id:
         return {"status": "idle"}
-    return shared().next(_inventory_counts(), memory=_memory(), position=_position())
+    nearby = None
+    if stations is not None:
+        nearby = [name for name in stations.split(",") if name.strip()]
+    return shared().next(_inventory_counts(), stations=nearby, memory=_memory(),
+                         position=_position())
 
 
 @router.post("/report")
