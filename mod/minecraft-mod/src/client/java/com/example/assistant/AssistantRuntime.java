@@ -78,11 +78,15 @@ public final class AssistantRuntime {
     private final WorldScanner scanner;
     private final ContainerTracker containers;
 
+    // «Сделай сам»: исполнение задач плана по одной.
+    private final AutopilotController autopilot;
+
     public AssistantRuntime(AssistantConfig cfg) {
         this.cfg = cfg;
         this.http = new HttpAssistantClient(cfg);
         this.scanner = new WorldScanner(http);
         this.containers = new ContainerTracker(http);
+        this.autopilot = new AutopilotController(http, cfg);
         this.runtimeSendIntervalTicks = Math.max(1, cfg.sendIntervalTicks);
         this.sendTickCountdown = this.runtimeSendIntervalTicks;
         this.adviceTickCountdown = Math.max(1, cfg.adviceIntervalTicks);
@@ -104,6 +108,10 @@ public final class AssistantRuntime {
      */
     public HttpAssistantClient getHttpClient() {
         return http;
+    }
+
+    public AutopilotController getAutopilot() {
+        return autopilot;
     }
 
     public String getLastPlanTree() {
@@ -151,6 +159,7 @@ public final class AssistantRuntime {
 
     private void rememberForOverlay(HttpAssistantClient.RPResponse rpResponse) {
         setAssistantMode(rpResponse.assistant_mode);
+        autopilot.onBrief(rpResponse.autopilot);
         if (rpResponse.outcome == null) {
             return;
         }
@@ -170,6 +179,7 @@ public final class AssistantRuntime {
             worldReady = false;
             scanner.reset();
             containers.reset();
+            autopilot.reset();
             return;
         }
 
@@ -190,6 +200,11 @@ public final class AssistantRuntime {
             sendStartup(client);
             sendInventorySnapshot(client, true);
             pullRPAndShow(client);
+            http.getAutopilotState().thenAccept(state -> {
+                if (state != null) {
+                    client.execute(() -> autopilot.onBrief(state.briefFromRun()));
+                }
+            });
         }
 
         sendTickCountdown -= 1;
@@ -209,6 +224,7 @@ public final class AssistantRuntime {
 
         scanner.tick(client);
         containers.tick(client);
+        autopilot.tick(client);
 
         if (sendTickCountdown <= 0) {
             sendTickCountdown = Math.max(1, runtimeSendIntervalTicks);
@@ -610,7 +626,13 @@ public final class AssistantRuntime {
 
         System.out.println("[AI Assistant] sendChatMessage called with: " + text);
         
-        http.sendChat(text, gazeFacts(Minecraft.getInstance())).thenAccept(rpResponse -> {
+        Minecraft game = Minecraft.getInstance();
+        Map<String, Object> facts = new LinkedHashMap<>(gazeFacts(game));
+        // Для «Сделай сам»: одиночная ли игра (мир не открыт в LAN), есть ли Baritone.
+        facts.put("singleplayer", AutopilotController.singleplayer(game));
+        facts.put("autopilot_available", true);
+        facts.put("baritone", BaritoneBridge.isAvailable());
+        http.sendChat(text, facts).thenAccept(rpResponse -> {
             System.out.println("[AI Assistant] Chat response received: " + (rpResponse != null ? "not null" : "null"));
 
             if (rpResponse == null) {

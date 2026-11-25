@@ -189,10 +189,10 @@ public final class HttpAssistantClient {
      * Реплика игрока и то, что игра знает о его взгляде: блок или существо под прицелом,
      * предмет в руке. Сервер по этим сведениям отвечает на «что это передо мной».
      */
-    public CompletableFuture<RPResponse> sendChat(String text, Map<String, String> gaze) {
+    public CompletableFuture<RPResponse> sendChat(String text, Map<String, ?> gaze) {
         System.out.println("[AI Assistant] HttpAssistantClient.sendChat called with: " + text);
         
-        Map<String, String> payload = new java.util.LinkedHashMap<>();
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("text", text);
         if (gaze != null) {
             payload.putAll(gaze);
@@ -444,6 +444,108 @@ public final class HttpAssistantClient {
                 });
     }
 
+    // --- «Сделай сам» ---
+
+    /** Следующая задача автопилота; stations — станции, которые стоят рядом с игроком. */
+    public CompletableFuture<AutopilotNext> getAutopilotNext(String runId, java.util.List<String> stations) {
+        StringBuilder path = new StringBuilder("/api/autopilot/next?stations=")
+                .append(java.net.URLEncoder.encode(String.join(",", stations), StandardCharsets.UTF_8));
+        if (runId != null) {
+            path.append("&run_id=").append(java.net.URLEncoder.encode(runId, StandardCharsets.UTF_8));
+        }
+        return getJson(path.toString(), AutopilotNext.class);
+    }
+
+    public CompletableFuture<AutopilotNext> postAutopilotReport(Map<String, Object> payload) {
+        return postJson("/api/autopilot/report", payload, AutopilotNext.class);
+    }
+
+    public CompletableFuture<AutopilotState> postAutopilotStop(String runId, String reason) {
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("run_id", runId);
+        payload.put("reason", reason);
+        return postJson("/api/autopilot/stop", payload, AutopilotState.class);
+    }
+
+    public CompletableFuture<AutopilotState> getAutopilotState() {
+        return getJson("/api/autopilot/state", AutopilotState.class);
+    }
+
+    private <T> CompletableFuture<T> postJson(String path, Map<String, Object> payload, Class<T> type) {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + path))
+                .timeout(Duration.ofSeconds(10))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(GSON.toJson(payload).getBytes(StandardCharsets.UTF_8)))
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenApply(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] POST " + path + " failed: HTTP " + resp.statusCode());
+                        return (T) null;
+                    }
+                    try {
+                        return GSON.fromJson(resp.body(), type);
+                    } catch (Exception e) {
+                        System.out.println("[AI Assistant] POST " + path + " parse error: " + e);
+                        return (T) null;
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.out.println("[AI Assistant] POST " + path + " exception: " + ex);
+                    return null;
+                });
+    }
+
+    /** Коротко о запуске: для чата, оверлея и решения, опрашивать ли задачи. */
+    public static final class AutopilotBrief {
+        public String run_id;
+        public String status;
+        public String goal;
+        public String label;
+        public int step;
+        public int total;
+        public String current;
+        public String message;
+    }
+
+    public static final class AutopilotNext {
+        public String status;
+        public AutopilotTask task;
+        public String message;
+    }
+
+    public static final class AutopilotState {
+        public AutopilotRun run;
+        public AutopilotBrief brief;
+        public boolean enabled;
+
+        public AutopilotBrief briefFromRun() {
+            if (brief != null || run == null) {
+                return brief;
+            }
+            AutopilotBrief result = new AutopilotBrief();
+            result.run_id = run.run_id;
+            result.status = run.status;
+            result.goal = run.goal;
+            result.label = run.label;
+            result.step = run.steps_done;
+            result.total = Math.max(run.total_estimate, run.steps_done);
+            result.message = run.message;
+            return result;
+        }
+    }
+
+    public static final class AutopilotRun {
+        public String run_id;
+        public String status;
+        public String goal;
+        public String label;
+        public int steps_done;
+        public int total_estimate;
+        public String message;
+    }
+
     public static final class ScanListResponse {
         public boolean enabled;
         public java.util.List<String> blocks;
@@ -528,6 +630,8 @@ public final class HttpAssistantClient {
         public String plan_alternatives;
         public java.util.List<String> explanation;
         public java.util.List<String> options;
+        // «Сделай сам»: состояние запуска после этого ответа.
+        public AutopilotBrief autopilot;
     }
 
     public static final class ModeResponse {

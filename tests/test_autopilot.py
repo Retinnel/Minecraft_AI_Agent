@@ -470,3 +470,37 @@ class AutopilotApiTests(Isolated):
 if __name__ == "__main__":
     unittest.main()
 
+
+MOD_DIR = (Path(__file__).resolve().parent.parent / "mod" / "minecraft-mod" / "src" / "client"
+           / "java" / "com" / "example" / "assistant")
+AUTOPILOT_SOURCES = ("AutopilotController.java", "AutopilotTask.java", "CraftingActions.java",
+                     "SmeltingActions.java", "SafetyMonitor.java", "BaritoneBridge.java",
+                     "BaritoneCalls.java")
+
+
+@unittest.skipUnless(MOD_DIR.exists(), "исходников мода нет")
+class ModContractTests(unittest.TestCase):
+    """Договор с модом, который проверяется без запуска игры."""
+
+    def source(self, name):
+        return (MOD_DIR / name).read_text(encoding="utf-8")
+
+    def test_mod_accepts_exactly_the_server_task_kinds(self):
+        import re
+        from solver.executor import TASK_KINDS
+        declared = re.search(r"KINDS = Set\.of\(([^)]*)\)", self.source("AutopilotTask.java")).group(1)
+        self.assertEqual(set(re.findall(r'"([a-z_]+)"', declared)), set(TASK_KINDS))
+
+    def test_autopilot_never_sends_commands_or_chat(self):
+        for name in AUTOPILOT_SOURCES:
+            text = self.source(name)
+            with self.subTest(source=name):
+                for banned in ("sendCommand", "sendChat", "connection.send", '"#'):
+                    self.assertNotIn(banned, text)
+
+    def test_baritone_types_live_in_one_class(self):
+        for path in MOD_DIR.glob("*.java"):
+            if path.name == "BaritoneCalls.java":
+                continue
+            with self.subTest(source=path.name):
+                self.assertNotIn("import baritone", path.read_text(encoding="utf-8"))
