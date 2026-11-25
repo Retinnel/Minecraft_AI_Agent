@@ -74,9 +74,15 @@ public final class AssistantRuntime {
     private static final int RECALLED_MESSAGES = 4;
     private static final int RECALLED_LENGTH = 110;
 
+    // Память мира: сканер ценных блоков и учёт хранилищ.
+    private final WorldScanner scanner;
+    private final ContainerTracker containers;
+
     public AssistantRuntime(AssistantConfig cfg) {
         this.cfg = cfg;
         this.http = new HttpAssistantClient(cfg);
+        this.scanner = new WorldScanner(http);
+        this.containers = new ContainerTracker(http);
         this.runtimeSendIntervalTicks = Math.max(1, cfg.sendIntervalTicks);
         this.sendTickCountdown = this.runtimeSendIntervalTicks;
         this.adviceTickCountdown = Math.max(1, cfg.adviceIntervalTicks);
@@ -162,6 +168,8 @@ public final class AssistantRuntime {
             // Игрок вышел из мира: при следующем входе мир объявляется серверу заново.
             currentWorldKey = null;
             worldReady = false;
+            scanner.reset();
+            containers.reset();
             return;
         }
 
@@ -198,6 +206,9 @@ public final class AssistantRuntime {
 
         maybeSendMvpEvents(client);
         maybeSendTelemetryEvents(client);
+
+        scanner.tick(client);
+        containers.tick(client);
 
         if (sendTickCountdown <= 0) {
             sendTickCountdown = Math.max(1, runtimeSendIntervalTicks);

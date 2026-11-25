@@ -392,6 +392,41 @@ public final class HttpAssistantClient {
         }
     }
 
+    // --- память мира ---
+
+    /** Какие блоки искать сканеру, радиус и частота: список задаёт сервер. */
+    public CompletableFuture<ScanListResponse> getScanList() {
+        return getJson("/api/memory/scan-list", ScanListResponse.class);
+    }
+
+    /** Наблюдения сканера или содержимое хранилища: path — observations или containers. */
+    public CompletableFuture<Void> postMemory(String path, Map<String, Object> payload) {
+        String route = "/api/memory/" + path;
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + route))
+                .timeout(Duration.ofSeconds(5))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(GSON.toJson(payload).getBytes(StandardCharsets.UTF_8)))
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] POST " + route + " failed: HTTP " + resp.statusCode());
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.out.println("[AI Assistant] POST " + route + " exception: " + ex);
+                    return null;
+                });
+    }
+
+    public static final class ScanListResponse {
+        public boolean enabled;
+        public java.util.List<String> blocks;
+        public int radius;
+        public int interval_s;
+    }
+
     private <T> CompletableFuture<T> getJson(String path, Class<T> type) {
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
