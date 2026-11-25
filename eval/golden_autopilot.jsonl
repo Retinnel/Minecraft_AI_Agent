@@ -1,0 +1,16 @@
+// Набор реплик «Сделай сам». Формат тот же, что у golden_set.jsonl (eval/schema.py).
+// Главный риск разбора — спутать «сделай сам» (execute_plan) и «как сделать» (plan_goal),
+// поэтому половина реплик граничные. Отказы — от валидатора: охота, Незер, глубокие руды.
+// Прогон: python -m eval.runner --config hybrid --golden-set eval/golden_autopilot.jsonl --autopilot
+// Режим выживания, одиночная игра, Baritone есть, инвентарь пуст — eval/autopilot_fixture.py.
+
+{"id": "auto-t-001", "utterance": "сделай сам каменную кирку", "group": "typical", "outcome": "act", "intent": "execute_plan", "item_id": "minecraft:stone_pickaxe", "count": 1}
+{"id": "auto-t-002", "utterance": "скрафти за меня верстак", "group": "typical", "outcome": "act", "intent": "execute_plan", "item_id": "minecraft:crafting_table", "count": 1}
+{"id": "auto-t-003", "utterance": "сам сделай печку", "group": "typical", "outcome": "act", "intent": "execute_plan", "item_id": "minecraft:furnace", "count": 1}
+{"id": "auto-t-004", "utterance": "сделай мне сам 4 факела", "group": "typical", "outcome": "act", "intent": "execute_plan", "item_id": "minecraft:torch", "count": 4}
+{"id": "auto-b-001", "utterance": "как сделать каменную кирку", "group": "boundary", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:stone_pickaxe", "count": 1, "note": "«как сделать» — план, а не исполнение"}
+{"id": "auto-b-002", "utterance": "что нужно для печки", "group": "boundary", "outcome": "act", "intent": "plan_goal", "item_id": "minecraft:furnace", "count": 1}
+{"id": "auto-b-003", "utterance": "сделай сам", "group": "boundary", "outcome": "clarify", "intent": "execute_plan", "note": "не названо, что сделать"}
+{"id": "auto-n-001", "utterance": "сделай сам алмазную кирку", "group": "negative", "outcome": "reject", "intent": "execute_plan", "note": "алмазы с глубины под железную кирку — опасно"}
+{"id": "auto-n-002", "utterance": "сделай сам незеритовый слиток", "group": "negative", "outcome": "reject", "intent": "execute_plan", "note": "путь через Незер"}
+{"id": "auto-n-003", "utterance": "добудь за меня кожаную куртку", "group": "negative", "outcome": "reject", "intent": "execute_plan", "note": "нужна охота — вне v1"}

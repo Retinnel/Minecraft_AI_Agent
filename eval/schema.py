@@ -24,7 +24,8 @@ GROUPS = ("typical", "boundary", "negative")
 # предмета-цели, вместо него — метка факта, о котором речь (`subject`).
 MEMORY_INTENTS = ("remember", "recall", "forget_fact")
 
-INTENTS = ("give_item", "remove_item", "summon_entity", "plan_goal", *MEMORY_INTENTS, None)
+INTENTS = ("give_item", "remove_item", "summon_entity", "plan_goal", *MEMORY_INTENTS,
+           "execute_plan", None)
 
 
 @dataclass

@@ -433,6 +433,9 @@ def main() -> int:
     parser.add_argument("--memory", action="store_true",
                         help="подложить конфигурации память мира из eval/memory_fixture.py "
                              "(для набора golden_memory.jsonl; только гибрид)")
+    parser.add_argument("--autopilot", action="store_true",
+                        help="режим выживания с включённым «Сделай сам» в одиночной игре "
+                             "(для набора golden_autopilot.jsonl; только гибрид)")
     parser.add_argument("--tag",
                         help="метка в имени отчёта: прогон на другой модели не затирает "
                              "основной отчёт дня и не попадает в сводную таблицу")
@@ -451,6 +454,9 @@ def main() -> int:
     if args.memory:
         from eval.memory_fixture import with_memory
         config = with_memory(config)
+    if args.autopilot:
+        from eval.autopilot_fixture import with_autopilot
+        config = with_autopilot(config)
     runs = []
     for index in range(max(1, args.repeat)):
         if args.repeat > 1:
