@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional, Sequence
 
 from orchestrator.pipeline import (CREATE_QUEST, NONE, PLAN_GOAL, SEARCH_WEB, SHOW_PROGRESS,
                                    START_CAMPAIGN, Turn)
@@ -85,6 +85,21 @@ OTHER_GAME_CHAT_PROMPT = """Ты — игровой ассистент, игро
 находя ответы в интернете. Если игрок о чём-то просит, скажи это и предложи задать вопрос,
 например «как пройти …» или «для чего нужен …».
 Не придумывай фактов об игре: таких сведений у тебя здесь нет."""
+
+# Целые числа в тексте; минус бывает и типографский — так пишет координаты сама система.
+NUMBER = re.compile(r"[−–-]?\d+")
+
+
+def numbers_in(text: str) -> List[int]:
+    return [int(match.replace("−", "-").replace("–", "-"))
+            for match in NUMBER.findall((text or "").replace("\u00a0", " "))]
+
+
+def keeps_numbers(text: str, required: Iterable[int]) -> bool:
+    """Все ли числа, поставленные системой, прозвучали в пересказе — с тем же знаком."""
+    said = set(numbers_in(text))
+    return all(int(number) in said for number in required)
+
 
 ACTION_VERBS = {"give_item": "Выдаю", "remove_item": "Убираю", "summon_entity": "Призываю"}
 
@@ -206,12 +221,14 @@ class Responder:
             return Reply(template, TEMPLATE)
         return Reply(text, MODEL)
 
-    def phrase(self, facts: str, essentials: Optional[List[str]] = None) -> Reply:
+    def phrase(self, facts: str, essentials: Optional[List[str]] = None,
+               numbers: Sequence[int] = ()) -> Reply:
         """Пересказ готового вывода решателя, не связанного с репликой игрока.
 
         Так озвучивается разбор смерти: факты уже собраны текстом, модели остаётся сказать
         их короче и живее. Названия из `essentials` обязаны прозвучать (сверка по основам
-        слов), иначе в ответ уходит сам текст фактов.
+        слов), иначе в ответ уходит сам текст фактов. Числа из `numbers` — координаты,
+        количества — тоже: их ставит система, и пересказ не вправе их терять.
         """
         try:
             text = self._ask([
@@ -221,6 +238,8 @@ class Responder:
         except Exception:
             return Reply(facts, TEMPLATE)
         if not text:
+            return Reply(facts, TEMPLATE)
+        if numbers and not keeps_numbers(text, numbers):
             return Reply(facts, TEMPLATE)
         if essentials:
             from resolver.text import name_stems

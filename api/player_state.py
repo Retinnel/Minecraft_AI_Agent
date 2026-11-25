@@ -1,9 +1,10 @@
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from api.catalog_labels import get_entity_display_name_ru, get_item_display_name_ru
 from fastapi import APIRouter
+from memory.model import Position
 
 
 router = APIRouter(prefix="/api/player-state", tags=["player-state"])
@@ -25,6 +26,9 @@ _player_state: Dict[str, Any] = {
     # Причина последней смерти и инвентарь на её момент: после смерти он пустеет, а для
     # разбора нужен именно тот, с которым игрок погиб.
     "last_death": None,
+    # Последняя известная позиция игрока: измерение и координаты из событий мода. Нужна
+    # памяти мира — отметить место по «запомни, тут…» и считать расстояние до найденного.
+    "position": None,
 }
 
 
@@ -41,6 +45,7 @@ def reset_player_state() -> None:
     _player_state["last_kill_at"] = None
     _player_state["last_inventory_at"] = None
     _player_state["last_death"] = None
+    _player_state["position"] = None
 
 
 def progress_snapshot() -> Dict[str, Any]:
@@ -53,6 +58,7 @@ def progress_snapshot() -> Dict[str, Any]:
         "recent_kills": list(_player_state["recent_kills"]),
         "last_kill_at": _player_state["last_kill_at"],
         "last_death": deepcopy(_player_state["last_death"]),
+        "position": deepcopy(_player_state["position"]),
     }
 
 
@@ -71,6 +77,15 @@ def restore_progress(saved: Any) -> None:
         _player_state["last_kill_at"] = saved["last_kill_at"]
     if isinstance(saved.get("last_death"), dict):
         _player_state["last_death"] = deepcopy(saved["last_death"])
+    position = Position.parse(saved.get("position"))
+    if position is not None:
+        _player_state["position"] = {**position.to_dict(),
+                                     "at": (saved.get("position") or {}).get("at")}
+
+
+def current_position() -> Optional[Position]:
+    """Где игрок был по последнему сообщению мода; None, если мод координат не присылал."""
+    return Position.parse(_player_state.get("position"))
 
 
 def _now_iso() -> str:
@@ -140,6 +155,11 @@ def apply_log_to_player_state(entry: Any) -> None:
     timestamp = getattr(entry, "timestamp", None)
     timestamp_text = timestamp.isoformat() if timestamp else _now_iso()
 
+    # Позицию присылают состояние и гибель; хранится последняя.
+    position = Position.parse(event_data) if event_type in ("state", "death") else None
+    if position is not None:
+        _player_state["position"] = {**position.to_dict(), "at": timestamp_text}
+
     if event_type == "mob_kill":
         entity_id = str(event_data.get("entity_id") or "").strip()
         entity_name = str(event_data.get("entity_name") or entity_id).strip()
@@ -168,6 +188,8 @@ def apply_log_to_player_state(entry: Any) -> None:
             "cause": str(event_data.get("cause") or "unknown").strip(),
             "inventory": deepcopy(_player_state.get("inventory") or {}),
             "timestamp": timestamp_text,
+            # Место гибели — для разбора смерти и вопроса «где я умер».
+            "position": position.to_dict() if position is not None else None,
         }
         _player_state["updated_at"] = timestamp_text
 

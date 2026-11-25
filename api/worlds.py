@@ -18,6 +18,10 @@
 название мира — нет), для сетевой — адрес сервера. Страница `/chat` без игры работает в
 мире «без игры». Игрок у сервера один, поэтому мир — состояние процесса, а не поле запроса.
 
+Другая игра — отдельный мир. Заметки и факты с экрана о «Ведьмаке» не относятся ни к
+одному сохранению Minecraft, поэтому при смене игры заводится мир `game:<название>` (без учёта регистра) со
+своей папкой и своей памятью; к нему возвращаются, сколько бы раз игру ни меняли.
+
 Пока мир не выбран (тесты, сторонний код), модуль ничего не пишет и путей не трогает.
 """
 
@@ -42,6 +46,10 @@ CURRENT_FILE = "current.json"
 
 DEFAULT_WORLD = "web"
 DEFAULT_NAME = "Без игры"
+
+# Мир другой игры называется по игре: «game:ведьмак 3».
+GAME_PREFIX = "game:"
+DEFAULT_GAME = "Minecraft"
 
 # Сколько сообщений держать в памяти и отдавать клиентам; на диске история полная.
 MAX_LOADED = 300
@@ -125,6 +133,7 @@ def enter(world_id: str, name: Optional[str] = None) -> Dict[str, Any]:
         "dir": str(directory),
         "created_at": meta.get("created_at") or _now(),
         "new": not (directory / "meta.json").exists(),
+        "game": meta.get("game") or _game_of(world_id),
     }
     _load(directory)
     _touch_meta()
@@ -145,10 +154,65 @@ def restore() -> None:
 def _touch_meta() -> None:
     if not _current:
         return
-    _write(Path(_current["dir"]) / "meta.json", {
-        "id": _current["id"], "name": _current["name"],
-        "created_at": _current["created_at"], "last_seen": _now(),
-    })
+    meta = {"id": _current["id"], "name": _current["name"],
+            "created_at": _current["created_at"], "last_seen": _now()}
+    if _current.get("game"):
+        meta["game"] = _current["game"]
+    _write(Path(_current["dir"]) / "meta.json", meta)
+
+
+# --- миры других игр ---
+
+def _is_default_game(game: Optional[str]) -> bool:
+    return not game or game.strip().lower() == DEFAULT_GAME.lower()
+
+
+def _game_of(world_id: str) -> Optional[str]:
+    """Игра мира, заведённого под другую игру; None для миров Minecraft."""
+    if world_id.startswith(GAME_PREFIX):
+        return world_id[len(GAME_PREFIX):].strip() or None
+    return None
+
+
+def game_world_id(game: str) -> str:
+    """Идентификатор без учёта регистра: «ведьмак 3» и «Ведьмак 3» — одна игра."""
+    return f"{GAME_PREFIX}{' '.join(str(game).split()).lower()}"[:MAX_ID]
+
+
+def ensure_game_world(game: Optional[str]) -> Optional[Path]:
+    """Папка мира другой игры; заводится при первой смене игры. Для Minecraft — None.
+
+    Как и всё в модуле, без выбранного мира ничего не пишет.
+    """
+    if not _current or _is_default_game(game):
+        return None
+    world_id = game_world_id(game)
+    directory = _dir(world_id)
+    meta = _read(directory / "meta.json", None)
+    now = _now()
+    if not isinstance(meta, dict) or meta.get("id") != world_id:
+        meta = {"id": world_id, "name": " ".join(str(game).split())[:MAX_NAME],
+                "game": " ".join(str(game).split()), "created_at": now}
+    meta["last_seen"] = now
+    try:
+        _write(directory / "meta.json", meta)
+    except OSError as error:
+        logger.warning(f"[Worlds] Мир игры «{game}» не заведён: {error}")
+    return directory
+
+
+def memory_dir(game: Optional[str] = None) -> Optional[Path]:
+    """Где лежит память для игры, о которой сейчас разговор.
+
+    Minecraft — папка текущего мира. Другая игра — папка её собственного мира, если только
+    текущий мир и не есть мир этой игры. Без выбранного мира памяти на диске нет.
+    """
+    if not _current:
+        return None
+    own = _current.get("game")
+    if _is_default_game(game) or (own and own.lower() == str(game).strip().lower()):
+        return Path(_current["dir"])
+    return ensure_game_world(game)
 
 
 def _load(directory: Path) -> None:
@@ -181,6 +245,11 @@ def _load(directory: Path) -> None:
 
     player_state.reset_player_state()
     player_state.restore_progress(_read(directory / "player.json", {}))
+
+    # Мир другой игры: разговор в нём идёт об этой игре, даже если сессия ещё не сохранялась.
+    game = (_current or {}).get("game")
+    if game and sessions.shared().is_default_game:
+        sessions.shared().set_game(game)
 
     # То, что относилось к прежнему миру и в новом было бы ложью: недавние ответы,
     # предупреждение об угрозе, отметки обработанных событий.

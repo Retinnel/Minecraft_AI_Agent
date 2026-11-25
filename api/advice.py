@@ -984,7 +984,16 @@ def _death_reply() -> GroqAdvice:
             facts = f"Предупреждение об этой угрозе было за {ago} с до смерти. " + facts
             result.explanation.append(
                 f"предупреждение об угрозе «{result.threat_label}» было за {ago} с до смерти")
-    reply = _assistant_responder().phrase(facts, essentials(result, analyzer.kb))
+    # Место гибели ставит система по сообщению мода; пересказ, потерявший координаты,
+    # заменяется текстом фактов.
+    from memory.model import Position
+    place = Position.parse(death.get("position"))
+    numbers = []
+    if place is not None:
+        facts = f"Место гибели: {place.describe()}. " + facts
+        numbers = [place.x, place.y, place.z]
+        result.explanation.append(f"место гибели по сведениям мода: {place.describe()}")
+    reply = _assistant_responder().phrase(facts, essentials(result, analyzer.kb), numbers=numbers)
     plan = focus_plan(result)
     session = _assistant_session()
     return GroqAdvice(
@@ -1309,6 +1318,9 @@ async def _mode_reply(mode: str, text: str, last: Any) -> GroqAdvice:
 async def _game_reply(name: str, text: str) -> GroqAdvice:
     session = _assistant_session()
     session.set_game(name)
+    from api import worlds
+    # У другой игры свой мир: её заметки не смешиваются с памятью сохранений Minecraft.
+    worlds.ensure_game_world(session.game)
     reply = ("Возвращаемся к Minecraft: снова работают база знаний, планы и выдача."
              if session.is_default_game else
              f"Игра: {session.game}. Базы знаний по ней у меня нет — отвечаю по найденному "
@@ -1335,6 +1347,7 @@ async def set_assistant_game(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not session.set_game(name):
         return {"ok": False, "error": "Название игры пустое или слишком длинное.", "game": session.game}
     from api import worlds
+    worlds.ensure_game_world(session.game)
     worlds.save()
     return {"ok": True, "game": session.game, "knowledge_base": session.is_default_game}
 
