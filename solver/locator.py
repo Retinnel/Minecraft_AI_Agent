@@ -97,6 +97,33 @@ class Locator:
             where[item] = _place(fact, position)
         return totals, where
 
+    def container_for(self, store: MemoryStore, item: str,
+                      position: Optional[Position] = None):
+        """Ближайшее хранилище с предметом в измерении игрока: (позиция для мода, словами)."""
+        dimension = position.dimension if position else None
+        places = store.storage(dimension).get(item) or []
+        best = _nearest([fact for fact, _ in places], position)
+        return (best.position.to_dict(), _place(best, position)) if best else None
+
+    def nearest_block(self, store: MemoryStore, blocks, position: Optional[Position] = None):
+        """Ближайший увиденный блок из списка в измерении игрока: (позиция, словами)."""
+        wanted = set(blocks or ())
+        facts = [fact for fact in store.facts(RESOURCE)
+                 if fact.subject in wanted and fact.position is not None
+                 and (position is None or fact.position.dimension == position.dimension)]
+        best = _nearest(facts, position)
+        return (best.position.to_dict(), _place(best, position)) if best else None
+
+
+def _nearest(facts, position: Optional[Position]) -> Optional[Fact]:
+    best = None
+    for fact in facts:
+        if fact.position is None:
+            continue
+        if best is None or _closer(fact, best, position):
+            best = fact
+    return best
+
 
 def _closer(fact: Fact, other: Fact, position: Optional[Position]) -> bool:
     mine, theirs = fact.position.distance(position), other.position.distance(position)

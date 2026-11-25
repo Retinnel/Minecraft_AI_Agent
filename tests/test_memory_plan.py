@@ -151,6 +151,24 @@ class LocatorTests(unittest.TestCase):
         totals, _ = self.locator.storage(self.store, Position(NETHER, 0, 64, 0))
         self.assertEqual(totals, {})
 
+    def test_container_for_gives_the_nearest_chest_position(self):
+        container(self.store, chest({"minecraft:cobblestone": 9}, 100, 64, 0), self.kb)
+        container(self.store, chest({"minecraft:cobblestone": 3}, 5, 64, 5), self.kb)
+        position, text = self.locator.container_for(self.store, "minecraft:cobblestone", HOME)
+        self.assertEqual((position["x"], position["z"]), (5, 5))
+        self.assertTrue(text)
+        self.assertIsNone(self.locator.container_for(self.store, "minecraft:diamond", HOME))
+
+    def test_nearest_block_of_a_list_in_the_same_dimension(self):
+        observations(self.store, {"blocks": [
+            block("minecraft:iron_ore", 50, 40, 0),
+            block("minecraft:deepslate_iron_ore", 8, -10, 0),
+            block("minecraft:iron_ore", 1, 40, 1, NETHER)]}, self.kb)
+        position, _ = self.locator.nearest_block(
+            self.store, ["minecraft:iron_ore", "minecraft:deepslate_iron_ore"], HOME)
+        self.assertEqual(position["x"], 8)
+        self.assertIsNone(self.locator.nearest_block(self.store, ["minecraft:coal_ore"], HOME))
+
 
 @unittest.skipUnless(KB_PATH.exists(), "база знаний не собрана: запусти kb.build")
 class PipelineMemoryTests(unittest.TestCase):
