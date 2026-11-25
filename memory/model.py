@@ -123,7 +123,9 @@ KINDS = (PLACE, RESOURCE, CONTAINER, DEATH, NOTE, DIALOGUE)
 MOD = "mod"
 PLAYER = "player"
 SCREEN = "screen"
-CONFIDENCE = {MOD: 1.0, PLAYER: 0.9, SCREEN: 0.6}
+# Помощник — отдельный игрок под управлением сервера: видит мир так же точно, как мод.
+COMPANION = "companion"
+CONFIDENCE = {MOD: 1.0, PLAYER: 0.9, SCREEN: 0.6, COMPANION: 1.0}
 
 # Состояние факта.
 ACTIVE = "active"

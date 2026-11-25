@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
-from memory.model import Position
+from memory.model import COMPANION, MOD, Position
 from memory.store import MemoryStore
 
 
@@ -108,7 +108,7 @@ def observations(store: MemoryStore, payload: Dict[str, Any], kb=None) -> Dict[s
     removed = [position for position in (Position.parse(entry) for entry in
                                          list(payload.get("removed") or [])[:MAX_BATCH])
                if position is not None]
-    result = store.observe_blocks(found, removed, labels=labels)
+    result = store.observe_blocks(found, removed, labels=labels, source=_source(payload))
     result["skipped"] = skipped
     return result
 
@@ -128,4 +128,10 @@ def container(store: MemoryStore, payload: Dict[str, Any], kb=None):
             continue
         if count > 0 and _known(kb, item):
             items[item] = items.get(item, 0) + min(count, 27 * 64)
-    return store.record_container(block, position, items, label=_label(kb, block))
+    return store.record_container(block, position, items, label=_label(kb, block),
+                                  source=_source(payload))
+
+
+def _source(payload: Dict[str, Any]) -> str:
+    """Кто видел: мод игрока или помощник (отдельный игрок под управлением сервера)."""
+    return COMPANION if payload.get("source") == COMPANION else MOD

@@ -155,7 +155,7 @@ class MemoryStore:
     def observe_blocks(self, blocks: Iterable[Tuple[str, Position]],
                        removed: Iterable[Position] = (), *,
                        labels: Optional[Dict[str, str]] = None,
-                       now: Optional[str] = None) -> Dict[str, int]:
+                       now: Optional[str] = None, source: str = MOD) -> Dict[str, int]:
         """Пакет наблюдений сканера: найденные блоки и места, где блока больше нет."""
         now = now or now_iso()
         labels = labels or {}
@@ -173,7 +173,7 @@ class MemoryStore:
             coordinates = (position.x, position.y, position.z)
             if fact is None:
                 fact = self._new(RESOURCE, subject=subject, label=labels.get(subject) or subject,
-                                 position=position, now=now)
+                                 position=position, now=now, source=source)
                 fact.blocks = [coordinates]
                 index[key] = fact
                 added += 1
@@ -206,7 +206,8 @@ class MemoryStore:
         return {"added": added, "updated": updated, "stale": stale}
 
     def record_container(self, block: str, position: Position, items: Dict[str, int], *,
-                         label: Optional[str] = None, now: Optional[str] = None) -> Fact:
+                         label: Optional[str] = None, now: Optional[str] = None,
+                         source: str = MOD) -> Fact:
         """Содержимое хранилища при закрытии: заменяет прежнее, пустое тоже запоминается."""
         now = now or now_iso()
         contents = {}
@@ -221,7 +222,7 @@ class MemoryStore:
                      if existing.position == position), None)
         if fact is None:
             fact = self._new(CONTAINER, subject=block, label=label or block, position=position,
-                             now=now)
+                             now=now, source=source)
         else:
             self._seen(fact, now)
             fact.subject = block
