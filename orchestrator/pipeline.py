@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional, Protocol, Sequence
 
 from kb.graph import KnowledgeBase
@@ -28,7 +28,8 @@ from solver.planner import Plan, Planner
 from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
-from solver.validator import ACT, CLARIFY, CREATIVE, MEMORY_ACTIONS, REJECT, Validator
+from solver.validator import (ACT, CLARIFY, CREATIVE, EXECUTE_PLAN, MEMORY_ACTIONS, REJECT,
+                              Validator)
 from solver.worldfacts import (ABOUT, AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS,
                                WorldAnswer, WorldFacts, essentials as world_essentials,
                                render_answer)
@@ -52,7 +53,15 @@ DEFAULT_GAME = "Minecraft"
 # награды за задание) выполняются системой сами и модели не предъявляются.
 PROPOSABLE = ("give_item", "remove_item", "summon_entity", PLAN_GOAL, CREATE_QUEST,
               START_CAMPAIGN, PROPOSE_GOAL, SHOW_PROGRESS, *WORLD_ACTIONS, SEARCH_WEB,
-              *MEMORY_ACTIONS)
+              *MEMORY_ACTIONS, EXECUTE_PLAN)
+
+# «Сделай сам» в творческом режиме: модели такое действие не предъявляется, ответ даётся
+# без неё — предмет проще выдать.
+EXECUTE_CUES = re.compile(r"\b(сделай|скрафти|добудь|собери)\s+(мне\s+)?сам\b|\bсам\s+(сделай|скрафти|добудь)\b"
+                          r"|\bза\s+меня\b", re.IGNORECASE)
+
+# «Как сделать», «что нужно для» — просьба о плане, а не об исполнении.
+HOWTO_CUES = re.compile(r"\bкак\b|\bчто\s+нужно\b|\bчем\b|\bплан\b|\bрецепт", re.IGNORECASE)
 
 # Что доступно в игре без онтологии: память мира работает в любой игре — заметки игрока и
 # факты с экрана, — а остальное ищется в сети.
@@ -188,6 +197,9 @@ class Turn:
     memory: Sequence[Any] = ()
     memory_summary: Optional[str] = None
     memory_numbers: Sequence[int] = ()
+    # Заполняется только для execute_plan: запуск, ждущий подтверждения, и вопрос игроку.
+    autopilot: Optional[Dict[str, Any]] = None
+    autopilot_summary: Optional[str] = None
 
 
 class Pipeline:
@@ -209,6 +221,8 @@ class Pipeline:
         self._campaigns: Optional[CampaignBuilder] = None
         self._world: Optional[WorldFacts] = None
         self._locator = None
+        self._executor = None
+        self._autopilot: Dict[str, Any] = {}
 
     @property
     def planner(self) -> Planner:
@@ -238,11 +252,18 @@ class Pipeline:
             self._search = shared()
         return self._search
 
-    def actions_for(self, mode: str, game: Optional[str] = None) -> Sequence[str]:
-        """Действия, которые предъявляются модели в данном режиме и для данной игры."""
+    def actions_for(self, mode: str, game: Optional[str] = None,
+                    autopilot: bool = False) -> Sequence[str]:
+        """Действия, которые предъявляются модели в данном режиме и для данной игры.
+
+        «Сделай сам» предъявляется только тогда, когда автопилот включён: выключенный
+        режим не должен менять разбор остальных реплик.
+        """
         if game and game.lower() != DEFAULT_GAME.lower():
             return OTHER_GAME_ACTIONS
         allowed = set(self.validator.available_actions(mode))
+        if not autopilot:
+            allowed.discard(EXECUTE_PLAN)
         return tuple(action for action in PROPOSABLE if action in allowed)
 
     def handle(self, utterance: str, *, mode: Optional[str] = None,
@@ -253,7 +274,8 @@ class Pipeline:
                game: Optional[str] = None,
                screen: Optional[str] = None,
                memory: Optional[Any] = None,
-               position: Optional[Any] = None) -> Turn:
+               position: Optional[Any] = None,
+               autopilot: Optional[Dict[str, Any]] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -271,7 +293,16 @@ class Pipeline:
         """
         mode = mode or self.mode
         game = game or DEFAULT_GAME
-        actions = self.actions_for(mode, game)
+        # Сведения для «Сделай сам»: включён ли режим, одиночная ли игра, на связи ли мод.
+        self._autopilot = dict(autopilot or {})
+        actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")))
+
+        if (game.lower() == DEFAULT_GAME.lower() and mode == CREATIVE
+                and EXECUTE_CUES.search(utterance or "")):
+            verdict = self.validator.validate(EXECUTE_PLAN, None, 1, mode)
+            return Turn(outcome=REJECT, action=EXECUTE_PLAN, reason=verdict.reason,
+                        explanation=verdict.explanation + ["«сделай сам» в творческом режиме"],
+                        stages={"rule": "execute_in_creative"}, game=game)
 
         # Продолжение уточнения достраивает действие Minecraft («какой меч?» → «алмазный»)
         # и в разговоре о другой игре дало бы команду в обход проверки игры ниже.
@@ -335,6 +366,18 @@ class Pipeline:
 
         count = self._reconcile_count(utterance, proposal.count)
         stages["count"] = count
+
+        # «Сделай сам» против «как сделать» — главный риск разбора (B.11). Явные слова игрока
+        # важнее догадки модели: «сделай сам» — исполнение, «как сделать» без «сам» — план.
+        if EXECUTE_PLAN in actions and proposal.action in (PLAN_GOAL, EXECUTE_PLAN):
+            asked_to_do = bool(EXECUTE_CUES.search(utterance or ""))
+            asked_how = bool(HOWTO_CUES.search(utterance or ""))
+            if proposal.action == PLAN_GOAL and asked_to_do:
+                proposal = replace(proposal, action=EXECUTE_PLAN)
+                stages["rule"] = "execute_cue"
+            elif proposal.action == EXECUTE_PLAN and asked_how and not asked_to_do:
+                proposal = replace(proposal, action=PLAN_GOAL)
+                stages["rule"] = "howto_cue"
 
         # Удаление необратимо, поэтому одного слова модели для него мало: в реплике должна
         # быть просьба что-то убрать. Без этого модель, не найдя в перечне выдачи, хватает
@@ -495,6 +538,9 @@ class Pipeline:
             return self._build_plan(verdict, inventory, stages, memory=memory, position=position)
         if verdict.outcome == ACT and verdict.action == START_CAMPAIGN:
             return self._build_campaign(verdict, mode, inventory, stages)
+        if verdict.outcome == ACT and verdict.action == EXECUTE_PLAN:
+            return self._build_execution(verdict, inventory, stages, memory=memory,
+                                         position=position)
 
         command = None
         if verdict.outcome == ACT:
@@ -511,6 +557,74 @@ class Pipeline:
             explanation=verdict.explanation,
             stages=stages,
         )
+
+    @property
+    def executor(self):
+        if self._executor is None:
+            from solver.executor import ExecutionPlanner
+            self._executor = ExecutionPlanner(self.kb, self.planner)
+        return self._executor
+
+    def _build_execution(self, verdict, inventory: Optional[Dict[str, int]],
+                         stages: Dict[str, Any], *, memory: Optional[Any] = None,
+                         position: Optional[Any] = None) -> Turn:
+        """«Сделай сам»: план от инвентаря, проверка, что автопилот его выполнит, и вопрос.
+
+        Запуск только после «да» игрока; задачи моду выдаёт api/autopilot.py по одной,
+        с пересчётом плана после каждой. Модель здесь уже не участвует.
+        """
+        from solver.executor import Context
+
+        context_flags = self._autopilot
+        executor = self.executor
+        executor.max_effort = int(context_flags.get("max_effort") or executor.max_effort)
+        storage, where, known = {}, {}, {}
+        if memory is not None:
+            storage, where = self.locator.storage(memory, position)
+            known = self.locator.known_sources(memory, position)
+        context = Context(inventory=dict(inventory or {}), storage=storage, where=where,
+                          known=known)
+        plan = executor.plan(verdict.target, verdict.count, context)
+        label = self.kb.label(verdict.target) or verdict.target
+        actions = plan.actions()
+        taken = [step for step in plan.taken() if not step.children]
+        stages["planner"] = {"feasible": plan.feasible, "effort": plan.effort,
+                             "actions": len(actions), "taken": len(taken)}
+        if plan.feasible and not actions and not taken:
+            return Turn(outcome=REJECT, action=EXECUTE_PLAN, target=verdict.target, label=label,
+                        count=verdict.count, reason=f"«{label}» уже есть в инвентаре.",
+                        explanation=verdict.explanation + ["цель уже в инвентаре"],
+                        stages=stages)
+        problems = executor.check(plan)
+        checked = self.validator.validate_execution(
+            verdict, problems, enabled=bool(context_flags.get("enabled")),
+            singleplayer=context_flags.get("singleplayer"),
+            available=bool(context_flags.get("available")))
+        stages["autopilot"] = {"outcome": checked.outcome, "problems": problems}
+        if not checked.allowed:
+            return Turn(outcome=REJECT, action=EXECUTE_PLAN, target=verdict.target, label=label,
+                        count=verdict.count, reason=checked.reason,
+                        explanation=checked.explanation, stages=stages, plan=plan,
+                        plan_tree=render_tree(plan, self.kb),
+                        plan_summary=render_summary(plan, self.kb))
+        total = len(actions) + len(taken)
+        # Около 20 секунд на шаг: дойти, добыть или открыть станцию и забрать результат.
+        minutes = max(1, round(total * 20 / 60))
+        mining = any(step.kind == "mine" for step in actions)
+        note = ""
+        if mining and not context_flags.get("baritone"):
+            note = (" Baritone не установлен: добывать буду просить тебя, "
+                    "остальное сделаю сам.")
+        summary = (f"План: {render_summary(plan, self.kb)} Шагов около {total}, "
+                   f"примерно {minutes} мин.{note} Начать? Остановить — клавиша K "
+                   f"или любое движение.")
+        return Turn(outcome=ACT, action=EXECUTE_PLAN, target=verdict.target, label=label,
+                    count=verdict.count, explanation=checked.explanation, stages=stages,
+                    plan=plan, plan_tree=render_tree(plan, self.kb),
+                    plan_summary=render_summary(plan, self.kb),
+                    autopilot={"status": "pending_confirm", "total": total,
+                               "effort": plan.effort},
+                    autopilot_summary=summary)
 
     def _build_quest(self, utterance: str, proposal: Proposal, actions: Sequence[str],
                      mode: str, inventory: Optional[Dict[str, int]],

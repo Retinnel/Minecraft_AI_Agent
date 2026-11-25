@@ -32,8 +32,15 @@ MODE_ACTIONS = {
     SURVIVAL: ("remove_item", "plan_goal", "create_quest", "claim_quest_reward",
                "start_campaign", "propose_goal", "show_progress",
                "ask_uses", "ask_sources", "ask_drops", "ask_available", "ask_about",
-               "search_web", "remember", "recall", "forget_fact"),
+               "search_web", "remember", "recall", "forget_fact", "execute_plan"),
 }
+
+# «Сделай сам»: ассистент сам выполняет план решателя в игре. Только выживание — в
+# творческом режиме проще выдать предмет.
+EXECUTE_PLAN = "execute_plan"
+
+# Реестр всех действий: объединение режимов, порядок — как в творческом.
+ALL_ACTIONS = tuple(dict.fromkeys(MODE_ACTIONS[CREATIVE] + MODE_ACTIONS[SURVIVAL]))
 
 # Действия памяти мира: ничего не меняют в игре и доступны в обоих режимах. Забыть факт —
 # действие необратимое, поэтому конвейер требует для него явных слов (FORGET_CUES).
@@ -46,13 +53,14 @@ ACTION_SUBJECT = {
     "summon_entity": "creature",
     "plan_goal": "item",
     "start_campaign": "item",
+    EXECUTE_PLAN: "item",
 }
 
 MAX_ITEM_COUNT = 64
 MAX_SUMMON_COUNT = 16
 ACTION_LIMITS = {"give_item": MAX_ITEM_COUNT, "remove_item": MAX_ITEM_COUNT,
                  "summon_entity": MAX_SUMMON_COUNT, "plan_goal": MAX_ITEM_COUNT,
-                 "start_campaign": MAX_ITEM_COUNT}
+                 "start_campaign": MAX_ITEM_COUNT, EXECUTE_PLAN: MAX_ITEM_COUNT}
 
 # Какому запрету соответствует действие.
 ACTION_RESTRICTION = {"give_item": "give", "summon_entity": "summon"}
@@ -95,17 +103,18 @@ class Validator:
                  mode: str = CREATIVE) -> Verdict:
         trace: List[str] = []
 
-        if action not in MODE_ACTIONS[CREATIVE]:
+        if action not in ALL_ACTIONS:
             return Verdict(REJECT, action, reason=f"Действие «{action}» не поддерживается.",
                            explanation=trace + [f"действие {action} отсутствует в реестре"])
 
         # 1. Режим
         if action not in self.available_actions(mode):
             trace.append(f"режим {mode}: действие {action} недоступно")
-            return Verdict(REJECT, action, target=target,
-                           reason="В режиме выживания я не выдаю предметы — "
-                                  "могу построить план или предложить задание.",
-                           explanation=trace)
+            reason = ("В режиме выживания я не выдаю предметы — "
+                      "могу построить план или предложить задание.")
+            if action == EXECUTE_PLAN:
+                reason = "В творческом режиме проще выдать: скажи «дай …», и предмет будет в инвентаре."
+            return Verdict(REJECT, action, target=target, reason=reason, explanation=trace)
         trace.append(f"режим {mode}: действие {action} разрешено")
 
         # 2. Цель указана
@@ -160,6 +169,43 @@ class Validator:
 
         return Verdict(ACT, action, target=target, count=verdict_count,
                        game_id=self.kb.game_id(target), clamped=clamped, explanation=trace)
+
+    def validate_execution(self, verdict: Verdict, problems: Sequence[str], *,
+                           enabled: bool, singleplayer: Optional[bool],
+                           available: bool) -> Verdict:
+        """Допуск запуска «Сделай сам» после общей проверки цели и количества.
+
+        Проверяется то, что от модели не зависит: включён ли режим, одиночная ли игра, есть
+        ли мод, который будет исполнять, и выполним ли план автопилотом (виды шагов,
+        удалённость источников, трудоёмкость — `problems` от solver/executor.py).
+        """
+        if not verdict.allowed:
+            return verdict
+        trace = list(verdict.explanation)
+        label = self.kb.label(verdict.target) or verdict.target
+
+        def reject(reason: str, note: str) -> Verdict:
+            return Verdict(REJECT, EXECUTE_PLAN, target=verdict.target, count=verdict.count,
+                           reason=reason, explanation=trace + [note])
+
+        if not enabled:
+            return reject("«Сделай сам» выключен в настройках (раздел autopilot). "
+                          "Могу построить план — скажи «как сделать …».",
+                          "автопилот выключен в настройках")
+        if singleplayer is None or not available:
+            return reject("«Сделай сам» работает только в игре с модом: из браузера "
+                          "выполнить план нельзя.", "нет мода, который исполнит план")
+        if not singleplayer:
+            return reject("«Сделай сам» работает только в одиночной игре.",
+                          "игра не одиночная или открыта в LAN")
+        trace.append("одиночная игра, мод на связи, автопилот включён")
+        if problems:
+            return reject(f"Не возьмусь за «{label}»: " + "; ".join(problems)
+                          + ". Могу построить план или начать кампанию.",
+                          "план автопилоту не по силам: " + "; ".join(problems))
+        trace.append("план выполним автопилотом")
+        return Verdict(ACT, EXECUTE_PLAN, target=verdict.target, count=verdict.count,
+                       game_id=verdict.game_id, clamped=verdict.clamped, explanation=trace)
 
     @staticmethod
     def _is_carryable(kinds: Sequence[str]) -> bool:

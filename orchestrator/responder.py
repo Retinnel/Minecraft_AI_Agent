@@ -128,6 +128,8 @@ class Responder:
     def template(turn: Turn) -> str:
         """Ответ, собранный из выхода решателя без участия модели."""
         if turn.outcome == ACT:
+            if turn.autopilot_summary:
+                return turn.autopilot_summary
             if turn.action == PLAN_GOAL:
                 return turn.plan_summary or "План построен."
             if turn.action == SHOW_PROGRESS:
@@ -177,7 +179,18 @@ class Responder:
             return self._chat(utterance, state, summary, window or [])
         if turn.action == SEARCH_WEB and turn.outcome == ACT and turn.web is not None:
             return self._answer_web(turn, utterance)
+        if turn.autopilot_summary:
+            # Вопрос перед запуском «Сделай сам» — шаблоном: пересказ мог бы потерять
+            # «Начать?» и стоп-клавишу, а от них зависит согласие игрока.
+            return Reply(self.template(turn), TEMPLATE)
         return self._phrase(turn)
+
+    # --- отчёты «Сделай сам» ---
+
+    @staticmethod
+    def autopilot_line(event: Dict[str, Any]) -> str:
+        """Отчёт о ходе выполнения — шаблоном, без модели (B.11)."""
+        return str(event.get("response") or "").strip()
 
     # --- ответ по найденному в сети ---
 
