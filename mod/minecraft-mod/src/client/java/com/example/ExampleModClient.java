@@ -17,6 +17,7 @@ import org.lwjgl.glfw.GLFW;
 public class ExampleModClient implements ClientModInitializer {
 	private static AssistantRuntime runtime;
 	private static KeyMapping overlayKey;
+	private static KeyMapping autopilotStopKey;
 
 	@Override
 	public void onInitializeClient() {
@@ -30,10 +31,21 @@ public class ExampleModClient implements ClientModInitializer {
 			"category.aiassistant.general"
 		));
 
+		// «Сделай сам»: остановка автопилота (клавиша K)
+		autopilotStopKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.aiassistant.autopilot_stop",
+			GLFW.GLFW_KEY_K,
+			"category.aiassistant.general"
+		));
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			// Основной тик ассистента
 			runtime.onClientTick(client);
 			
+			while (autopilotStopKey.consumeClick()) {
+				runtime.getAutopilot().stopByPlayer(client);
+			}
+
 			// Проверка нажатия клавиши оверлея
 			while (overlayKey.consumeClick()) {
 				if (client.screen == null) {

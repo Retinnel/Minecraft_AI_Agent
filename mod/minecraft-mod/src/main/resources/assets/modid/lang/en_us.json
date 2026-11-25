@@ -1,4 +1,5 @@
 {
   "key.aiassistant.overlay": "Open AI Assistant overlay",
-  "category.aiassistant.general": "AI Assistant"
+  "category.aiassistant.general": "AI Assistant",
+  "key.aiassistant.autopilot_stop": "Stop autopilot"
 }

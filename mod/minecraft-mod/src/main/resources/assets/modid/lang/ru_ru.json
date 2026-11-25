@@ -1,4 +1,5 @@
 {
   "key.aiassistant.overlay": "Открыть оверлей AI-ассистента",
-  "category.aiassistant.general": "AI Assistant"
+  "category.aiassistant.general": "AI Assistant",
+  "key.aiassistant.autopilot_stop": "Остановить «Сделай сам»"
 }

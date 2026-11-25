@@ -37,6 +37,7 @@ public class AssistantOverlayScreen extends Screen {
     private Button memoryFilterButton;
     private Button cancelCampaignButton;
     private Button whyButton;
+    private Button autopilotStopButton;
     private Button modeButton;
 
     // Вкладка плана: прокрутка длинного дерева и переключение на объяснение выбора.
@@ -309,6 +310,12 @@ public class AssistantOverlayScreen extends Screen {
             btn.setMessage(Component.literal(whyLabel()));
         }).bounds(left + panelW - 130, top + 30, 115, 18).build();
         addRenderableWidget(whyButton);
+
+        // «Сделай сам»: то же, что клавиша K, — остановка с отчётом серверу.
+        autopilotStopButton = Button.builder(Component.literal("§c■ Стоп"), btn -> {
+            runtime.getAutopilot().stopByPlayer(Minecraft.getInstance());
+        }).bounds(left + panelW - 200, top + 30, 65, 18).build();
+        addRenderableWidget(autopilotStopButton);
         
         int btnY = top + panelH + 3;
         int spacing = 6;
@@ -393,6 +400,11 @@ public class AssistantOverlayScreen extends Screen {
         if (whyButton != null) {
             whyButton.visible = isPlan;
             whyButton.active = isPlan;
+        }
+        if (autopilotStopButton != null) {
+            boolean stoppable = isPlan && runtime.getAutopilot().isActive();
+            autopilotStopButton.visible = stoppable;
+            autopilotStopButton.active = stoppable;
         }
         if (campaignTabButton != null) {
             campaignTabButton.setMessage(Component.literal(isCampaign ? "§b§lКампания" : "§fКампания"));
@@ -775,6 +787,8 @@ public class AssistantOverlayScreen extends Screen {
         int y = top + 54;
         int bottom = top + panelH - 12;
 
+        y = renderAutopilotProgress(graphics, textLeft, y, maxWidth);
+
         java.util.List<String> lines = planLines();
         if (lines.isEmpty()) {
             // Плана нет — показываем цепочку правил последнего решения, если она есть:
@@ -828,6 +842,45 @@ public class AssistantOverlayScreen extends Screen {
                     + Math.min(lines.size(), planScroll + visible) + " из " + lines.size(),
                     left + panelW - 150, top + panelH - 11, COLOR_MUTED);
         }
+    }
+
+    /** Ход «Сделай сам» над планом: статус, шаг из скольких, что делается сейчас. */
+    private int renderAutopilotProgress(GuiGraphics graphics, int x, int y, int maxWidth) {
+        AutopilotController autopilot = runtime.getAutopilot();
+        if (autopilotStopButton != null) {
+            boolean stoppable = activeTab == Tab.PLAN && autopilot.isActive();
+            autopilotStopButton.visible = stoppable;
+            autopilotStopButton.active = stoppable;
+        }
+        HttpAssistantClient.AutopilotBrief brief = autopilot.getBrief();
+        if (brief == null || brief.status == null) {
+            return y;
+        }
+        String status = switch (brief.status) {
+            case "pending_confirm" -> "§eждёт «да»";
+            case "running" -> "§aвыполняю";
+            case "waiting" -> "§eжду, пока принесёшь";
+            case "paused" -> "§6пауза";
+            case "done" -> "§aготово";
+            case "failed" -> "§cне вышло";
+            case "stopped" -> "§7остановлен";
+            default -> brief.status;
+        };
+        String goal = brief.label != null ? brief.label : (brief.goal != null ? brief.goal : "");
+        String head = "§l▶ Сделай сам: §r" + goal + " — " + status;
+        if (brief.total > 0) {
+            head += "§r, шаг " + Math.min(brief.step + ("running".equals(brief.status) ? 1 : 0), brief.total)
+                    + " из " + brief.total;
+        }
+        graphics.drawString(font, font.plainSubstrByWidth(head, maxWidth), x, y, COLOR_TEXT);
+        y += font.lineHeight + 2;
+        String current = autopilot.currentStep();
+        String detail = current != null ? "Сейчас: " + current : brief.message;
+        if (detail != null && !detail.isBlank()) {
+            graphics.drawString(font, font.plainSubstrByWidth("§7" + detail, maxWidth), x, y, COLOR_MUTED);
+            y += font.lineHeight + 2;
+        }
+        return y + 4;
     }
 
     // --- вкладка кампании ---
