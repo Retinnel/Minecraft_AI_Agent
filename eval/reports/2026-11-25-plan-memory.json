@@ -1,0 +1,266 @@
+{
+  "summary": {
+    "goals": 12,
+    "shorter": 12,
+    "longer": 0,
+    "actions_before": 112,
+    "actions_after": 19,
+    "effort_before": 167,
+    "effort_after": 56,
+    "median_actions_cut": 82.3,
+    "median_effort_cut": 57.6
+  },
+  "rows": [
+    {
+      "goal": "minecraft:iron_pickaxe",
+      "label": "Железная кирка",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        12,
+        1
+      ],
+      "effort": [
+        18,
+        3
+      ],
+      "taken": {
+        "minecraft:stick": 2,
+        "minecraft:iron_ingot": 3
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:iron_sword",
+      "label": "Железный меч",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        12,
+        1
+      ],
+      "effort": [
+        17,
+        3
+      ],
+      "taken": {
+        "minecraft:stick": 1,
+        "minecraft:iron_ingot": 2
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:shield",
+      "label": "Щит",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        11,
+        1
+      ],
+      "effort": [
+        17,
+        3
+      ],
+      "taken": {
+        "minecraft:oak_planks": 6,
+        "minecraft:iron_ingot": 1
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:bucket",
+      "label": "Ведро",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        11,
+        1
+      ],
+      "effort": [
+        16,
+        2
+      ],
+      "taken": {
+        "minecraft:iron_ingot": 3
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:furnace",
+      "label": "Печь",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        8,
+        1
+      ],
+      "effort": [
+        9,
+        2
+      ],
+      "taken": {
+        "minecraft:cobblestone": 8
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:torch",
+      "label": "Факел",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        6,
+        1
+      ],
+      "effort": [
+        6,
+        3
+      ],
+      "taken": {
+        "minecraft:stick": 1,
+        "minecraft:coal": 1
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:bow",
+      "label": "Лук",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        5,
+        1
+      ],
+      "effort": [
+        5,
+        3
+      ],
+      "taken": {
+        "minecraft:stick": 3,
+        "minecraft:string": 3
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:iron_chestplate",
+      "label": "Железный нагрудник",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        11,
+        4
+      ],
+      "effort": [
+        16,
+        9
+      ],
+      "taken": {
+        "minecraft:iron_ingot": 7,
+        "minecraft:stick": 2,
+        "minecraft:cobblestone": 3
+      },
+      "seen_sources": [
+        "minecraft:iron_ore"
+      ]
+    },
+    {
+      "goal": "minecraft:diamond_pickaxe",
+      "label": "Алмазная кирка",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        14,
+        3
+      ],
+      "effort": [
+        26,
+        12
+      ],
+      "taken": {
+        "minecraft:stick": 2,
+        "minecraft:iron_ingot": 3
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:crafting_table",
+      "label": "Верстак",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        3,
+        1
+      ],
+      "effort": [
+        3,
+        2
+      ],
+      "taken": {
+        "minecraft:oak_planks": 4
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:chest",
+      "label": "Сундук",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        3,
+        1
+      ],
+      "effort": [
+        3,
+        2
+      ],
+      "taken": {
+        "minecraft:oak_planks": 8
+      },
+      "seen_sources": []
+    },
+    {
+      "goal": "minecraft:compass",
+      "label": "Компас",
+      "feasible": [
+        true,
+        true
+      ],
+      "actions": [
+        16,
+        3
+      ],
+      "effort": [
+        31,
+        12
+      ],
+      "taken": {
+        "minecraft:iron_ingot": 3,
+        "minecraft:stick": 2
+      },
+      "seen_sources": []
+    }
+  ]
+}

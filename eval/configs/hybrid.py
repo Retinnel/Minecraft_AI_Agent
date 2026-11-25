@@ -48,12 +48,15 @@ def _get_pipeline() -> Pipeline:
 
 
 def predict(utterance: str, *, mode: Optional[str] = None,
-            inventory: Optional[Dict[str, int]] = None) -> Prediction:
+            inventory: Optional[Dict[str, int]] = None,
+            memory: Optional[Any] = None, position: Optional[Any] = None) -> Prediction:
     """Золотой набор прогоняется в творческом режиме с пустым инвентарём (значения по
-    умолчанию); страница сравнения передаёт режим и инвентарь текущей сессии."""
+    умолчанию); страница сравнения передаёт режим и инвентарь текущей сессии.
+    Набор памяти мира передаёт ещё память и позицию игрока (eval/memory_fixture.py)."""
     started = time.perf_counter()
     try:
-        turn = _get_pipeline().handle(utterance, mode=mode, inventory=inventory)
+        turn = _get_pipeline().handle(utterance, mode=mode, inventory=inventory,
+                                      memory=memory, position=position)
     except ModelUnavailable as error:
         # Сбой канала связи — не решение системы, поэтому и не отказ.
         return Prediction(outcome="error", details={"error": str(error)},
@@ -71,7 +74,8 @@ def predict(utterance: str, *, mode: Optional[str] = None,
         latency_ms=latency,
         details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation,
                  "plan_tree": turn.plan_tree, "plan_summary": turn.plan_summary,
-                 "plan_alternatives": turn.plan_alternatives},
+                 "plan_alternatives": turn.plan_alternatives,
+                 "memory_labels": [fact.label for fact in turn.memory]},
     )
 
 

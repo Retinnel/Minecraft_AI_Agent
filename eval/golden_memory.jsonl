@@ -1,0 +1,15 @@
+// Набор реплик о памяти мира. Формат тот же, что у golden_set.jsonl (eval/schema.py);
+// вместо предмета-цели у действий памяти метка факта — поле subject.
+// Прогон: python -m eval.runner --config hybrid --golden-set eval/golden_memory.jsonl --memory
+// Память мира и позиция игрока — eval/memory_fixture.py.
+
+{"id": "mem-t-001", "utterance": "запомни, тут моя ферма", "group": "typical", "outcome": "act", "intent": "remember", "subject": "ферма"}
+{"id": "mem-t-002", "utterance": "где моя база?", "group": "typical", "outcome": "act", "intent": "recall", "subject": "база"}
+{"id": "mem-t-003", "utterance": "где я видел алмазы?", "group": "typical", "outcome": "act", "intent": "recall", "subject": "алмазная руда"}
+{"id": "mem-t-004", "utterance": "в каком сундуке у меня железо?", "group": "typical", "outcome": "act", "intent": "recall", "subject": "сундук"}
+{"id": "mem-t-005", "utterance": "где я умер в последний раз?", "group": "typical", "outcome": "act", "intent": "recall", "subject": "лава"}
+{"id": "mem-t-006", "utterance": "запомни: портал в Незер у деревни", "group": "typical", "outcome": "act", "intent": "remember", "subject": "портал в Незер"}
+{"id": "mem-b-001", "utterance": "забудь отметку шахта", "group": "boundary", "outcome": "act", "intent": "forget_fact", "subject": "шахта"}
+{"id": "mem-b-002", "utterance": "запомни", "group": "boundary", "outcome": "clarify", "intent": "remember", "note": "не названо, что запомнить"}
+{"id": "mem-b-003", "utterance": "шахта больше не нужна", "group": "boundary", "outcome": "clarify", "intent": "forget_fact", "policy": true, "note": "забывание только по явным словам «забудь», «удали»: иначе переспросить"}
+{"id": "mem-n-001", "utterance": "где я видел древние обломки?", "group": "negative", "outcome": "reject", "intent": "recall", "note": "в памяти этого нет; координаты не выдумываются"}

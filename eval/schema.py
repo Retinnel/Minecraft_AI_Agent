@@ -20,7 +20,11 @@ OUTCOMES = ("act", "clarify", "reject", "none")
 
 GROUPS = ("typical", "boundary", "negative")
 
-INTENTS = ("give_item", "remove_item", "summon_entity", "plan_goal", None)
+# Действия памяти мира размечаются в отдельном наборе (golden_memory.jsonl): у них нет
+# предмета-цели, вместо него — метка факта, о котором речь (`subject`).
+MEMORY_INTENTS = ("remember", "recall", "forget_fact")
+
+INTENTS = ("give_item", "remove_item", "summon_entity", "plan_goal", *MEMORY_INTENTS, None)
 
 
 @dataclass
@@ -39,6 +43,8 @@ class Case:
     # Разметка спорная и требует подтверждения: поведение зависит от принятой политики,
     # а не от объективно правильного ответа.
     policy: bool = False
+    # Только для действий памяти: метка факта словами игрока («база», «Алмазная руда»).
+    subject: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.outcome not in OUTCOMES:
@@ -47,6 +53,8 @@ class Case:
             raise ValueError(f"{self.id}: неизвестная group {self.group!r}")
         if self.intent not in INTENTS:
             raise ValueError(f"{self.id}: неизвестный intent {self.intent!r}")
+        if self.subject is not None and self.intent not in MEMORY_INTENTS:
+            raise ValueError(f"{self.id}: subject задаётся только для действий памяти")
         if self.outcome == "act" and self.intent is None:
             raise ValueError(f"{self.id}: outcome=act требует intent")
 

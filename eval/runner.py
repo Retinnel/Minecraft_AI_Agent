@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from eval.schema import Case, Config, Prediction, load_golden_set
+from eval.schema import MEMORY_INTENTS, Case, Config, Prediction, load_golden_set
 
 ROOT = Path(__file__).resolve().parent
 GOLDEN_SET_PATH = ROOT / "golden_set.jsonl"
@@ -96,6 +96,13 @@ def classify(case: Case, prediction: Prediction) -> str:
             if prediction.intent in READ_ONLY_INTENTS:
                 return "answered_instead"
             return "wrong_intent"
+        if case.intent in MEMORY_INTENTS:
+            # У действия памяти цель — факт: его метка должна быть среди найденных
+            # или записанных фактов.
+            labels = [str(label).lower() for label in prediction.details.get("memory_labels", [])]
+            if case.subject and not any(case.subject.lower() in label for label in labels):
+                return "wrong_target"
+            return "pass"
         expected_target = case.item_id or case.entity_id
         actual_target = prediction.item_id or prediction.entity_id
         if expected_target != actual_target:
@@ -423,6 +430,9 @@ def main() -> int:
                              "файл настроек при этом не меняется")
     parser.add_argument("--repeat", type=int, default=1,
                         help="сколько раз прогнать набор; в сводку идут медиана и разброс")
+    parser.add_argument("--memory", action="store_true",
+                        help="подложить конфигурации память мира из eval/memory_fixture.py "
+                             "(для набора golden_memory.jsonl; только гибрид)")
     parser.add_argument("--tag",
                         help="метка в имени отчёта: прогон на другой модели не затирает "
                              "основной отчёт дня и не попадает в сводную таблицу")
@@ -438,6 +448,9 @@ def main() -> int:
         print("Модель: " + ", ".join(f"{key} {value}" for key, value in profile.items()))
         print()
     config = load_config(args.config)
+    if args.memory:
+        from eval.memory_fixture import with_memory
+        config = with_memory(config)
     runs = []
     for index in range(max(1, args.repeat)):
         if args.repeat > 1:
