@@ -192,6 +192,14 @@ class PipelineMemoryTests(unittest.TestCase):
         # Пересказ без координат не принимается: остаётся шаблон с числами из памяти.
         self.assertIn("−120", responder.reply(turn, "откуда берутся алмазы").text)
 
+    def test_ambiguous_name_searches_every_reading(self):
+        # «Железо» — слиток, кусочек или рудное железо: для «где» переспрашивать незачем.
+        container(self.store, chest({"minecraft:iron_ingot": 5}), self.kb)
+        turn = self.handle(Proposal(RECALL, "железо"), "где у меня железо")
+        self.assertEqual(turn.outcome, "act")
+        self.assertIn("minecraft:iron_ingot", turn.stages["memory"]["subjects"])
+        self.assertIn("Сундук", turn.memory_summary)
+
     def test_recall_of_ore_says_whether_the_pickaxe_is_there(self):
         observations(self.store, {"blocks": [block("minecraft:diamond_ore", 10, 12, 0)]}, self.kb)
         turn = self.handle(Proposal(RECALL, "алмазы"), "где алмазы",

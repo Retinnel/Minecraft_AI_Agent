@@ -101,6 +101,8 @@ REMEMBER_PREFIX = re.compile(r"^\s*(пожалуйста\s+)?(запомни|з�
 
 # Сколько фактов называть в ответе; остальные — во вкладке «Память».
 RECALL_SPOKEN = 3
+# Сколько кандидатов неоднозначного названия учитывается при поиске в памяти.
+RECALL_CANDIDATES = 5
 
 # Признаки просьбы о цели. Кампания начинается сразу, поэтому одного слова модели мало:
 # малая модель, не разобрав «дай», выбирала предложение цели, и игрок получал кампанию,
@@ -853,12 +855,20 @@ class Pipeline:
         if not str(target or "").strip():
             return []
         resolution = self.resolver.resolve(str(target))
-        if not resolution.ok:
+        if resolution.ok:
+            things = [resolution.thing]
+        elif resolution.status == "ambiguous":
+            # Вспомнить — действие только для чтения: при неоднозначном названии («железо» —
+            # слиток, кусочек или руда) ищется по всем кандидатам, а не переспрашивается.
+            things = [candidate.thing for candidate in resolution.candidates[:RECALL_CANDIDATES]]
+        else:
             return []
-        subjects = [resolution.thing]
-        subjects.extend(source.id for source in self.kb.sources_of(resolution.thing)
-                        if source.kind != "creature")
-        return subjects
+        subjects: List[str] = []
+        for thing in things:
+            subjects.append(thing)
+            subjects.extend(source.id for source in self.kb.sources_of(thing)
+                            if source.kind != "creature")
+        return list(dict.fromkeys(subjects))
 
     def _recall(self, utterance: str, proposal: Proposal, game: str, memory: Any,
                 position: Optional[Any], actions: Sequence[str], stages: Dict[str, Any],
