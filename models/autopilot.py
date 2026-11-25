@@ -62,5 +62,10 @@ class RunState(BaseModel):
     waiting: Optional[Dict[str, Any]] = None
     stations: List[str] = Field(default_factory=list)
     baritone: bool = False
+    # Кто исполняет: автопилот мода (player) или помощник (companion), и как помощник
+    # отдаёт сделанное: {"mode": "drop" | "chest" | "none", "position": …, "where": …}.
+    executor: str = "player"
+    delivery: Optional[Dict[str, Any]] = None
+    delivered: bool = False
     message: Optional[str] = None
     log: List[str] = Field(default_factory=list)

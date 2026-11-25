@@ -68,7 +68,7 @@ class Isolated(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.state_path = Path(self.temp.name) / "autopilot.json"
         self.patches = [
-            patch.object(Autopilot, "_path", lambda _self: self.state_path),
+            patch.object(Autopilot, "_path", lambda _self: Path(self.temp.name) / _self._state_file),
             patch.object(autopilot, "settings", lambda path=None: self.settings or config()),
         ]
         for item in self.patches:

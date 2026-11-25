@@ -91,10 +91,36 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class Autopilot:
-    """Один запуск на мир. Потокобезопасен: чат и мод обращаются из разных запросов."""
+PLAYER = "player"
+COMPANION = "companion"
 
-    def __init__(self, clock=time.time) -> None:
+# Как исполнитель говорит о себе в объявлениях. Автопилот — это сам ассистент в теле
+# игрока; помощник — отдельный игрок, поэтому в его объявлениях есть имя исполнителя.
+VOICE = {
+    PLAYER: {"start": "Начинаю: {goal}. Остановить — клавиша K или любое движение.",
+             "prefix": ""},
+    COMPANION: {"start": "Помощник начинает: {goal}. Остановить — «помощник, стоп».",
+                "prefix": "Помощник: "},
+}
+
+# Последняя задача помощника: отдать сделанное игроку (бросить рядом) или положить в сундук.
+TASK_DELIVER = "deliver"
+
+
+class Autopilot:
+    """Один запуск на мир для одного исполнителя. Потокобезопасен: чат и исполнитель
+    обращаются из разных запросов.
+
+    Исполнителей два, и план у них один и тот же: автопилот мода (тело игрока) и помощник
+    (отдельный игрок, `companion/`). Помощник отличается тем, что добывает всегда — у него
+    свой поиск пути, — и тем, что в конце отдаёт сделанное игроку.
+    """
+
+    def __init__(self, clock=time.time, *, executor: str = PLAYER, state_file: str = STATE_FILE,
+                 config=None) -> None:
+        self.kind = executor
+        self._state_file = state_file
+        self._config = config
         self._clock = clock
         self._lock = threading.Lock()
         self._run: Optional[RunState] = None
@@ -108,9 +134,12 @@ class Autopilot:
         from api.advice import _assistant_pipeline
         return _assistant_pipeline().kb
 
+    def _settings(self) -> Dict[str, Any]:
+        return (self._config or settings)()
+
     def executor(self):
         from solver.executor import ExecutionPlanner
-        config = settings()
+        config = self._settings()
         if self._executor is None:
             self._executor = ExecutionPlanner(self._kb())
         self._executor.max_effort = config["max_effort"]
@@ -126,7 +155,7 @@ class Autopilot:
     def _path(self) -> Optional[Path]:
         from api import worlds
         directory = worlds.memory_dir()
-        return Path(directory) / STATE_FILE if directory else None
+        return Path(directory) / self._state_file if directory else None
 
     def _ensure_loaded(self) -> None:
         path = self._path()
@@ -180,7 +209,8 @@ class Autopilot:
         if run is None:
             return None
         task = run.current_task or {}
-        return {"run_id": run.run_id, "status": run.status, "goal": run.goal, "label": run.label,
+        return {"run_id": run.run_id, "status": run.status, "executor": run.executor,
+                "goal": run.goal, "label": run.label,
                 "step": run.steps_done, "total": max(run.total_estimate, run.steps_done),
                 "current": task.get("goal_step"), "waiting": run.waiting, "message": run.message}
 
@@ -188,8 +218,10 @@ class Autopilot:
         with self._lock:
             return self._announcements.pop(0) if self._announcements else None
 
-    def _announce(self, text: str) -> None:
-        self._announcements.append({"response": text, "autopilot": True})
+    def _announce(self, text: str, *, bare: bool = False) -> None:
+        if not bare:
+            text = VOICE[self.kind]["prefix"] + text
+        self._announcements.append({"response": text, "autopilot": True, "executor": self.kind})
         if self._run is not None:
             self._run.message = text
             self._run.log = (self._run.log + [text])[-MAX_LOG:]
@@ -197,13 +229,14 @@ class Autopilot:
     # --- жизненный цикл ---
 
     def start(self, goal: str, count: int, *, label: Optional[str] = None, total: int = 0,
-              baritone: bool = False) -> RunState:
+              baritone: bool = False, delivery: Optional[Dict[str, Any]] = None) -> RunState:
         with self._lock:
             self._ensure_loaded()
             self._run = RunState(run_id=uuid.uuid4().hex[:10], goal=goal, label=label,
                                  count=max(1, int(count)), status=PENDING, total_estimate=total,
-                                 baritone=bool(baritone), started_at=_now())
-            if not settings()["require_confirmation"]:
+                                 baritone=bool(baritone), started_at=_now(), executor=self.kind,
+                                 delivery=delivery if self.kind == COMPANION else None)
+            if not self._settings()["require_confirmation"]:
                 self._begin()
             self._save()
             return self._run.model_copy(deep=True)
@@ -221,8 +254,8 @@ class Autopilot:
     def _begin(self) -> None:
         run = self._run
         run.status = RUNNING
-        run.deadline = self._clock() + settings()["max_run_minutes"] * 60
-        self._announce(f"Начинаю: {run.label or run.goal}. Остановить — клавиша K или любое движение.")
+        run.deadline = self._clock() + self._settings()["max_run_minutes"] * 60
+        self._announce(VOICE[self.kind]["start"].format(goal=run.label or run.goal), bare=True)
 
     def resume(self) -> Optional[RunState]:
         """«Продолжай» после паузы, остановки игроком или перезапуска сервера."""
@@ -233,7 +266,7 @@ class Autopilot:
                 return None
             run.status = RUNNING
             run.current_task = None
-            run.deadline = self._clock() + settings()["max_run_minutes"] * 60
+            run.deadline = self._clock() + self._settings()["max_run_minutes"] * 60
             self._announce(f"Продолжаю: {run.label or run.goal}. Сделано шагов: {run.steps_done}.")
             self._save()
             return run.model_copy(deep=True)
@@ -277,10 +310,12 @@ class Autopilot:
             # Повторный опрос, пока задача не отчиталась, — та же задача.
             return {"status": RUNNING, "task": run.current_task}
         if run.deadline and self._clock() > run.deadline:
-            return self._finish(FAILED, f"Время вышло ({settings()['max_run_minutes']} мин). "
+            return self._finish(FAILED, f"Время вышло ({self._settings()['max_run_minutes']} мин). "
                                         f"Сделано шагов: {run.steps_done}.")
         if run.replans >= MAX_REPLANS:
             return self._finish(FAILED, "План не сходится в игре — остановился.")
+        if run.delivered:
+            return self._finish(DONE, self._done_text(run, delivered=True))
         if stations is not None:
             run.stations = list(stations)
 
@@ -290,8 +325,9 @@ class Autopilot:
         plan, task = executor.next_task(run.goal, run.count, context)
         if task is None:
             if inventory.get(run.goal, 0) >= run.count:
-                return self._finish(DONE, f"Готово: {run.label or run.goal} ×{run.count}. "
-                                          f"Шагов: {run.steps_done}.")
+                if self._delivers(run):
+                    return self._deliver(run)
+                return self._finish(DONE, self._done_text(run))
             problems = executor.check(plan, effort_limit=False)
             if not problems and run.excluded_sources:
                 problems = ["другого места добычи не знаю, а прежнее не далось"]
@@ -333,7 +369,8 @@ class Autopilot:
         return Context(inventory=dict(inventory or {}), stations=tuple(run.stations),
                        storage=storage, where=where, known=known,
                        excluded=tuple(run.excluded_sources),
-                       can_mine=run.baritone and settings()["use_baritone"],
+                       can_mine=(self.kind == COMPANION
+                                 or (run.baritone and self._settings()["use_baritone"])),
                        container_of=container_of, block_at=block_at)
 
     def report(self, report: TaskReport, *, memory=None, position=None) -> Dict[str, Any]:
@@ -350,6 +387,17 @@ class Autopilot:
                 run.stations = list(report.stations)
             inventory = dict(report.inventory or {})
             key = f"{task.get('kind')}:{task.get('item')}"
+            if task.get("kind") == TASK_DELIVER:
+                if report.status == "done":
+                    run.delivered = True
+                    return self._finish(DONE, self._done_text(run, delivered=True))
+                if report.status == "failed":
+                    run.attempts[key] = run.attempts.get(key, 0) + 1
+                    if run.attempts[key] > MAX_RETRIES:
+                        run.delivered = True
+                        return self._finish(DONE, self._done_text(run) + " Отдать не вышло ("
+                                            + (report.reason or "сбой") + ") — всё у помощника.")
+                    return self._deliver(run)
             if report.status == "done":
                 run.steps_done += 1
                 run.attempts.pop(key, None)
@@ -376,6 +424,40 @@ class Autopilot:
                                                       f"({report.reason or 'сбой'}), повторы исчерпаны.")
                         return result
             return self._next(inventory, None, memory, position)
+
+    # --- доставка (помощник) ---
+
+    @staticmethod
+    def _delivers(run: RunState) -> bool:
+        mode = (run.delivery or {}).get("mode")
+        return run.executor == COMPANION and mode in ("drop", "chest") and not run.delivered
+
+    def _deliver(self, run: RunState) -> Dict[str, Any]:
+        delivery = run.delivery or {}
+        label = run.label or run.goal
+        if delivery.get("mode") == "chest":
+            step = f"положить «{label}» ×{run.count} в сундук"
+        else:
+            step = f"принести тебе «{label}» ×{run.count}"
+        timeout = int(self._settings().get("timeouts_s", {}).get(TASK_DELIVER, 120))
+        run.current_task = {
+            "task_id": f"d{run.replans}", "kind": TASK_DELIVER, "item": run.goal, "count": run.count,
+            "blocks": [], "recipe_id": None, "runs": 1, "station": delivery.get("mode"),
+            "input": None, "fuel": None, "fuel_count": 0, "position": delivery.get("position"),
+            "where": delivery.get("where") or delivery.get("player"), "timeout_s": timeout,
+            "goal_step": step,
+        }
+        self._announce(f"Готово, {step}" + (f" — {delivery['where']}" if delivery.get("where") else "")
+                       + ".")
+        self._save()
+        return {"status": RUNNING, "task": run.current_task}
+
+    def _done_text(self, run: RunState, *, delivered: bool = False) -> str:
+        text = f"Готово: {run.label or run.goal} ×{run.count}. Шагов: {run.steps_done}."
+        if delivered:
+            mode = (run.delivery or {}).get("mode")
+            text += " Положил в сундук." if mode == "chest" else " Оставил рядом с тобой."
+        return text
 
     def _finish(self, status: str, text: str) -> Dict[str, Any]:
         run = self._run
