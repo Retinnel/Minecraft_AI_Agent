@@ -33,6 +33,8 @@ public class AssistantOverlayScreen extends Screen {
     private Button campaignTabButton;
     private Button treeTabButton;
     private Button historyTabButton;
+    private Button memoryTabButton;
+    private Button memoryFilterButton;
     private Button cancelCampaignButton;
     private Button whyButton;
     private Button modeButton;
@@ -63,8 +65,19 @@ public class AssistantOverlayScreen extends Screen {
         PLAN,
         CAMPAIGN,
         TREE,
-        HISTORY
+        HISTORY,
+        MEMORY
     }
+
+    // Вкладка памяти: что сервер запомнил об этом мире — руды, хранилища, отметки, гибели.
+    // Фильтр перебирает виды фактов; значения — те же, что принимает GET /api/memory/.
+    private static final String[][] MEMORY_FILTERS = {
+            {"", "все"}, {"resource", "руды"}, {"container", "хранилища"},
+            {"place", "места"}, {"death", "гибели"}, {"note", "заметки"}
+    };
+    private int memoryFilter = 0;
+    private HttpAssistantClient.MemoryResponse lastMemory;
+    private int memoryScroll = 0;
 
     // Вкладка истории: разговор в этом мире, сохранённый сервером между запусками.
     private HttpAssistantClient.WorldResponse lastHistory;
@@ -232,7 +245,7 @@ public class AssistantOverlayScreen extends Screen {
 
         // Вкладки
         int tabY = top - 24;
-        int tabW = (panelW - 20) / 6;
+        int tabW = (panelW - 24) / 7;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
         }).bounds(left, tabY, tabW, 20).build();
@@ -267,6 +280,21 @@ public class AssistantOverlayScreen extends Screen {
             fetchHistory();
         }).bounds(left + (tabW + 4) * 5, tabY, tabW, 20).build();
         addRenderableWidget(historyTabButton);
+
+        memoryTabButton = Button.builder(Component.literal("§fПамять"), btn -> {
+            setActiveTab(Tab.MEMORY);
+            memoryScroll = 0;
+            fetchMemory();
+        }).bounds(left + (tabW + 4) * 6, tabY, tabW, 20).build();
+        addRenderableWidget(memoryTabButton);
+
+        memoryFilterButton = Button.builder(Component.literal(memoryFilterLabel()), btn -> {
+            memoryFilter = (memoryFilter + 1) % MEMORY_FILTERS.length;
+            memoryScroll = 0;
+            btn.setMessage(Component.literal(memoryFilterLabel()));
+            fetchMemory();
+        }).bounds(left + panelW - 130, top + 30, 115, 18).build();
+        addRenderableWidget(memoryFilterButton);
 
         // Отмена кампании — та же команда, что фраза в чате: решает сервер, не мод.
         cancelCampaignButton = Button.builder(Component.literal("§cОтменить кампанию"), btn -> {
@@ -354,6 +382,14 @@ public class AssistantOverlayScreen extends Screen {
             historyTabButton.setMessage(Component.literal(
                     activeTab == Tab.HISTORY ? "§b§lИстория" : "§fИстория"));
         }
+        if (memoryTabButton != null) {
+            memoryTabButton.setMessage(Component.literal(
+                    activeTab == Tab.MEMORY ? "§b§lПамять" : "§fПамять"));
+        }
+        if (memoryFilterButton != null) {
+            memoryFilterButton.visible = activeTab == Tab.MEMORY;
+            memoryFilterButton.active = activeTab == Tab.MEMORY;
+        }
         if (whyButton != null) {
             whyButton.visible = isPlan;
             whyButton.active = isPlan;
@@ -433,6 +469,8 @@ public class AssistantOverlayScreen extends Screen {
             renderTreeTab(graphics, left, top, panelW, panelH);
         } else if (activeTab == Tab.HISTORY) {
             renderHistoryTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.MEMORY) {
+            renderMemoryTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
@@ -932,6 +970,84 @@ public class AssistantOverlayScreen extends Screen {
         }
     }
 
+    // --- вкладка памяти ---
+
+    private String memoryFilterLabel() {
+        return "§fПоказать: " + MEMORY_FILTERS[memoryFilter][1];
+    }
+
+    private void fetchMemory() {
+        runtime.getHttpClient().getMemory(MEMORY_FILTERS[memoryFilter][0], 100).thenAccept(data -> {
+            Minecraft.getInstance().execute(() -> {
+                if (data != null) {
+                    lastMemory = data;
+                }
+            });
+        });
+    }
+
+    private static int memoryColor(String kind) {
+        if ("resource".equals(kind)) {
+            return 0xFF7fdbff;
+        }
+        if ("container".equals(kind)) {
+            return 0xFFffd479;
+        }
+        if ("death".equals(kind)) {
+            return 0xFFff6b6b;
+        }
+        return COLOR_TEXT;
+    }
+
+    private void renderMemoryTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        int textLeft = left + 15;
+        int maxWidth = panelW - 30;
+        graphics.drawString(font, "§lПамять мира", textLeft, top + 34, COLOR_HEADER);
+
+        int y = top + 52;
+        int bottom = top + panelH - 14;
+        if (lastMemory == null) {
+            graphics.drawString(font, "Загрузка…", textLeft, y, COLOR_MUTED);
+            return;
+        }
+        if (lastMemory.facts == null || lastMemory.facts.isEmpty()) {
+            for (String row : fitLine("Пока пусто. Сканер отмечает ценные блоки рядом, сундуки — "
+                    + "при открытии; «запомни, тут база» в чате — отметка.", maxWidth)) {
+                graphics.drawString(font, row, textLeft, y, COLOR_MUTED);
+                y += font.lineHeight + 1;
+            }
+            return;
+        }
+
+        // Описание факта составляет сервер: координаты, сторона света, давность, источник.
+        java.util.List<String> rows = new java.util.ArrayList<>();
+        java.util.List<Integer> colors = new java.util.ArrayList<>();
+        for (HttpAssistantClient.MemoryResponse.MemoryFact fact : lastMemory.facts) {
+            if (fact == null || fact.description == null) {
+                continue;
+            }
+            String text = fact.description.replace('\n', ' ').replace('\r', ' ');
+            for (String row : fitLine("• " + text, maxWidth)) {
+                rows.add(row);
+                colors.add(memoryColor(fact.kind));
+            }
+        }
+
+        int visible = Math.max(1, (bottom - y) / (font.lineHeight + 1));
+        memoryScroll = Math.min(memoryScroll, Math.max(0, rows.size() - visible));
+        for (int i = memoryScroll; i < rows.size() && i < memoryScroll + visible; i++) {
+            graphics.drawString(font, rows.get(i), textLeft, y, colors.get(i));
+            y += font.lineHeight + 1;
+        }
+        String footer = "фактов: " + lastMemory.total;
+        if (rows.size() > visible) {
+            footer += " · колесо мыши: " + (memoryScroll + 1) + "–"
+                    + Math.min(rows.size(), memoryScroll + visible) + " из " + rows.size();
+        }
+        graphics.drawString(font, footer, left + panelW - 15 - font.width(footer), top + panelH - 11,
+                COLOR_MUTED);
+    }
+
     private void fetchTree() {
         lastTreeFetchTime = System.currentTimeMillis();
         runtime.getHttpClient().getTree().thenAccept(data -> {
@@ -1090,6 +1206,10 @@ public class AssistantOverlayScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (activeTab == Tab.PLAN) {
             planScroll = Math.max(0, planScroll - (int) Math.signum(delta) * 3);
+            return true;
+        }
+        if (activeTab == Tab.MEMORY) {
+            memoryScroll = Math.max(0, memoryScroll - (int) Math.signum(delta) * 3);
             return true;
         }
         if (activeTab == Tab.HISTORY) {

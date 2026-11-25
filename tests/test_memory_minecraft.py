@@ -145,6 +145,21 @@ class ModEndpointsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(memory.shared("Minecraft").facts(RESOURCE)), 1)
         self.assertEqual(len(memory.shared("Ведьмак 3")), 0)
 
+    async def test_overlay_reads_minecraft_memory_while_talking_about_another_game(self):
+        await memory_api.post_observations({"blocks": [block("minecraft:diamond_ore", 1, -58, 1)]})
+        sessions.shared().set_game("Ведьмак 3")
+        self.assertEqual((await memory_api.list_memory())["total"], 0)
+        listed = await memory_api.list_memory(game="Minecraft", kind="resource")
+        self.assertEqual((listed["game"], listed["total"]), ("Minecraft", 1))
+        self.assertIn("Алмазная руда", listed["facts"][0]["description"])
+
+    def test_chat_page_has_a_memory_card_that_inserts_text_safely(self):
+        page = (Path(__file__).resolve().parent.parent / "static" / "chat.html").read_text(encoding="utf-8")
+        self.assertIn("<h2>Память</h2>", page)
+        self.assertIn('fetch("/api/memory/?"', page)
+        # Описание может содержать текст с экрана: только textContent, не innerHTML.
+        self.assertIn("text.textContent = fact.description", page)
+
     async def test_container_endpoint(self):
         result = await memory_api.post_container({"block": "minecraft:chest", "x": 12, "y": 64,
                                                   "z": -40, "dimension": "minecraft:overworld",

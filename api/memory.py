@@ -50,10 +50,11 @@ def fact_view(fact, *, origin=None, names=None) -> Dict[str, Any]:
 
 @router.get("/")
 async def list_memory(kind: Optional[str] = None, q: Optional[str] = None,
-                      limit: int = MAX_LISTED) -> Dict[str, Any]:
+                      limit: int = MAX_LISTED, game: Optional[str] = None) -> Dict[str, Any]:
+    """Факты памяти; game — чья память (оверлей мода просит Minecraft), иначе игра сессии."""
     from api.player_state import current_position
 
-    game = _session_game()
+    game = str(game).strip() if game and str(game).strip() else _session_game()
     store = memory.shared(game)
     if kind and kind not in KINDS:
         raise HTTPException(status_code=400, detail=f"Вид факта должен быть одним из: {', '.join(KINDS)}")

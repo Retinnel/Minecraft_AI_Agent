@@ -57,6 +57,15 @@
   .voicebar select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 14px; }
   .gamebar { display: flex; gap: 10px; align-items: center; margin: 0 0 12px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
   .gamebar input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 14px; width: 220px; }
+  .memory-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .memory-row select, .memory-row input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 14px; }
+  .memory-row input { flex: 1; min-width: 120px; }
+  .memory-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; font-size: 14px; }
+  .memory-list li { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .memory-list li span { flex: 1; }
+  .memory-list li.death span { color: var(--bad); }
+  .memory-list li.screen span { font-style: italic; }
+  .memory-list button { font-size: 12px; padding: 2px 8px; }
   .gamebar button { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; font-size: 14px; cursor: pointer; }
   .gamebar button:hover { border-color: var(--accent); }
   .gamebar select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 14px; max-width: 320px; }
@@ -151,6 +160,25 @@
         плане; в игру ничего не встраивается и ничего не нажимается.</div>
     </div>
     <div class="card">
+      <h2>Память</h2>
+      <div class="memory-row">
+        <select id="memory-kind" title="вид фактов">
+          <option value="">все</option>
+          <option value="resource">руды и ресурсы</option>
+          <option value="container">хранилища</option>
+          <option value="place">места</option>
+          <option value="death">гибели</option>
+          <option value="note">заметки</option>
+          <option value="dialogue">реплики с экрана</option>
+        </select>
+        <input id="memory-query" placeholder="поиск: алмазы, база, Кейра…">
+      </div>
+      <ul id="memory-list" class="memory-list"><li class="muted">—</li></ul>
+      <div id="memory-total" class="muted" style="font-size:12px;margin-top:6px"></div>
+      <div class="muted" style="font-size:12px">Факты этого мира: что прислал мод, что ты велел запомнить,
+        что распознано на экране. Память для игры, о которой сейчас разговор.</div>
+    </div>
+    <div class="card">
       <h2>Кампания</h2>
       <div id="campaign"><span class="muted">нет</span></div>
     </div>
@@ -224,6 +252,7 @@ async function ask(text) {
     if (d.error && d.outcome !== "reject") html += '<span class="meta err">' + escapeHtml(d.error) + "</span>";
     if (d.sources && d.sources.length) html += renderSources(d.sources);
     if (d.screen) meta.push("экран: " + (d.screen.summary || d.screen.scene || "учтён"));
+    if (d.memory && d.memory.length) meta.push("из памяти: " + d.memory.length);
     html += '<span class="meta">' + escapeHtml(meta.join(" · ")) + "</span>";
     pending.innerHTML = html;
     if (d.game) showGame(d.game, d.game.toLowerCase() === "minecraft");
@@ -238,12 +267,46 @@ async function ask(text) {
     if (d.explanation && d.explanation.length) node("explanation").textContent = d.explanation.join("\n");
     if (d.campaign !== undefined && d.campaign !== null) renderCampaign(d.campaign);
     else if (/кампани/i.test(text)) refreshCampaign();
+    refreshMemory();
   } catch (e) {
     pending.innerHTML = '<span class="err">' + escapeHtml(e) + "</span>";
   }
   node("send").disabled = false;
   node("utterance").value = "";
   node("utterance").focus();
+}
+
+// Карточка «Память»: описание факта составляет сервер (координаты, давность, источник),
+// страница только показывает его. Текст с экрана и из чата вставляется как текст, не HTML.
+async function refreshMemory() {
+  const params = new URLSearchParams({ limit: "50" });
+  const kind = node("memory-kind").value;
+  const query = node("memory-query").value.trim();
+  if (kind) params.set("kind", kind);
+  if (query) params.set("q", query);
+  let d;
+  try { d = await (await fetch("/api/memory/?" + params)).json(); } catch (e) { return; }
+  const list = node("memory-list");
+  list.innerHTML = "";
+  if (!d.facts || !d.facts.length) {
+    list.innerHTML = '<li class="muted">' + (query ? "ничего не найдено" : "пока пусто") + "</li>";
+  }
+  for (const fact of d.facts || []) {
+    const item = document.createElement("li");
+    item.className = fact.kind + (fact.source === "screen" ? " screen" : "");
+    const text = document.createElement("span");
+    text.textContent = fact.description;
+    const forget = document.createElement("button");
+    forget.textContent = "забыть";
+    forget.title = "убрать факт из памяти";
+    forget.onclick = async () => {
+      await fetch("/api/memory/" + encodeURIComponent(fact.id), { method: "DELETE" });
+      refreshMemory();
+    };
+    item.append(text, forget);
+    list.append(item);
+  }
+  node("memory-total").textContent = d.game ? ("игра: " + d.game + " · фактов: " + d.total) : "";
 }
 
 // Ссылки на страницы, из которых взят ответ. Адрес приходит из поисковика, поэтому
@@ -677,6 +740,14 @@ node("vision-file").onchange = (e) => {
   reader.readAsDataURL(file);
 };
 node("game-set").onclick = setGame;
+refreshMemory();
+setInterval(refreshMemory, 5000);
+node("memory-kind").onchange = refreshMemory;
+let memoryTimer = null;
+node("memory-query").addEventListener("input", () => {
+  clearTimeout(memoryTimer);
+  memoryTimer = setTimeout(refreshMemory, 300);
+});
 node("game").addEventListener("keydown", (e) => { if (e.key === "Enter") setGame(); });
 </script>
 <script src="/frontend/js/topbar.js"></script>

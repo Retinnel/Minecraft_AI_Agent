@@ -395,6 +395,30 @@ public final class HttpAssistantClient {
     // --- память мира ---
 
     /** Какие блоки искать сканеру, радиус и частота: список задаёт сервер. */
+    /** Факты памяти мира Minecraft; kind пустой — все виды. */
+    public CompletableFuture<MemoryResponse> getMemory(String kind, int limit) {
+        String query = "?game=Minecraft&limit=" + limit;
+        if (kind != null && !kind.isEmpty()) {
+            query += "&kind=" + kind;
+        }
+        return getJson("/api/memory/" + query, MemoryResponse.class);
+    }
+
+    public static final class MemoryResponse {
+        public String game;
+        public String world;
+        public int total;
+        public java.util.List<MemoryFact> facts;
+
+        public static final class MemoryFact {
+            public String id;
+            public String kind;
+            public String label;
+            public String description;
+            public String source;
+        }
+    }
+
     public CompletableFuture<ScanListResponse> getScanList() {
         return getJson("/api/memory/scan-list", ScanListResponse.class);
     }
