@@ -446,6 +446,23 @@ class AutopilotApiTests(Isolated):
         self.assertIn("не начинаю", result.response)
         self.assertEqual(self.service.state().status, STOPPED)
 
+    def test_a_misspelled_yes_is_asked_again_and_nothing_starts(self):
+        """Найдено в игре: «наичнай» в ответ на «Начать?»."""
+        self.chat("сделай сам каменную кирку", singleplayer=True, autopilot_available=True,
+                  baritone=True)
+        result = self.chat("наичнай")
+        self.assertIn("«да» или «нет»", result.response)
+        self.assertEqual(self.service.state().status, "pending_confirm")
+        self.chat("да")
+        self.assertEqual(self.service.state().status, "running")
+
+    def test_an_unrelated_request_while_waiting_is_not_taken_for_an_answer(self):
+        self.assertFalse(advice._near_answer("дай"))
+        self.assertFalse(advice._near_answer("дай меч"))
+        self.assertFalse(advice._near_answer("найди"))
+        self.assertTrue(advice._near_answer("наичнай"))
+        self.assertTrue(advice._near_answer("отмна"))
+
     def test_yes_without_a_run_goes_to_the_pipeline(self):
         self.assertIsNone(advice._autopilot_command("да"))
 

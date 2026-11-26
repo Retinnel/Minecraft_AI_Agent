@@ -1335,6 +1335,22 @@ AUTOPILOT_NO = re.compile(r"^(нет|не надо|не нужно|отмена|
 AUTOPILOT_STOP = re.compile(r"^(стоп|хватит|остановись|останови|прекрати)\b", re.IGNORECASE)
 AUTOPILOT_RESUME = re.compile(r"^(продолжай|продолжи|продолжаем|дальше)\b", re.IGNORECASE)
 
+# Слова, с которыми сверяется ответ с опечаткой («наичнай»). Запуск по догадке не начинается:
+# похожий ответ переспрашивается.
+AUTOPILOT_ANSWER_WORDS = ("давай", "начинай", "поехали", "отмена", "отмени")
+AUTOPILOT_NEAR = 0.8
+
+
+def _near_answer(phrase: str) -> bool:
+    """Одно слово, похожее на «да» или «нет» с опечаткой, но не совпавшее ни с одним."""
+    from difflib import SequenceMatcher
+
+    word = phrase.strip(" .!?,").lower()
+    if " " in word or len(word) < 4:
+        return False
+    return any(SequenceMatcher(None, word, known).ratio() >= AUTOPILOT_NEAR
+               for known in AUTOPILOT_ANSWER_WORDS)
+
 
 def _autopilot_brief() -> Optional[Dict[str, Any]]:
     from api import autopilot
@@ -1410,6 +1426,11 @@ def _run_command(service, phrase: str) -> Optional[str]:
             changed = service.confirm(run.run_id)
         elif AUTOPILOT_NO.match(phrase):
             changed = service.stop(run_id=run.run_id)
+        elif _near_answer(phrase):
+            # Замечено в игре: «наичнай» уходило в конвейер, и модель отвечала «не понял, о
+            # чём речь», хотя вопрос «Начать?» ещё висел.
+            return (f"Не разобрал ответ «{phrase.strip()}». План «{run.label}» ждёт: "
+                    f"скажи «да» или «нет».")
     elif run.status in (autopilot.RUNNING, autopilot.PAUSED) and AUTOPILOT_STOP.match(phrase):
         changed = service.stop("по твоей просьбе", run.run_id)
     elif run.status in (autopilot.PAUSED, autopilot.STOPPED) and AUTOPILOT_RESUME.match(phrase):
