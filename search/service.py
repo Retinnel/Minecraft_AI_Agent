@@ -24,6 +24,8 @@ from search.engines import ACCEPTABLE, Engine, Hit, SearchUnavailable, default_e
 # Порог релевантности для движков, которые её оценивают (см. замер выше). Он один на всех:
 # каждый движок сам приводит свою оценку к общей шкале (search.engines.normalize).
 MIN_SCORE = ACCEPTABLE
+# Короче этого название игры в адресе сайта не ищется: «it», «gta» совпадут с чем угодно.
+MIN_GAME_NAME = 6
 
 # Сколько фрагментов отдаётся модели и какой длины. Ответ игроку — несколько фраз, а запрос к
 # модели должен оставаться коротким: длинный контекст ухудшает ответ слабой модели.
@@ -78,6 +80,26 @@ def _mentions_query(hit: Hit, query: str) -> bool:
     return any(word in text for word in words)
 
 
+def spaced(game: Optional[str]) -> str:
+    """Название игры словами: заголовок окна «CasualtiesUnknown» ищется как «Casualties Unknown»."""
+    name = re.sub(r"(?<=[a-zа-яё])(?=[A-ZА-ЯЁ])", " ", (game or "").strip())
+    return " ".join(name.split())
+
+
+def _compact(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def own_site(hit: Hit, game: Optional[str]) -> bool:
+    """Сайт назван именем игры (её вики или страница разработчика).
+
+    Для малоизвестной игры поисковик оценивает такую страницу низко — у неё мало ссылок, —
+    хотя к вопросу об игре она относится по построению.
+    """
+    name = _compact(game or "")
+    return len(name) >= MIN_GAME_NAME and name in _compact(hit.site)
+
+
 class WebSearch:
     def __init__(self, engines: Optional[Sequence[Engine]] = None, *,
                  cache_seconds: float = CACHE_SECONDS, clock=time.monotonic) -> None:
@@ -98,12 +120,17 @@ class WebSearch:
         «The Witcher 3». Такое название не добавляется второй раз.
         """
         query = " ".join((query or "").split())
+        if game and not _CYRILLIC.search(game):
+            # Склеенное название из заголовка окна заменяется раздельным и в самом запросе.
+            query = re.sub(re.escape(game.strip()), spaced(game), query, flags=re.IGNORECASE)
+            game = spaced(game)
         # Игру, названную по-русски («Ведьмака 3»), в английский запрос не добавляем: русское
         # слово сбивает поисковик, а английское название модель пишет в запрос сама.
         if not game or _CYRILLIC.search(game):
             return query
         core = re.sub(r"^the\s+", "", game.strip(), flags=re.IGNORECASE).lower()
-        if core not in query.lower():
+        # Сверка без знаков: «Casualties: Unknown» и «Casualties Unknown» — одно название.
+        if _compact(core) not in _compact(query):
             query = f"{game} {query}"
         return query
 
@@ -118,19 +145,36 @@ class WebSearch:
 
         started = time.perf_counter()
         answer = SearchAnswer(query=full)
-        for engine in self.engines:
-            try:
-                hits = engine.search(full, max_results=MAX_SOURCES + 2)
-            except SearchUnavailable as error:
-                answer.errors.append(str(error))
-                continue
-            accepted = [hit for hit in hits if self._relevant(hit, full)]
-            answer.rejected += len(hits) - len(accepted)
-            if accepted:
-                answer.hits = [Hit(title=hit.title, url=hit.url, content=clean_passage(hit.content),
-                                   score=hit.score, engine=hit.engine, raw_score=hit.raw_score)
-                               for hit in accepted[:MAX_SOURCES]]
-                answer.engine = engine.name
+        # Вторая попытка — только если первая ничего не дала: запрос «<игра> wiki <тема>»
+        # выводит на вики игры, когда вопрос сформулирован неудачно.
+        attempts = [full]
+        if game and not _CYRILLIC.search(game):
+            name = spaced(game)
+            # Название убирается из темы в любом написании: с двоеточием и без.
+            words = [re.escape(word) for word in re.findall(r"\w+", name)]
+            topic = " ".join(re.sub(r"\W*".join(words), " ", full, flags=re.IGNORECASE).split())
+            attempts.append(f"{name} wiki {topic}".strip())
+        for attempt in attempts:
+            for engine in self.engines:
+                try:
+                    hits = engine.search(attempt, max_results=MAX_SOURCES + 2)
+                except SearchUnavailable as error:
+                    if str(error) not in answer.errors:
+                        answer.errors.append(str(error))
+                    continue
+                accepted = [hit for hit in hits if self._relevant(hit, attempt, game)]
+                answer.rejected += len(hits) - len(accepted)
+                if accepted:
+                    # Страницы с сайта самой игры — первыми.
+                    accepted.sort(key=lambda hit: not own_site(hit, game))
+                    answer.hits = [Hit(title=hit.title, url=hit.url,
+                                       content=clean_passage(hit.content), score=hit.score,
+                                       engine=hit.engine, raw_score=hit.raw_score)
+                                   for hit in accepted[:MAX_SOURCES]]
+                    answer.engine = engine.name
+                    answer.query = attempt
+                    break
+            if answer.hits:
                 break
         answer.elapsed_ms = (time.perf_counter() - started) * 1000
 
@@ -140,9 +184,11 @@ class WebSearch:
         return answer
 
     @staticmethod
-    def _relevant(hit: Hit, query: str) -> bool:
+    def _relevant(hit: Hit, query: str, game: Optional[str] = None) -> bool:
         if not hit.content.strip():
             return False
+        if own_site(hit, game):
+            return True
         if hit.score is not None:
             return hit.score >= MIN_SCORE
         return _mentions_query(hit, query)

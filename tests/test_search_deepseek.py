@@ -200,3 +200,58 @@ class EngineOrderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NicheGameSearchTests(unittest.TestCase):
+    """Малоизвестная игра: вики на сайте с её именем, склеенное название, вторая попытка."""
+
+    def _engine(self, answers):
+        from search.engines import Hit
+
+        class Engine:
+            name = "stub"
+
+            def __init__(self):
+                self.queries = []
+
+            def search(self, query, max_results=5):
+                self.queries.append(query)
+                return [Hit(title=title, url=f"https://{site}/page", content="text", score=score,
+                            engine="stub") for title, site, score in answers(query)]
+
+        return Engine()
+
+    def test_window_title_is_searched_as_words(self):
+        from search.service import WebSearch, spaced
+        self.assertEqual(spaced("CasualtiesUnknown"), "Casualties Unknown")
+        self.assertEqual(spaced("Elden Ring"), "Elden Ring")
+        self.assertEqual(WebSearch.compose("CasualtiesUnknown bandage", "CasualtiesUnknown"),
+                         "Casualties Unknown bandage")
+        # Название с двоеточием и без — одно и то же: второй раз не добавляется.
+        self.assertEqual(WebSearch.compose("Casualties Unknown bandage", "Casualties: Unknown"),
+                         "Casualties Unknown bandage")
+
+    def test_page_on_the_games_own_site_is_accepted_below_the_threshold(self):
+        from search.service import WebSearch
+        engine = self._engine(lambda query: [("Wiki", "casualtiesunknown.miraheze.org", 0.1),
+                                             ("News", "example.com", 0.1)])
+        answer = WebSearch([engine]).search("bandage", game="Casualties: Unknown")
+        self.assertEqual([hit.site for hit in answer.hits], ["casualtiesunknown.miraheze.org"])
+
+    def test_short_game_name_gives_no_site_bonus(self):
+        from search.engines import Hit
+        from search.service import own_site
+        hit = Hit(title="t", url="https://gta.example.com/x", content="c", score=0.1, engine="s")
+        self.assertFalse(own_site(hit, "GTA"))
+
+    def test_second_attempt_asks_for_the_wiki_only_after_a_miss(self):
+        from search.service import WebSearch
+        engine = self._engine(lambda query: [("Guide", "guides.example.com", 0.9)]
+                              if " wiki " in query else [("News", "example.com", 0.1)])
+        answer = WebSearch([engine]).search("strange item", game="Some Game")
+        self.assertEqual(engine.queries, ["Some Game strange item", "Some Game wiki strange item"])
+        self.assertEqual(answer.query, "Some Game wiki strange item")
+
+        hit_first = self._engine(lambda query: [("Guide", "guides.example.com", 0.9)])
+        WebSearch([hit_first]).search("strange item", game="Some Game")
+        self.assertEqual(len(hit_first.queries), 1)

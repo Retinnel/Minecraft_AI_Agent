@@ -1069,6 +1069,12 @@ class Pipeline:
         sentence = tool_sentence(entry, self.kb)
         return f"{text}. {sentence[:-1]}" if sentence else text
 
+    @staticmethod
+    def _screen_text(screen: Optional[str]) -> Optional[str]:
+        """Надписи с экрана из строки фактов модели зрения (vision.scene.as_prompt)."""
+        match = re.search(r"надписи: (.+?)(?:; кратко:|…?$)", screen or "")
+        return match.group(1).strip(" ;") if match else None
+
     def _search_web(self, utterance: str, proposal: Proposal, game: str,
                     stages: Dict[str, Any]) -> Turn:
         """Вопрос, на который онтология не отвечает: ответ ищется в сети.
@@ -1078,6 +1084,18 @@ class Pipeline:
         попадает: на его основании ничего не выдаётся и не призывается.
         """
         query = proposal.search_query or proposal.target or utterance
+        # Запрос об игре с латинским названием должен быть английским целиком: кириллица
+        # в нём (название предмета из локализации) переписывается отдельным обращением.
+        rewrite = getattr(self.extractor, "english_query", None)
+        if (rewrite is not None and re.search("[а-яё]", query, re.IGNORECASE)
+                and not re.search("[а-яё]", game or "", re.IGNORECASE)):
+            try:
+                rewritten = rewrite(query, game, stages.get("screen"))
+            except Exception:
+                rewritten = query
+            if rewritten != query:
+                stages["query_rewrite"] = {"from": query, "to": rewritten}
+                query = rewritten
         answer = self.search.search(query, game=game)
         stages["search"] = {"query": answer.query, "engine": answer.engine,
                             "sources": [hit.site for hit in answer.hits],
@@ -1093,6 +1111,11 @@ class Pipeline:
             unavailable = bool(answer.errors) and not answer.rejected
             reason = ("Поиск сейчас недоступен, попробуй позже." if unavailable
                       else "В сети не нашёл надёжного ответа на этот вопрос.")
+            # Подсказка самой игры — тоже ответ: если на экране есть надписи, они
+            # передаются игроку как сказанное игрой, а не как найденное.
+            shown = self._screen_text(stages.get("screen"))
+            if shown:
+                reason += f" В самой игре на экране написано: «{shown}»."
             return Turn(outcome=REJECT, action=SEARCH_WEB, reason=reason, query=proposal.target,
                         explanation=[f"поиск «{answer.query}»: " + (
                             "все движки недоступны" if unavailable

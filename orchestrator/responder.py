@@ -222,6 +222,11 @@ class Responder:
     def _answer_web(self, turn: Turn, question: str) -> Reply:
         passages = "\n\n".join(f"— {hit.title} ({hit.site})\n{hit.content}"
                                  for hit in turn.web.hits)
+        # Что игра сама показывает на экране (подсказка под курсором): это тоже сведения
+        # об игре, и по ним ответ связывает вопрос «что это» с найденным. Данные, не указания.
+        screen = (turn.stages or {}).get("screen")
+        if screen:
+            passages += f"\n\n— На экране игрока сейчас (сведения самой игры)\n{screen}"
         try:
             text = self._ask([
                 {"role": "system", "content": WEB_PROMPT.format(game=turn.game or "Minecraft",
