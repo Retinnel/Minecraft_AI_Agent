@@ -15,6 +15,7 @@ from api import compare
 from api import tree
 from api import voice
 from api import worlds
+from api import quality
 from api import vision
 from api import memory
 from api import autopilot
@@ -52,6 +53,7 @@ app.include_router(tree.router)
 app.include_router(voice.router)
 app.include_router(vision.router)
 app.include_router(worlds.router)
+app.include_router(quality.router)
 app.include_router(memory.router)
 app.include_router(autopilot.router)
 app.include_router(companion.router)
@@ -109,6 +111,12 @@ async def admin_wiki_page():
 async def compare_page():
     """Страница сравнения конфигураций — демонстрационный материал к защите."""
     return FileResponse(BASE_DIR / "static" / "compare.html")
+
+
+@app.get("/quality")
+async def quality_page():
+    """Страница качества: числа из отчётов оценочного контура."""
+    return FileResponse(BASE_DIR / "static" / "quality.html")
 
 
 @app.get("/chat")

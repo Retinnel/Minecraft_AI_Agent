@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Качество — игровой ассистент</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #11161d; --panel: #1a2230; --line: #2a3546; --text: #e6edf6; --muted: #8b9bb0;
+          --accent: #4ea8ff; --bad: #ff5f56; --good: #45c76a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  header h1 { font-size: 21px; margin: 0; font-weight: 600; }
+  main { padding: 20px 28px 48px; max-width: 1300px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .lead { color: var(--muted); max-width: 900px; margin: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; }
+  .card h2 { margin: 0 0 4px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .card .sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  .tile { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .value { font-size: 34px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile .value small { font-size: 16px; font-weight: 500; color: var(--muted); }
+  .tile .label { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .tile.good .value { color: var(--good); }
+  .rows { display: grid; grid-template-columns: minmax(170px, 230px) 1fr 1fr; gap: 10px 18px; align-items: center; }
+  .rows .head { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+  .rows .name b { display: block; font-weight: 600; }
+  .rows .name span { color: var(--muted); font-size: 13px; }
+  .bar { position: relative; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, .05); overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; min-width: 2px; }
+  .bar.pass i { background: linear-gradient(90deg, #3aa0e8, #4be3a8); }
+  .bar.unsafe i { background: linear-gradient(90deg, #d9534f, #ff7b6b); }
+  .bar span { position: absolute; left: 10px; top: 0; line-height: 30px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+  .bar.zero span { color: var(--good); }
+  .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
+  .group { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .group h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .mini { display: grid; grid-template-columns: 150px 1fr; gap: 6px 10px; align-items: center; font-size: 13px; color: var(--muted); }
+  .mini .bar { height: 18px; }
+  .mini .bar span { line-height: 18px; font-size: 12px; left: 8px; }
+  .source { color: var(--muted); font-size: 12.5px; margin-top: 14px; }
+  .source code { font-family: Consolas, monospace; }
+  .empty { color: var(--muted); }
+  @media (max-width: 760px) { .rows { grid-template-columns: 1fr; } .rows .head { display: none; } }
+</style>
+<link rel="stylesheet" href="/static/theme.css?v=3">
+</head>
+<body>
+<header>
+  <h1>Качество</h1>
+  <div id="topbar"></div>
+</header>
+<main>
+  <p class="lead">Числа этой страницы не считаются здесь: они прочитаны из отчётов оценочного контура
+    (<code>eval/reports</code>), которые пишет прогон размеченного набора реплик. Под каждым блоком назван
+    файл отчёта.</p>
+  <section class="card" id="now"><h2>Гибрид сейчас</h2><div class="empty">загрузка…</div></section>
+  <section class="card" id="comparison"><h2>Три конфигурации на одном наборе и одной модели</h2><div class="empty">загрузка…</div></section>
+  <section class="card" id="weak"><h2>Замена модели на малую локальную</h2><div class="empty">загрузка…</div></section>
+  <section class="card" id="extra"><h2>Отдельные наборы и планировщик</h2><div class="empty">загрузка…</div></section>
+</main>
+<script src="/frontend/js/topbar.js"></script>
+<script>
+const node = (id) => document.getElementById(id);
+const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (share) => (share * 100).toFixed(1).replace(".", ",") + " %";
+
+function bar(kind, value, total) {
+  const share = total ? value / total : 0;
+  const zero = kind === "unsafe" && !value;
+  return '<div class="bar ' + kind + (zero ? " zero" : "") + '"><i style="width:' + (share * 100).toFixed(1) +
+    '%"></i><span>' + value + " из " + total + " · " + pct(share) + "</span></div>";
+}
+
+function rows(runs) {
+  let html = '<div class="rows"><div class="head">Конфигурация</div><div class="head">Совпало с разметкой</div>' +
+    '<div class="head">Недопустимых действий</div>';
+  for (const run of runs) {
+    html += '<div class="name"><b>' + esc(run.title) + "</b><span>" + esc(run.note) + "</span></div>" +
+      bar("pass", run.passed, run.total) + bar("unsafe", run.unsafe, run.total);
+  }
+  return html + "</div>";
+}
+
+function groups(runs) {
+  const keys = runs[0] ? runs[0].groups : [];
+  let html = '<div class="groups">';
+  for (const group of keys) {
+    html += '<div class="group"><h3>Реплики: ' + esc(group.title) + '</h3><div class="mini">';
+    for (const run of runs) {
+      const mine = run.groups.find((g) => g.key === group.key);
+      if (mine) html += "<div>" + esc(run.title) + "</div>" + bar("pass", mine.passed, mine.total);
+    }
+    html += "</div></div>";
+  }
+  return html + "</div>";
+}
+
+function source(runs) {
+  const files = [...new Set(runs.map((run) => run.report))];
+  const model = runs.map((run) => run.model).find(Boolean);
+  const repeat = Math.max(...runs.map((run) => run.repeat || 1));
+  return '<div class="source">' + (model ? "Модель: " + esc(model) + ". " : "") +
+    (repeat > 1 ? "Прогонов: " + repeat + ", показана медиана. " : "") +
+    "Отчёты: " + files.map((f) => "<code>" + esc(f) + "</code>").join(", ") + "</div>";
+}
+
+function fill(id, title, sub, body) {
+  node(id).innerHTML = "<h2>" + title + "</h2>" + (sub ? '<p class="sub">' + sub + "</p>" : "") + body;
+}
+
+async function load() {
+  let d;
+  try { d = await (await fetch("/api/quality/")).json(); }
+  catch (e) { node("now").innerHTML = '<div class="empty">Сервер не ответил.</div>'; return; }
+
+  if (d.latest) {
+    const run = d.latest;
+    const range = run.passed_range && run.passed_range[0] !== run.passed_range[1]
+      ? " (по прогонам " + run.passed_range[0] + "–" + run.passed_range[1] + ")" : "";
+    fill("now", "Гибрид сейчас", "Последний прогон общего набора из " + run.total + " реплик, " + esc(run.date) + ".",
+      '<div class="tiles">' +
+      '<div class="tile"><div class="value">' + run.passed + " <small>из " + run.total + '</small></div><div class="label">совпало с разметкой' + range + "</div></div>" +
+      '<div class="tile good"><div class="value">' + run.unsafe + '</div><div class="label">недопустимых действий</div></div>' +
+      '<div class="tile"><div class="value">' + pct(run.accuracy) + '</div><div class="label">доля совпавших</div></div>' +
+      (run.latency_median_ms ? '<div class="tile"><div class="value">' + (run.latency_median_ms / 1000).toFixed(1).replace(".", ",") +
+        ' <small>с</small></div><div class="label">медиана времени отклика</div></div>' : "") +
+      "</div>" + source([run]));
+  } else node("now").innerHTML = '<h2>Гибрид сейчас</h2><div class="empty">Отчётов пока нет.</div>';
+
+  if (d.comparison.length) {
+    fill("comparison", "Три конфигурации на одном наборе и одной модели",
+      "Недопустимое действие — выполненное вопреки разметке: выдан не тот объект, действие по несуществующему названию, призвано запрещённое существо.",
+      rows(d.comparison) + groups(d.comparison) + source(d.comparison));
+  }
+  if (d.weak_model.length) {
+    fill("weak", "Замена модели на малую локальную",
+      "Тот же набор, модель с четырьмя миллиардами параметров на этом компьютере: знания и проверки лежат вне модели.",
+      rows(d.weak_model) + source(d.weak_model));
+  }
+  let extra = "";
+  if (d.extra_sets.length) extra += rows(d.extra_sets) + source(d.extra_sets);
+  if (d.planner) {
+    const p = d.planner;
+    extra += '<div class="tiles" style="margin-top:18px">' +
+      '<div class="tile"><div class="value">' + p.feasible + " <small>из " + p.targets + '</small></div><div class="label">объектов, для которых строится план</div></div>' +
+      '<div class="tile"><div class="value">' + String(p.ms_median).replace(".", ",") + ' <small>мс</small></div><div class="label">время плана, медиана</div></div>' +
+      '<div class="tile"><div class="value">' + String(p.ms_p95).replace(".", ",") + ' <small>мс</small></div><div class="label">время плана, 95 % объектов</div></div>' +
+      '<div class="tile"><div class="value">' + Math.ceil(p.ms_max) + ' <small>мс</small></div><div class="label">время плана, наибольшее</div></div>' +
+      '</div><div class="source">Отчёт: <code>' + esc(p.report) + "</code></div>";
+  }
+  fill("extra", "Отдельные наборы и планировщик", "", extra || '<div class="empty">Отчётов пока нет.</div>');
+}
+load();
+</script>
+</body>
+</html>
