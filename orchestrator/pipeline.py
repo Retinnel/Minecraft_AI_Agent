@@ -463,6 +463,11 @@ class Pipeline:
                         explanation=[f"действие {proposal.action} недоступно для игры {game}: "
                                      f"команд в неё ассистент не отдаёт"],
                         stages=stages)
+        if not self._at_home(game) and proposal.action in (PLAN_GOAL, *WORLD_ACTIONS):
+            # Вопрос об игре без базы знаний («как это добыть», «что это») модель иногда
+            # называет планом или вопросом о мире. Это тот же вопрос — на него отвечает поиск.
+            stages["rule"] = "question_to_search"
+            return self._search_web(utterance, replace(proposal, action=SEARCH_WEB), game, stages)
         if not self._at_home(game):
             return Turn(outcome=REJECT, action=proposal.action, game=game,
                         reason=f"В {game} я только ищу ответы на вопросы: выдавать предметы "

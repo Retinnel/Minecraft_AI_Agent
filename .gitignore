@@ -97,6 +97,7 @@ data/vision_frames/
 data/worlds/
 # Профиль игрока — наблюдения о человеке, в репозиторий не идут
 data/profile.json
+data/window/
 
 # Помощник (companion/): зависимости Node и журнал процесса
 companion/node_modules/

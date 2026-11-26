@@ -110,3 +110,33 @@ class WindowVoiceTests(unittest.TestCase):
         self.assertEqual(repair("сделайкошмарнуюкирку", terraria), "сделай кошмарную кирку")
         # У игры без базы знаний словаря нет своего: берётся общий, правка не падает.
         self.assertIsNotNone(speech._vocabulary("Elden Ring"))
+
+
+class OtherGameQuestionTests(unittest.TestCase):
+    """Игра без базы знаний: вопрос, названный моделью планом, уходит в поиск, а не в отказ."""
+
+    def test_plan_or_world_question_is_searched(self):
+        from search.engines import Hit
+        from search.service import SearchAnswer
+
+        class Search:
+            def __init__(self):
+                self.queries = []
+
+            def search(self, query, game=None):
+                self.queries.append((query, game))
+                return SearchAnswer(query=query, engine="stub", hits=[Hit(
+                    title="Iron ore", url="https://wiki.factorio.com/Iron_ore", content="Mined by drills.",
+                    score=0.9, engine="stub")])
+
+        for action in ("plan_goal", "ask_about", "ask_sources"):
+            search = Search()
+            turn = Pipeline(Extractor(action, "iron ore"), search=search).handle(
+                "как это добыть?", game="Factorio")
+            self.assertEqual((turn.outcome, turn.action), ("act", "search_web"), action)
+            self.assertEqual(turn.stages["rule"], "question_to_search")
+            self.assertEqual(search.queries[0][1], "Factorio")
+
+    def test_giving_in_another_game_is_still_refused(self):
+        turn = Pipeline(Extractor("give_item", "iron ore")).handle("дай руду", game="Factorio")
+        self.assertEqual(turn.outcome, "reject")

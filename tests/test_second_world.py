@@ -175,9 +175,18 @@ class WorldPipelineTests(unittest.TestCase):
         self.assertNotIn("ontology", extractor.calls[0])
 
     def test_game_without_ontology_still_only_searches(self):
+        from search.service import SearchAnswer
+
+        class NoResults:
+            def search(self, query, game=None):
+                return SearchAnswer(query=query, rejected=3)
+
         extractor = Scripted("plan_goal", "кирка")
-        turn = self._pipeline(extractor).handle("как сделать кирку", game="Elden Ring")
-        self.assertEqual(turn.outcome, REJECT)
+        turn = Pipeline(extractor, search=NoResults()).handle("как сделать кирку",
+                                                              game="Elden Ring")
+        # Плана для игры без базы знаний нет: вопрос уходит в поиск, а не в решатель.
+        self.assertEqual(turn.action, "search_web")
+        self.assertIsNone(turn.plan)
         self.assertNotIn("ontology", extractor.calls[0])
 
 

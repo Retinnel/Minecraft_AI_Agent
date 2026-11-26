@@ -9,6 +9,9 @@ Minecraft и не попадает в историю его мира. Конве
 from __future__ import annotations
 
 import asyncio
+import json
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter
@@ -18,6 +21,8 @@ router = APIRouter(prefix="/api/window", tags=["window"])
 
 DEFAULT_GAME = "Minecraft"
 MAX_TEXT = 400
+# Журнал разговоров окна: по нему разбираются неудачные ответы. В репозиторий не идёт.
+LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "window" / "dialogue.jsonl"
 
 _sessions: Dict[str, Any] = {}
 
@@ -90,6 +95,7 @@ def answer(text: str, game: Optional[str], pipeline: Any, responder: Any,
             "explanation": ([f"по снимку экрана: {screen}"] if screen else [])
             + list(turn.explanation or []),
             "screen": screen,
+            "stages": {key: value for key, value in (turn.stages or {}).items() if key != "screen"},
             "options": [option.label for option in turn.options],
             "sources": [{"site": hit.site, "url": hit.url} for hit in getattr(web, "hits", [])]}
 
@@ -97,6 +103,17 @@ def answer(text: str, game: Optional[str], pipeline: Any, responder: Any,
 @router.get("/games")
 async def get_games() -> Dict[str, Any]:
     return {"games": games_list()}
+
+
+def log(entry: Dict[str, Any]) -> None:
+    """Реплика, ответ и след конвейера — строкой в журнал; сбой записи разговору не мешает."""
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with LOG_PATH.open("a", encoding="utf-8") as target:
+            target.write(json.dumps({"time": datetime.now(timezone.utc).isoformat(), **entry},
+                                    ensure_ascii=False, default=str) + "\n")
+    except OSError:
+        pass
 
 
 @router.post("/chat")
@@ -110,9 +127,14 @@ async def window_chat(message: WindowMessage) -> Dict[str, Any]:
         facts = await asyncio.to_thread(advice._screen_facts)
         seen = facts.as_prompt() if facts is not None else None
     try:
-        return await asyncio.to_thread(answer, message.text, message.game,
-                                       advice._assistant_pipeline(), advice._assistant_responder(),
-                                       seen)
+        result = await asyncio.to_thread(answer, message.text, message.game,
+                                         advice._assistant_pipeline(),
+                                         advice._assistant_responder(), seen)
+        log({"text": message.text, "typed_game": message.game, "screen_asked": message.screen,
+             **{key: result.get(key) for key in ("game", "outcome", "action", "response",
+                                                 "screen", "explanation", "stages")}})
+        result.pop("stages", None)
+        return result
     except ModelUnavailable as error:
         return {"game": canonical(message.game), "response": f"Модель недоступна: {error}",
                 "outcome": "error"}
