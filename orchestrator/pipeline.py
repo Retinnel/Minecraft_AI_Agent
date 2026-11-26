@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, List, Optional, Protocol, Sequence
+from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple
 
 from kb.graph import KnowledgeBase
 from resolver.lexical import Candidate
@@ -70,6 +70,10 @@ HOWTO_CUES = re.compile(r"\bкак\b|\bчто\s+нужно\b|\bчем\b|\bпла
 # Что доступно в игре без онтологии: память мира работает в любой игре — заметки игрока и
 # факты с экрана, — а остальное ищется в сети.
 OTHER_GAME_ACTIONS = (SEARCH_WEB, *MEMORY_ACTIONS)
+
+# Указание на предмет прошлой реплики: «сделай это», «пусть принесёт его», «то же самое».
+THAT_WORDS = re.compile(r"(?<![а-яё])(это|этого|его|её|ее|их|такое же|такую же|такой же|то же самое|тоже самое)(?![а-яё])",
+                        re.IGNORECASE)
 
 # Слова просьбы о выдаче: по ним видно, что игрок ждал предмет, а не план.
 GIVE_WORDS = re.compile(r"(?<![а-яё])(дай|дайте|выдай|выдайте|выдать|кинь|закинь|подкинь)(?![а-яё])",
@@ -365,7 +369,8 @@ class Pipeline:
                memory: Optional[Any] = None,
                position: Optional[Any] = None,
                autopilot: Optional[Dict[str, Any]] = None,
-               preferences: Optional[Dict[str, Any]] = None) -> Turn:
+               preferences: Optional[Dict[str, Any]] = None,
+               last_target: Optional[Tuple[str, Any]] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -389,7 +394,8 @@ class Pipeline:
             # считается от того, с чем персонаж появляется в мире (описание мира).
             return world.handle(utterance, mode=SURVIVAL, inventory=world.starting_inventory,
                                 pending=pending, context=context, game=world.home,
-                                screen=screen, memory=memory, position=position)
+                                screen=screen, memory=memory, position=position,
+                                last_target=last_target)
         mode = mode or self.mode
         # Сведения для «Сделай сам»: включён ли режим, одиночная ли игра, на связи ли мод.
         self._autopilot = dict(autopilot or {})
@@ -505,6 +511,7 @@ class Pipeline:
             # Кто исполняет: помощник, если к нему обратились или автопилот мода выключен.
             if to_companion or (companion.get("enabled") and not self._autopilot.get("enabled")):
                 self._executor_kind = "companion"
+            stages["executor"] = self._executor_kind
             if proposal.action == PLAN_GOAL and asked_to_do:
                 proposal = replace(proposal, action=EXECUTE_PLAN)
                 stages["rule"] = "execute_cue"
@@ -536,6 +543,17 @@ class Pipeline:
                 explanation=["вопрос «что это» без названия: сведений об экране нет"],
                 stages=stages,
             )
+
+        # «Пусть помощник сделает это»: цели в реплике нет, но есть указание на прошлую —
+        # предмет предыдущей реплики по делу. Без указательного слова цель не подставляется.
+        if (last_target and proposal.action in (PLAN_GOAL, EXECUTE_PLAN)
+                and THAT_WORDS.search(utterance or "")
+                and not self._named_target(proposal.target, utterance)):
+            thing, amount = last_target
+            if self.kb.exists(thing):
+                stages["rule_target"] = {"from": "last_target", "thing": thing, "count": amount}
+                return self._decide(proposal.action, thing, amount or 1, mode, inventory, stages,
+                                    memory=memory, position=position)
 
         # Цель не названа — уточняем, а не додумываем. Вопрос формулирует валидатор.
         if not str(proposal.target or "").strip():
@@ -644,15 +662,39 @@ class Pipeline:
             return self._decide(pending.action, chosen, pending.count, mode, inventory, stages,
                                 memory=memory, position=position)
 
+        # Кто исполняет, решено в реплике с вопросом («помощник, добудь брёвна») и к ответу
+        # на него относится тоже: в самом ответе («еловых») обращения уже нет.
+        self._executor_kind = (pending.stages or {}).get("executor") or self._executor_kind
         for query in (f"{utterance} {pending.query or ''}".strip(), utterance):
             resolution = self.resolver.resolve(query, action=pending.action)
             chosen = resolution.thing if resolution.ok else None
+            # В вопросе показана только часть вариантов («акациевое, берёзовое, …»), а игрок
+            # вправе назвать любой из той же семьи — «еловых». Семью задаёт исходное слово.
+            if chosen and chosen not in offered and query != utterance and pending.query:
+                if self._same_family(chosen, pending.query):
+                    offered = offered | {chosen}
             if chosen in offered:
                 stages = {"follow_up": {"question": pending.reason, "answer": utterance,
-                                        "chosen": chosen}}
+                                        "chosen": chosen},
+                          "executor": self._executor_kind}
                 return self._decide(pending.action, chosen, pending.count, mode, inventory, stages,
                                 memory=memory, position=position)
         return None
+
+    def _named_target(self, target: Optional[str], utterance: str) -> bool:
+        """Названа ли в реплике своя цель: слово из названий базы знаний, не местоимение."""
+        from resolver.text import NUMERALS, STOPWORDS, stem, tokenize
+        if not str(target or "").strip() or THAT_WORDS.fullmatch(str(target).strip()):
+            return False
+        vocabulary = self.resolver.index.vocabulary
+        return any(stem(word) in vocabulary for word in tokenize(utterance)
+                   if word not in STOPWORDS and word not in NUMERALS)
+
+    def _same_family(self, thing: str, generic: str) -> bool:
+        """Название сущности содержит родовое слово запроса: «Еловое бревно» — «бревно»."""
+        from resolver.text import name_stems, query_stems
+        wanted = set(query_stems(generic))
+        return bool(wanted) and wanted <= set(name_stems(self.kb.label(thing) or ""))
 
     def _decide(self, action: str, thing: str, count: Any, mode: str,
                 inventory: Optional[Dict[str, int]], stages: Dict[str, Any], *,

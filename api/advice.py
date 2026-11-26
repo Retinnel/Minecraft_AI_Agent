@@ -1692,7 +1692,7 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
             game=session.game, screen=seen or None, memory=_world_memory(session.game),
             position=_player_position(), autopilot=_autopilot_context(message),
-            preferences=_player_preferences())
+            preferences=_player_preferences(), last_target=session.last_target)
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(

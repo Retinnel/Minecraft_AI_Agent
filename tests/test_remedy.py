@@ -144,3 +144,74 @@ class OwnedGoalWordingTests(unittest.TestCase):
         self.assertNotIn("отдельном экране", Responder.facts(owned))
         needed = pipeline._decide("plan_goal", "minecraft:stone_pickaxe", 1, "survival", {}, {})
         self.assertIn("отдельном экране", Responder.facts(needed))
+
+
+class HelperDialogueTests(unittest.TestCase):
+    """Разговор с помощником из проверки в игре: вопрос, ответ не из показанных вариантов,
+    «сделай это»."""
+
+    AUTOPILOT = {"enabled": True, "singleplayer": False, "available": True,
+                 "companion": {"enabled": True, "connected": True, "name": "Helper",
+                               "inventory": {"minecraft:wooden_axe": 1}}}
+
+    class Extractor:
+        def __init__(self, action, target=None, count=1):
+            from orchestrator.pipeline import Proposal
+            self.proposal = Proposal(action=action, target=target, count=count)
+
+        def extract(self, utterance, **kwargs):
+            return self.proposal
+
+    def test_answer_outside_the_shown_options_keeps_action_count_and_executor(self):
+        pipeline = Pipeline(self.Extractor("execute_plan", "бревно", 5))
+        asked = pipeline.handle("Помощник, добудь мне 5 брёвен", mode="survival", inventory={},
+                                autopilot=self.AUTOPILOT)
+        self.assertEqual(asked.outcome, "clarify")
+        self.assertNotIn("Еловое бревно", [option.label for option in asked.options])
+        answered = pipeline.handle("Еловых брёвен", mode="survival", inventory={},
+                                   pending=asked, autopilot=self.AUTOPILOT)
+        self.assertEqual(answered.target, "minecraft:spruce_log")
+        self.assertEqual(answered.action, "execute_plan")
+        self.assertEqual(answered.count, 5)
+        self.assertEqual(answered.stages["executor"], "companion")
+        self.assertNotIn("одиночной игре", answered.reason or "")
+
+    def test_unrelated_answer_is_a_new_request(self):
+        pipeline = Pipeline(self.Extractor("execute_plan", "бревно", 5))
+        asked = pipeline.handle("Помощник, добудь мне 5 брёвен", mode="survival", inventory={},
+                                autopilot=self.AUTOPILOT)
+        other = Pipeline(self.Extractor("plan_goal", "печь")).handle(
+            "как сделать печь", mode="survival", inventory={}, pending=asked,
+            autopilot=self.AUTOPILOT)
+        self.assertEqual(other.target, "minecraft:furnace")
+        self.assertNotIn("follow_up", other.stages)
+
+    def test_do_this_takes_the_target_of_the_previous_turn(self):
+        pipeline = Pipeline(self.Extractor("execute_plan", None))
+        turn = pipeline.handle("Пусть помощник сделает это", mode="survival", inventory={},
+                               autopilot=self.AUTOPILOT, last_target=("minecraft:spruce_log", 5))
+        self.assertEqual((turn.target, turn.count), ("minecraft:spruce_log", 5))
+        self.assertEqual(turn.stages["rule_target"]["from"], "last_target")
+        self.assertEqual(turn.action, "execute_plan")
+
+    def test_without_a_pointing_word_nothing_is_substituted(self):
+        pipeline = Pipeline(self.Extractor("execute_plan", None))
+        turn = pipeline.handle("Пусть помощник сделает", mode="survival", inventory={},
+                               autopilot=self.AUTOPILOT, last_target=("minecraft:spruce_log", 5))
+        self.assertEqual(turn.outcome, "clarify")
+        self.assertIsNone(turn.target)
+
+    def test_named_target_beats_the_previous_one(self):
+        pipeline = Pipeline(self.Extractor("execute_plan", "верстак"))
+        turn = pipeline.handle("пусть помощник сделает его — верстак", mode="survival",
+                               inventory={}, autopilot=self.AUTOPILOT,
+                               last_target=("minecraft:spruce_log", 5))
+        self.assertEqual(turn.target, "minecraft:crafting_table")
+
+    def test_session_remembers_the_last_target(self):
+        from orchestrator.session import Session
+        session = Session()
+        turn = Pipeline(self.Extractor("plan_goal", "еловое бревно", 5)).handle(
+            "как добыть 5 еловых брёвен", mode="survival", inventory={})
+        session.record("как добыть 5 еловых брёвен", turn, "план")
+        self.assertEqual(session.last_target, ("minecraft:spruce_log", 5))

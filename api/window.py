@@ -79,7 +79,8 @@ def answer(text: str, game: Optional[str], pipeline: Any, responder: Any,
                 "source": "rule", "explanation": list(told.get("trace") or []),
                 "plan_alternatives": told.get("alternatives")}
     turn = pipeline.handle(text, mode="survival", inventory={}, pending=session.pending,
-                           context=session.last_exchange, game=name, screen=screen or None)
+                           context=session.last_exchange, game=name, screen=screen or None,
+                           last_target=session.last_target)
     reply = responder.reply(turn, text, summary=session.summary(), window=session.window())
     session.record(text, turn, reply.text)
     web = getattr(turn, "web", None)

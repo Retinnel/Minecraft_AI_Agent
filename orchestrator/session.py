@@ -52,6 +52,8 @@ class Session:
     pending: Optional[object] = None
     # След правил последней реплики — для ответа на «почему?» (orchestrator/why.py).
     last_why: Optional[dict] = None
+    # Предмет и количество последней реплики по делу — для «сделай это».
+    last_target: Optional[tuple] = None
     # Предыдущий обмен одной строкой — для продолжений вроде «и ещё крипера».
     last_exchange: Optional[str] = None
     # Игра, о которой спрашивает игрок. Для Minecraft работает онтология, для остальных —
@@ -100,6 +102,8 @@ class Session:
         # всё ещё относится к последнему отказу или плану.
         from orchestrator.why import snapshot
         self.last_why = snapshot(turn) or self.last_why
+        if getattr(turn, "target", None):
+            self.last_target = (turn.target, turn.count)
 
         label = turn.label or turn.target
         if turn.outcome == "act" and label:
