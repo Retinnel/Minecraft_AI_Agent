@@ -1,0 +1,503 @@
+[
+ {
+  "id": "terraria:work_bench",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "inventory",
+  "result": {
+   "item": "terraria:work_bench",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 10
+   }
+  ]
+ },
+ {
+  "id": "terraria:torch",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "inventory",
+  "result": {
+   "item": "terraria:torch",
+   "count": 3
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:gel"
+     }
+    ],
+    "count": 1
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 1
+   }
+  ]
+ },
+ {
+  "id": "terraria:wood_platform",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "inventory",
+  "result": {
+   "item": "terraria:wood_platform",
+   "count": 2
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 1
+   }
+  ]
+ },
+ {
+  "id": "terraria:furnace",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "work_bench",
+  "result": {
+   "item": "terraria:furnace",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:stone_block"
+     }
+    ],
+    "count": 20
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 4
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:torch"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:iron_anvil",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "work_bench",
+  "result": {
+   "item": "terraria:iron_anvil",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:iron_bar"
+     }
+    ],
+    "count": 5
+   }
+  ]
+ },
+ {
+  "id": "terraria:chest",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "work_bench",
+  "result": {
+   "item": "terraria:chest",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 8
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:iron_bar"
+     }
+    ],
+    "count": 2
+   }
+  ]
+ },
+ {
+  "id": "terraria:wooden_sword",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "work_bench",
+  "result": {
+   "item": "terraria:wooden_sword",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 7
+   }
+  ]
+ },
+ {
+  "id": "terraria:wooden_bow",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "work_bench",
+  "result": {
+   "item": "terraria:wooden_bow",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 10
+   }
+  ]
+ },
+ {
+  "id": "terraria:copper_bar",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "furnace",
+  "result": {
+   "item": "terraria:copper_bar",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:copper_ore"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:iron_bar",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "furnace",
+  "result": {
+   "item": "terraria:iron_bar",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:iron_ore"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:gold_bar",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "furnace",
+  "result": {
+   "item": "terraria:gold_bar",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:gold_ore"
+     }
+    ],
+    "count": 4
+   }
+  ]
+ },
+ {
+  "id": "terraria:demonite_bar",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "furnace",
+  "result": {
+   "item": "terraria:demonite_bar",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:demonite_ore"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:copper_pickaxe",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:copper_pickaxe",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:copper_bar"
+     }
+    ],
+    "count": 12
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 4
+   }
+  ]
+ },
+ {
+  "id": "terraria:copper_axe",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:copper_axe",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:copper_bar"
+     }
+    ],
+    "count": 9
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:copper_shortsword",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:copper_shortsword",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:copper_bar"
+     }
+    ],
+    "count": 5
+   }
+  ]
+ },
+ {
+  "id": "terraria:iron_pickaxe",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:iron_pickaxe",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:iron_bar"
+     }
+    ],
+    "count": 12
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 3
+   }
+  ]
+ },
+ {
+  "id": "terraria:iron_broadsword",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:iron_broadsword",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:iron_bar"
+     }
+    ],
+    "count": 8
+   }
+  ]
+ },
+ {
+  "id": "terraria:gold_pickaxe",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:gold_pickaxe",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:gold_bar"
+     }
+    ],
+    "count": 12
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:wood"
+     }
+    ],
+    "count": 4
+   }
+  ]
+ },
+ {
+  "id": "terraria:gold_broadsword",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:gold_broadsword",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:gold_bar"
+     }
+    ],
+    "count": 8
+   }
+  ]
+ },
+ {
+  "id": "terraria:nightmare_pickaxe",
+  "type": "terraria:crafting",
+  "method": "craft",
+  "station": "iron_anvil",
+  "result": {
+   "item": "terraria:nightmare_pickaxe",
+   "count": 1
+  },
+  "inputs": [
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:demonite_bar"
+     }
+    ],
+    "count": 12
+   },
+   {
+    "alternatives": [
+     {
+      "kind": "item",
+      "id": "terraria:shadow_scale"
+     }
+    ],
+    "count": 6
+   }
+  ]
+ }
+]

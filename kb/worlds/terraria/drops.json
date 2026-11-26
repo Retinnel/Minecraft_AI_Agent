@@ -1,0 +1,31 @@
+{
+ "blocks": {
+  "terraria:tree": {
+   "terraria:wood": false
+  },
+  "terraria:stone_block": {
+   "terraria:stone_block": false
+  },
+  "terraria:copper_ore": {
+   "terraria:copper_ore": false
+  },
+  "terraria:iron_ore": {
+   "terraria:iron_ore": false
+  },
+  "terraria:gold_ore": {
+   "terraria:gold_ore": false
+  },
+  "terraria:demonite_ore": {
+   "terraria:demonite_ore": false
+  }
+ },
+ "entities": {
+  "terraria:slime": {
+   "terraria:gel": false
+  },
+  "terraria:eater_of_worlds": {
+   "terraria:shadow_scale": false,
+   "terraria:demonite_ore": false
+  }
+ }
+}

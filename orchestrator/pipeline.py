@@ -71,6 +71,10 @@ HOWTO_CUES = re.compile(r"\bкак\b|\bчто\s+нужно\b|\bчем\b|\bпла
 # факты с экрана, — а остальное ищется в сети.
 OTHER_GAME_ACTIONS = (SEARCH_WEB, *MEMORY_ACTIONS)
 
+# Игра со своей базой знаний (kb/worlds): планы и вопросы о мире — по ней. Команд в такую
+# игру ассистент не отдаёт: мода для неё нет, и выдача с призывом модели не предъявляются.
+WORLD_GAME_ACTIONS = (PLAN_GOAL, *WORLD_ACTIONS, SEARCH_WEB, *MEMORY_ACTIONS)
+
 # Сколько раз модели дают переделать отклонённое задание. Одна попытка — по описанию
 # целевой системы: модель учитывает причину отказа, но перебором не занимается.
 QUEST_RETRIES = 1
@@ -225,7 +229,13 @@ class Pipeline:
         *,
         mode: str = CREATIVE,
         search: Optional[Any] = None,
+        home: str = DEFAULT_GAME,
     ) -> None:
+        # Игра, чью базу знаний держит этот конвейер. Для неё работают резолвер, валидатор
+        # и планировщик; о любой другой игре — только поиск.
+        self.home = home
+        self._worlds: Dict[str, "Pipeline"] = {}
+        self.starting_inventory: Dict[str, int] = {}
         self.kb = kb or KnowledgeBase.shared()
         self._search = search
         self.extractor = extractor
@@ -275,12 +285,36 @@ class Pipeline:
         «Сделай сам» предъявляется только тогда, когда автопилот включён: выключенный
         режим не должен менять разбор остальных реплик.
         """
-        if game and game.lower() != DEFAULT_GAME.lower():
+        if game and not self._at_home(game):
             return OTHER_GAME_ACTIONS
+        if not self._minecraft:
+            return WORLD_GAME_ACTIONS
         allowed = set(self.validator.available_actions(mode))
         if not autopilot:
             allowed.discard(EXECUTE_PLAN)
         return tuple(action for action in PROPOSABLE if action in allowed)
+
+    @property
+    def _minecraft(self) -> bool:
+        return self.home.lower() == DEFAULT_GAME.lower()
+
+    def _at_home(self, game: Optional[str]) -> bool:
+        return (game or DEFAULT_GAME).lower() == self.home.lower()
+
+    def _world_pipeline(self, game: str) -> Optional["Pipeline"]:
+        """Конвейер для игры со своей базой знаний: те же компоненты на другой онтологии."""
+        if not self._minecraft or self._at_home(game):
+            return None
+        from kb import games
+        world = games.find(game)
+        if world is None:
+            return None
+        if world.key not in self._worlds:
+            pipeline = Pipeline(self.extractor, world.kb(), mode=SURVIVAL, search=self._search,
+                                home=world.game)
+            pipeline.starting_inventory = dict(world.starting_inventory)
+            self._worlds[world.key] = pipeline
+        return self._worlds[world.key]
 
     def handle(self, utterance: str, *, mode: Optional[str] = None,
                inventory: Optional[Dict[str, int]] = None,
@@ -307,8 +341,15 @@ class Pipeline:
         последняя позиция игрока по сведениям мода. Координаты в ответах и отметках
         берутся только отсюда.
         """
-        mode = mode or self.mode
         game = game or DEFAULT_GAME
+        world = self._world_pipeline(game)
+        if world is not None:
+            # Инвентарь Minecraft к другой игре не относится: мода для неё нет, и план
+            # считается от того, с чем персонаж появляется в мире (описание мира).
+            return world.handle(utterance, mode=SURVIVAL, inventory=world.starting_inventory,
+                                pending=pending, context=context, game=world.home,
+                                screen=screen, memory=memory, position=position)
+        mode = mode or self.mode
         # Сведения для «Сделай сам»: включён ли режим, одиночная ли игра, на связи ли мод.
         self._autopilot = dict(autopilot or {})
         self._executor_kind = "player"
@@ -316,7 +357,7 @@ class Pipeline:
         actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")
                                                     or companion.get("enabled")))
 
-        if (game.lower() == DEFAULT_GAME.lower() and mode == CREATIVE
+        if (self._minecraft and self._at_home(game) and mode == CREATIVE
                 and EXECUTE_CUES.search(utterance or "")):
             verdict = self.validator.validate(EXECUTE_PLAN, None, 1, mode)
             return Turn(outcome=REJECT, action=EXECUTE_PLAN, reason=verdict.reason,
@@ -325,16 +366,20 @@ class Pipeline:
 
         # Продолжение уточнения достраивает действие Minecraft («какой меч?» → «алмазный»)
         # и в разговоре о другой игре дало бы команду в обход проверки игры ниже.
-        if game.lower() == DEFAULT_GAME.lower():
+        if self._at_home(game):
             follow_up = self._follow_up(utterance, pending, mode, inventory, memory, position)
             if follow_up is not None:
                 return follow_up
 
+        # Необязательные сведения передаются только когда они есть: извлекатель без них
+        # получает тот же вызов, что и раньше.
+        extra: Dict[str, Any] = {}
         if screen:
-            proposal = self.extractor.extract(utterance, actions=actions, context=context,
-                                              game=game, screen=screen)
-        else:
-            proposal = self.extractor.extract(utterance, actions=actions, context=context, game=game)
+            extra["screen"] = screen
+        if not self._minecraft and self._at_home(game):
+            extra["ontology"] = True
+        proposal = self.extractor.extract(utterance, actions=actions, context=context,
+                                          game=game, **extra)
         stages: Dict[str, Any] = {
             "llm": {"action": proposal.action, "target": proposal.target, "count": proposal.count}
         }
@@ -353,7 +398,14 @@ class Pipeline:
         # Второй рубеж для чужой игры: модели предъявлен только поиск, но если она всё же
         # предложит выдачу или план, валидатор об игре не знает и пропустил бы команду
         # Minecraft в разговор об Elden Ring. Онтология есть только для Minecraft.
-        if game.lower() != DEFAULT_GAME.lower():
+        if not self._minecraft and self._at_home(game) and proposal.action not in actions:
+            return Turn(outcome=REJECT, action=proposal.action, game=game,
+                        reason=f"В {game} я строю планы и отвечаю на вопросы о мире: "
+                               f"выдавать предметы умею только в Minecraft.",
+                        explanation=[f"действие {proposal.action} недоступно для игры {game}: "
+                                     f"команд в неё ассистент не отдаёт"],
+                        stages=stages)
+        if not self._at_home(game):
             return Turn(outcome=REJECT, action=proposal.action, game=game,
                         reason=f"В {game} я только ищу ответы на вопросы: выдавать предметы "
                                f"и строить планы умею в Minecraft.",
@@ -794,7 +846,8 @@ class Pipeline:
         чего не хватает, чем услышать «нельзя».
         """
         storage, where, known = {}, {}, {}
-        if memory is not None:
+        # Наблюдения мода (сундуки, жилы) есть только у Minecraft.
+        if memory is not None and self._minecraft:
             locator = self.locator
             storage, where = locator.storage(memory, position)
             known = locator.known_sources(memory, position)

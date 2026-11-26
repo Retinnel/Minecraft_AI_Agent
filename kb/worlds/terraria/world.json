@@ -1,0 +1,92 @@
+{
+ "_comment": [
+  "Вторая среда на том же ядре: описание мира Terraria в форматах data/game/.",
+  "Решатель, резолвер и валидатор берут о мире всё из онтологии, собранной из этих файлов."
+ ],
+ "game": "Terraria",
+ "names": [
+  "terraria",
+  "террария",
+  "террарию",
+  "террарии"
+ ],
+ "tiers": {
+  "copper": 0,
+  "iron": 1,
+  "gold": 2,
+  "nightmare": 3
+ },
+ "tool_items": {
+  "terraria:copper_pickaxe": {
+   "kind": "pickaxe",
+   "tier": "copper"
+  },
+  "terraria:iron_pickaxe": {
+   "kind": "pickaxe",
+   "tier": "iron"
+  },
+  "terraria:gold_pickaxe": {
+   "kind": "pickaxe",
+   "tier": "gold"
+  },
+  "terraria:nightmare_pickaxe": {
+   "kind": "pickaxe",
+   "tier": "nightmare"
+  },
+  "terraria:copper_axe": {
+   "kind": "axe",
+   "tier": "copper"
+  }
+ },
+ "stations": {
+  "inventory": {
+   "phrase": "в руках"
+  },
+  "work_bench": {
+   "item": "terraria:work_bench",
+   "phrase": "на верстаке"
+  },
+  "furnace": {
+   "item": "terraria:furnace",
+   "phrase": "в печи"
+  },
+  "iron_anvil": {
+   "item": "terraria:iron_anvil",
+   "phrase": "на наковальне"
+  }
+ },
+ "starting_inventory": {
+  "terraria:copper_pickaxe": 1,
+  "terraria:copper_axe": 1,
+  "terraria:copper_shortsword": 1
+ },
+ "aliases": [
+  {
+   "id": "terraria:wood",
+   "aliases_ru": [
+    "дерево",
+    "доски"
+   ]
+  },
+  {
+   "id": "terraria:eater_of_worlds",
+   "aliases_ru": [
+    "пожиратель",
+    "червь"
+   ]
+  },
+  {
+   "id": "terraria:slime",
+   "aliases_ru": [
+    "слайм",
+    "слизь"
+   ]
+  },
+  {
+   "id": "terraria:iron_anvil",
+   "aliases_ru": [
+    "наковальня"
+   ]
+  }
+ ]
+}

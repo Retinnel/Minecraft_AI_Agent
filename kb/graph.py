@@ -134,6 +134,7 @@ class KnowledgeBase:
         self._tool_profiles: Dict[str, Optional[Tool]] = {}
         self._tools_by_kind: Dict[str, List[Tool]] = {}
         self._name_index: Optional[Dict[str, Naming]] = None
+        self._tier_ranks: Dict[str, int] = {}
 
     # --- загрузка ---
 
@@ -391,7 +392,32 @@ class KnowledgeBase:
         return list(self._tools_by_kind[kind])
 
     def tool_tier_rank(self, tier: Optional[str]) -> int:
-        return ont.TOOL_TIERS.get(tier or "", 0)
+        """Порядок уровня по шкале этой базы знаний: у каждой игры шкала своя."""
+        if not tier:
+            return 0
+        if tier not in self._tier_ranks:
+            value = next(iter(self.graph.objects(ont.tier_uri(tier), ont.TIER_RANK)), None)
+            self._tier_ranks[tier] = (int(value) if value is not None
+                                      else ont.TOOL_TIERS.get(tier, 0))
+        return self._tier_ranks[tier]
+
+    # --- станции ---
+
+    def station_item(self, station: Optional[str]) -> Optional[str]:
+        """Предмет, которым ставится станция, если база знаний его называет."""
+        if not station:
+            return None
+        target = next(iter(self.graph.objects(ont.station_uri(station), ont.STATION_ITEM)), None)
+        return self._by_uri.get(target) if target is not None else None
+
+    def station_phrase(self, station: Optional[str]) -> Optional[str]:
+        """Как сказать «на этой станции» по-русски, если база знаний это называет."""
+        if not station:
+            return None
+        for label in self.graph.objects(ont.station_uri(station), RDFS.label):
+            if getattr(label, "language", None) == "ru":
+                return str(label)
+        return None
 
     def tier_satisfies(self, available: Optional[str], required: Optional[str]) -> bool:
         """Хватит ли инструмента уровня `available` для требования `required`."""

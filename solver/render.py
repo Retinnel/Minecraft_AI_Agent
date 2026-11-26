@@ -24,6 +24,14 @@ STATION_RU = {
     "smithing_table": "на кузнечном столе",
 }
 
+def station_phrase(kb, station: Optional[str]) -> str:
+    """«На верстаке», «в печи»: для Minecraft — из таблицы, для другого мира — из его
+    базы знаний."""
+    if not station:
+        return ""
+    return STATION_RU.get(station) or kb.station_phrase(station) or station
+
+
 TOOL_KIND_RU = {"pickaxe": "кирка", "axe": "топор", "shovel": "лопата", "hoe": "мотыга"}
 # Где искать, если не в обычном Верхнем мире: игроку важно знать, что путь лежит в Незер.
 REMOTE_RU = {"nether": "в Незере", "end": "в Крае", "rare_biome": "в редком биоме", "unnatural": "только построенное",
@@ -53,7 +61,7 @@ def _describe(step: Step, kb: KnowledgeBase, generic: Optional[Dict[int, str]] =
         return f"{head} — взять из хранилища" + (f": {step.where}" if step.where else "")
     if step.kind in (CRAFT, SMELT, STONECUT, SMITH):
         return f"{head} — {'скрафтить' if step.kind == CRAFT else 'изготовить'} " \
-               f"{STATION_RU.get(step.station, step.station or '')}".rstrip()
+               f"{station_phrase(kb, step.station)}".rstrip()
     if step.kind == MINE:
         source = kb.label(step.source) or step.source
         suffix = ""
@@ -169,7 +177,7 @@ def _describe_option(option: Option, kb: KnowledgeBase) -> str:
     if option.kind in (MINE, HUNT):
         where = kb.label(option.detail) or option.detail
         return f"{action} из «{where}»"
-    where = STATION_RU.get(option.detail, option.detail)
+    where = station_phrase(kb, option.detail)
     source = f" из «{kb.label(option.via) or option.via}»" if option.via else ""
     return f"{action} {where}{source}"
 

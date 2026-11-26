@@ -47,6 +47,7 @@ PRODUCES_COUNT = GA.producesCount     # Recipe -> integer
 REQUIRES = GA.requires                # Recipe -> Ingredient
 METHOD = GA.method                    # Recipe -> literal: craft | smelt | stonecut | smith
 AT_STATION = GA.atStation             # Recipe -> Station
+STATION_ITEM = GA.stationItem         # Station -> Item: предмет, которым станция ставится
 
 # Позиция состава
 ALTERNATIVE = GA.alternative          # Ingredient -> Item | Tag
@@ -86,7 +87,7 @@ ACCESSIBILITY = GA.accessibility      # Block | Creature -> literal
 
 OBJECT_PROPERTIES = (PRODUCES, REQUIRES, AT_STATION, ALTERNATIVE, HAS_MEMBER, YIELDS,
                      RARE_YIELD, REQUIRES_TOOL_TIER, REQUIRES_TOOL_KIND, IS_TOOL_KIND,
-                     HAS_TOOL_TIER, FORBIDS)
+                     HAS_TOOL_TIER, FORBIDS, STATION_ITEM)
 DATA_PROPERTIES = (PRODUCES_COUNT, METHOD, QUANTITY, TIER_RANK, FORBIDDEN_ACTION,
                    REASON, CATEGORY, GAME_ID, TOOL_REQUIRED, ACCESSIBILITY)
 

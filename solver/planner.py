@@ -608,7 +608,7 @@ class Planner:
             total += ingredient.quantity * min(
                 self._item_cost(item, stack) for item in ingredient.alternatives)
         station_cost = 0
-        station_item = STATION_ITEMS.get(recipe.station)
+        station_item = self.kb.station_item(recipe.station) or STATION_ITEMS.get(recipe.station)
         if station_item and not (stock and stock.get(station_item, 0) > 0):
             station_cost = self._item_cost(station_item, stack)
         return (total / max(recipe.produces_count, 1) + station_cost,

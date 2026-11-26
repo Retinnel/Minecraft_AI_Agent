@@ -1518,16 +1518,27 @@ async def _mode_reply(mode: str, text: str, last: Any) -> GroqAdvice:
     return await _store_chat_result(result, text)
 
 
+def _has_knowledge_base(session) -> bool:
+    """Есть ли по игре сессии база знаний: Minecraft либо мир из kb/worlds."""
+    from kb import games
+    return session.is_default_game or games.find(session.game) is not None
+
+
 async def _game_reply(name: str, text: str) -> GroqAdvice:
     session = _assistant_session()
     session.set_game(name)
     from api import worlds
     # У другой игры свой мир: её заметки не смешиваются с памятью сохранений Minecraft.
     worlds.ensure_game_world(session.game)
-    reply = ("Возвращаемся к Minecraft: снова работают база знаний, планы и выдача."
-             if session.is_default_game else
-             f"Игра: {session.game}. Базы знаний по ней у меня нет — отвечаю по найденному "
-             f"в сети и называю источник.")
+    from kb import games
+    if session.is_default_game:
+        reply = "Возвращаемся к Minecraft: снова работают база знаний, планы и выдача."
+    elif games.find(session.game) is not None:
+        reply = (f"Игра: {session.game}. База знаний по ней есть: строю планы и отвечаю на "
+                 f"вопросы о предметах по ней, остальное ищу в сети.")
+    else:
+        reply = (f"Игра: {session.game}. Базы знаний по ней у меня нет — отвечаю по "
+                 f"найденному в сети и называю источник.")
     result = GroqAdvice(response=reply, confidence=1.0, level="INFO", threats=[], source="rule",
                         mode="chat", outcome="act", assistant_mode=session.mode, game=session.game)
     return await _store_chat_result(result, text)
@@ -1536,7 +1547,7 @@ async def _game_reply(name: str, text: str) -> GroqAdvice:
 @router.get("/game")
 async def get_assistant_game() -> Dict[str, Any]:
     session = _assistant_session()
-    return {"game": session.game, "knowledge_base": session.is_default_game}
+    return {"game": session.game, "knowledge_base": _has_knowledge_base(session)}
 
 
 @router.post("/game")
@@ -1552,7 +1563,7 @@ async def set_assistant_game(payload: Dict[str, Any]) -> Dict[str, Any]:
     from api import worlds
     worlds.ensure_game_world(session.game)
     worlds.save()
-    return {"ok": True, "game": session.game, "knowledge_base": session.is_default_game}
+    return {"ok": True, "game": session.game, "knowledge_base": _has_knowledge_base(session)}
 
 
 @router.get("/mode")

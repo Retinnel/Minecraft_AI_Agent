@@ -1,0 +1,32 @@
+{
+ "terraria:tree": {
+  "tier": "copper",
+  "tool": "axe",
+  "tool_required": true
+ },
+ "terraria:stone_block": {
+  "tier": "copper",
+  "tool": "pickaxe",
+  "tool_required": true
+ },
+ "terraria:copper_ore": {
+  "tier": "copper",
+  "tool": "pickaxe",
+  "tool_required": true
+ },
+ "terraria:iron_ore": {
+  "tier": "copper",
+  "tool": "pickaxe",
+  "tool_required": true
+ },
+ "terraria:gold_ore": {
+  "tier": "copper",
+  "tool": "pickaxe",
+  "tool_required": true
+ },
+ "terraria:demonite_ore": {
+  "tier": "gold",
+  "tool": "pickaxe",
+  "tool_required": true
+ }
+}

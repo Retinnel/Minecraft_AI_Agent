@@ -1,0 +1,250 @@
+{
+ "terraria:wood": {
+  "id": "terraria:wood",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Wood",
+  "name_ru": "Древесина"
+ },
+ "terraria:stone_block": {
+  "id": "terraria:stone_block",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Stone Block",
+  "name_ru": "Каменный блок"
+ },
+ "terraria:copper_ore": {
+  "id": "terraria:copper_ore",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Copper Ore",
+  "name_ru": "Медная руда"
+ },
+ "terraria:iron_ore": {
+  "id": "terraria:iron_ore",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Iron Ore",
+  "name_ru": "Железная руда"
+ },
+ "terraria:gold_ore": {
+  "id": "terraria:gold_ore",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Gold Ore",
+  "name_ru": "Золотая руда"
+ },
+ "terraria:demonite_ore": {
+  "id": "terraria:demonite_ore",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Demonite Ore",
+  "name_ru": "Демонитовая руда"
+ },
+ "terraria:gel": {
+  "id": "terraria:gel",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Gel",
+  "name_ru": "Гель"
+ },
+ "terraria:shadow_scale": {
+  "id": "terraria:shadow_scale",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Shadow Scale",
+  "name_ru": "Теневая чешуя"
+ },
+ "terraria:torch": {
+  "id": "terraria:torch",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Torch",
+  "name_ru": "Факел"
+ },
+ "terraria:work_bench": {
+  "id": "terraria:work_bench",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Work Bench",
+  "name_ru": "Верстак"
+ },
+ "terraria:furnace": {
+  "id": "terraria:furnace",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Furnace",
+  "name_ru": "Печь"
+ },
+ "terraria:iron_anvil": {
+  "id": "terraria:iron_anvil",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Iron Anvil",
+  "name_ru": "Железная наковальня"
+ },
+ "terraria:chest": {
+  "id": "terraria:chest",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Chest",
+  "name_ru": "Сундук"
+ },
+ "terraria:wood_platform": {
+  "id": "terraria:wood_platform",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Wood Platform",
+  "name_ru": "Деревянная платформа"
+ },
+ "terraria:copper_bar": {
+  "id": "terraria:copper_bar",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Copper Bar",
+  "name_ru": "Медный слиток"
+ },
+ "terraria:iron_bar": {
+  "id": "terraria:iron_bar",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Iron Bar",
+  "name_ru": "Железный слиток"
+ },
+ "terraria:gold_bar": {
+  "id": "terraria:gold_bar",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Gold Bar",
+  "name_ru": "Золотой слиток"
+ },
+ "terraria:demonite_bar": {
+  "id": "terraria:demonite_bar",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Demonite Bar",
+  "name_ru": "Демонитовый слиток"
+ },
+ "terraria:copper_pickaxe": {
+  "id": "terraria:copper_pickaxe",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Copper Pickaxe",
+  "name_ru": "Медная кирка"
+ },
+ "terraria:iron_pickaxe": {
+  "id": "terraria:iron_pickaxe",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Iron Pickaxe",
+  "name_ru": "Железная кирка"
+ },
+ "terraria:gold_pickaxe": {
+  "id": "terraria:gold_pickaxe",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Gold Pickaxe",
+  "name_ru": "Золотая кирка"
+ },
+ "terraria:nightmare_pickaxe": {
+  "id": "terraria:nightmare_pickaxe",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Nightmare Pickaxe",
+  "name_ru": "Кошмарная кирка"
+ },
+ "terraria:copper_axe": {
+  "id": "terraria:copper_axe",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Copper Axe",
+  "name_ru": "Медный топор"
+ },
+ "terraria:wooden_sword": {
+  "id": "terraria:wooden_sword",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Wooden Sword",
+  "name_ru": "Деревянный меч"
+ },
+ "terraria:copper_shortsword": {
+  "id": "terraria:copper_shortsword",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Copper Shortsword",
+  "name_ru": "Медный короткий меч"
+ },
+ "terraria:iron_broadsword": {
+  "id": "terraria:iron_broadsword",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Iron Broadsword",
+  "name_ru": "Железный палаш"
+ },
+ "terraria:gold_broadsword": {
+  "id": "terraria:gold_broadsword",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Gold Broadsword",
+  "name_ru": "Золотой палаш"
+ },
+ "terraria:wooden_bow": {
+  "id": "terraria:wooden_bow",
+  "kinds": [
+   "item"
+  ],
+  "name_en": "Wooden Bow",
+  "name_ru": "Деревянный лук"
+ },
+ "terraria:tree": {
+  "id": "terraria:tree",
+  "kinds": [
+   "block"
+  ],
+  "name_en": "Tree",
+  "name_ru": "Дерево"
+ },
+ "terraria:slime": {
+  "id": "terraria:slime",
+  "kinds": [
+   "entity"
+  ],
+  "name_en": "Slime",
+  "name_ru": "Слизень"
+ },
+ "terraria:eater_of_worlds": {
+  "id": "terraria:eater_of_worlds",
+  "kinds": [
+   "entity"
+  ],
+  "name_en": "Eater of Worlds",
+  "name_ru": "Пожиратель миров"
+ }
+}

@@ -155,8 +155,11 @@ NO_GIVE_RULE = """
 
 def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
                  context: Optional[str] = None, game: Optional[str] = None,
-                 screen: Optional[str] = None) -> str:
-    """Промпт под набор действий, доступных в текущем режиме и для текущей игры."""
+                 screen: Optional[str] = None, ontology: bool = False) -> str:
+    """Промпт под набор действий, доступных в текущем режиме и для текущей игры.
+
+    ontology — у игры есть своя база знаний: вопросы о рецептах и добыче относятся к ней,
+    как в Minecraft, и поиску не отдаются."""
     usable = [action for action in actions if action in ACTION_HINTS]
     quest = "create_quest" in usable
     search = "search_web" in usable
@@ -165,7 +168,7 @@ def build_prompt(actions: Sequence[str], feedback: Optional[str] = None,
         rules += NO_GIVE_RULE
     if search:
         rules += SEARCH_RULES
-    other_game = bool(game) and game.lower() != "minecraft"
+    other_game = bool(game) and game.lower() != "minecraft" and not ontology
     search_hint = OTHER_GAME_SEARCH_HINT + (OTHER_GAME_MEMORY_NOTE if "recall" in usable else "")
     hints = {action: (search_hint if other_game and action == "search_web"
                       else ACTION_HINTS[action]) for action in usable}
@@ -230,8 +233,10 @@ class LanguageModelIntent:
 
     def extract(self, utterance: str, *, actions: Sequence[str] = EXTRACTABLE,
                 feedback: Optional[str] = None, context: Optional[str] = None,
-                game: Optional[str] = None, screen: Optional[str] = None) -> Proposal:
-        payload = self._ask(build_prompt(actions, feedback, context, game, screen), utterance)
+                game: Optional[str] = None, screen: Optional[str] = None,
+                ontology: bool = False) -> Proposal:
+        payload = self._ask(build_prompt(actions, feedback, context, game, screen, ontology),
+                            utterance)
         action = str(payload.get("action") or "none").strip()
         # Малые модели пишут "count": null там, где большие поле опускают. Смысл один —
         # количество не названо, то есть речь об одной штуке. Без этого вопрос «как

@@ -74,9 +74,11 @@ def _declare_schema(graph: Graph) -> None:
         graph.add((prop, RDFS.range, range_))
 
 
-def _add_tool_tiers(graph: Graph) -> None:
-    """Уровни инструмента упорядочены: решателю нужно сравнивать «хватит ли этого»."""
-    for name, rank in ont.TOOL_TIERS.items():
+def _add_tool_tiers(graph: Graph, tiers: Optional[Dict[str, int]] = None) -> None:
+    """Уровни инструмента упорядочены: решателю нужно сравнивать «хватит ли этого».
+
+    У другого мира шкала своя (описание мира, `world.json`); по умолчанию — шкала Minecraft."""
+    for name, rank in (tiers or ont.TOOL_TIERS).items():
         uri = ont.tier_uri(name)
         graph.add((uri, RDF.type, ont.TOOL_TIER))
         graph.add((uri, RDFS.label, Literal(name, lang="en")))
@@ -201,6 +203,40 @@ def _add_tool_items(graph: Graph, item_tags: Dict[str, List[str]]) -> int:
     return marked
 
 
+def _add_world_layer(graph: Graph, world: Dict[str, Any], known: set) -> int:
+    """Рукописный слой описания мира (`world.json`): станции, инструменты, разговорные имена.
+
+    В данных Minecraft вид инструмента выводится из тегов, а уровень — из приставки
+    идентификатора; у другой игры таких соглашений нет, и она называет то же явно. Решатель
+    разницы не видит: в графе это те же свойства.
+    """
+    added = 0
+    for item_id, tool in (world.get("tool_items") or {}).items():
+        if item_id not in known:
+            continue
+        uri = ont.thing_uri(item_id)
+        graph.add((uri, ont.IS_TOOL_KIND, ont.tool_kind_uri(tool["kind"])))
+        graph.add((ont.tool_kind_uri(tool["kind"]), RDF.type, ont.TOOL_KIND))
+        if tool.get("tier"):
+            graph.add((uri, ont.HAS_TOOL_TIER, ont.tier_uri(tool["tier"])))
+        added += 1
+    for name, station in (world.get("stations") or {}).items():
+        uri = ont.station_uri(name)
+        graph.add((uri, RDF.type, ont.STATION))
+        if station.get("phrase"):
+            graph.add((uri, RDFS.label, Literal(station["phrase"], lang="ru")))
+        if station.get("item") in known:
+            graph.add((uri, ont.STATION_ITEM, ont.thing_uri(station["item"])))
+        added += 1
+    for entry in world.get("aliases") or []:
+        if entry.get("id") not in known:
+            continue
+        for alias in entry.get("aliases_ru") or []:
+            graph.add((ont.thing_uri(entry["id"]), SKOS.altLabel, Literal(alias, lang="ru")))
+            added += 1
+    return added
+
+
 def _add_restrictions(graph: Graph, restrictions: Dict[str, Any]) -> int:
     added = 0
     for action in ont.ACTIONS:
@@ -311,6 +347,12 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     tags = _load(game_dir / "tags.json")
     drops = _load(game_dir / "drops.json")
     tools = _load(game_dir / "tools.json")
+    # Описание мира рядом с данными означает другую игру: рукописные слои Minecraft
+    # (запреты, доступность, разговорные имена, каталоги) к ней не относятся.
+    world_path = game_dir / "world.json"
+    world = _load(world_path) if world_path.exists() else None
+    if world is not None:
+        return _build_world(world, items, recipes, tags, drops, tools, output_dir)
     restrictions = _load(RESTRICTIONS_PATH)
 
     graph = Graph()
@@ -359,6 +401,37 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     }
 
 
+def _build_world(world: Dict[str, Any], items, recipes, tags, drops, tools,
+                 output_dir: Path) -> Dict[str, Any]:
+    """Онтология другой игры: та же схема и те же шаги сборки, слои — из описания мира."""
+    graph = Graph()
+    for prefix, namespace in ont.PREFIXES.items():
+        graph.bind(prefix, namespace)
+    _declare_schema(graph)
+    _add_tool_tiers(graph, world.get("tiers"))
+    _add_things(graph, items)
+    _add_recipes(graph, recipes)
+    _add_tags(graph, tags.get("items", {}))
+    craftable = {recipe["result"]["item"] for recipe in recipes}
+    _add_drops(graph, drops, craftable)
+    _add_tool_requirements(graph, tools)
+    layer = _add_world_layer(graph, world, set(items))
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target = output_dir / "game.ttl"
+    graph.serialize(destination=target, format="turtle")
+    return {
+        "граф": graph,
+        "файл": target,
+        "игра": world.get("game"),
+        "триплетов": len(graph),
+        "сущностей": len(set(graph.subjects(RDF.type, ont.THING))),
+        "рецептов": len(set(graph.subjects(RDF.type, ont.RECIPE))),
+        "связей добычи": len(list(graph.triples((None, ont.YIELDS, None)))),
+        "записей слоя мира": layer,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--game-dir", type=Path, default=GAME_DIR)
@@ -372,7 +445,7 @@ def main() -> int:
     for key, value in stats.items():
         print(f"{key.ljust(width)}  {value}")
     size_mb = target.stat().st_size / 1024 / 1024
-    print(f"\nСохранено: {target.relative_to(ROOT)} ({size_mb:.1f} МБ)")
+    print(f"\nСохранено: {target.resolve().relative_to(ROOT)} ({size_mb:.1f} МБ)")
     return 0
 
 

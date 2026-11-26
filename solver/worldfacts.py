@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from kb.graph import KnowledgeBase, Recipe, Source
 from solver.planner import STATION_ITEMS, UNNATURAL, Planner
-from solver.render import REMOTE_RU, STATION_RU, TIER_RU, TOOL_KIND_RU
+from solver.render import REMOTE_RU, STATION_RU, TIER_RU, TOOL_KIND_RU, station_phrase
 
 USES = "ask_uses"
 SOURCES = "ask_sources"
@@ -70,6 +70,7 @@ class WorldFacts:
         self.planner = planner or Planner(kb)
         self._uses: Optional[Dict[str, List[Recipe]]] = None
         self._drops: Optional[Dict[str, List[Tuple[str, bool]]]] = None
+        self._station_items: Optional[set] = None
 
     # --- что делается из предмета ---
 
@@ -88,9 +89,20 @@ class WorldFacts:
             f"«{self._label(item)}» входит в состав рецептов {len(products)} предметов")
         return answer
 
+    def _station_item(self, station: Optional[str]) -> Optional[str]:
+        """Предмет станции: из базы знаний мира, для Minecraft — из таблицы планировщика."""
+        return self.kb.station_item(station) or STATION_ITEMS.get(station or "")
+
+    def _stations(self) -> set:
+        if self._station_items is None:
+            self._station_items = {
+                self._station_item(recipe.station)
+                for found in self.kb.index_recipes().values() for recipe in found} - {None}
+        return self._station_items
+
     def _prominence(self, item: str) -> Tuple[int, float, str]:
         """Что назвать первым: инструменты и оборудование, затем то, что проще получить."""
-        if self.kb.tool_profile(item) is not None or item in STATION_ITEMS.values():
+        if self.kb.tool_profile(item) is not None or item in self._stations():
             group = 0
         elif item.endswith(("_helmet", "_chestplate", "_leggings", "_boots", "_sword",
                             "shield", "bucket")):
@@ -201,7 +213,7 @@ class WorldFacts:
 
         answer.station_for = len({
             recipe.produces for found in self.kb.index_recipes().values() for recipe in found
-            if STATION_ITEMS.get(recipe.station) == thing})
+            if self._station_item(recipe.station) == thing})
 
         used = self.uses(thing)
         answer.uses, answer.uses_total = used.items[:MAX_ABOUT], used.total
@@ -234,12 +246,11 @@ class WorldFacts:
             f"одним действием из инвентаря изготавливается предметов: {len(makeable)}")
         return answer
 
-    @staticmethod
-    def _in_reach(recipe: Recipe, stock: Dict[str, int]) -> bool:
+    def _in_reach(self, recipe: Recipe, stock: Dict[str, int]) -> bool:
         """Все составляющие рецепта в инвентаре, и оборудование для него есть."""
         if not recipe.inputs:
             return False
-        station = STATION_ITEMS.get(recipe.station)
+        station = self._station_item(recipe.station)
         if station and stock.get(station, 0) <= 0:
             return False
         need: Dict[str, int] = {}
@@ -283,7 +294,7 @@ def render_answer(answer: WorldAnswer, kb: KnowledgeBase) -> str:
             parts.append(f"Встречается в мире, добывается: {answer.world_note}."
                          if answer.world_note else "Встречается в мире.")
         if answer.made_of:
-            where = STATION_RU.get(answer.station or "", "")
+            where = station_phrase(kb, answer.station) if answer.station else ""
             made = ", ".join(f"{name(item)} ×{count}" for item, count in answer.made_of)
             parts.append(f"Изготавливается {where}: {made}.".replace("  ", " "))
         elif answer.items:
