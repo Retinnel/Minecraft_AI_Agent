@@ -96,6 +96,36 @@ class MemoryPipelineTests(unittest.TestCase):
         return pipeline.handle(utterance, game=game, position=position, mode=mode,
                                memory=self.store if store else None)
 
+    # --- обзор памяти ---
+
+    def test_what_do_you_remember_lists_the_memory_instead_of_searching_for_the_words(self):
+        """Модель называет целью «этот мир» — искать такой факт бессмысленно."""
+        self.store.note("база у большого дуба")
+        self.store.note("портал за рекой")
+        for utterance, target in (("что ты помнишь об этом мире?", "этот мир"),
+                                  ("покажи все отметки", "все отметки"),
+                                  ("что ты запомнил?", "всё, что ты запомнил")):
+            with self.subTest(utterance=utterance):
+                turn = self.turn(utterance, Proposal("recall", target))
+                self.assertEqual(turn.outcome, "act")
+                self.assertIn("В памяти записей: 2", turn.memory_summary)
+                self.assertIn("база у большого дуба", turn.memory_summary)
+                self.assertIn("портал за рекой", turn.memory_summary)
+                self.assertTrue(turn.stages["memory"]["overview"])
+
+    def test_overview_of_an_empty_memory_says_so_and_tells_how_to_fill_it(self):
+        turn = self.turn("что ты помнишь?", Proposal("recall", "этот мир"))
+        self.assertEqual(turn.outcome, "reject")
+        self.assertIn("пока ничего нет", turn.reason)
+
+    def test_a_question_about_one_thing_is_still_a_search(self):
+        self.store.note("база у большого дуба")
+        self.store.note("портал за рекой")
+        turn = self.turn("где портал?", Proposal("recall", "портал"))
+        self.assertFalse(turn.stages["memory"]["overview"])
+        self.assertIn("портал за рекой", turn.memory_summary)
+        self.assertNotIn("большого дуба", turn.memory_summary)
+
     # --- запомнить ---
 
     def test_remember_here_marks_the_place_from_the_mod(self):

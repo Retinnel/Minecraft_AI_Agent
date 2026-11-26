@@ -108,6 +108,15 @@ HERE_CUES = re.compile(r"(\bтут\b|\bздесь\b|\bэто\s+место|\bна
 # Вопрос о гибели: отвечает последняя запись о смерти, а не поиск по словам.
 DEATH_CUES = re.compile(r"(умер|погиб|смерт|сдох|died|death)", re.IGNORECASE)
 
+# Вопрос обо всей памяти сразу: «что ты помнишь», «покажи все отметки». Модель в таком
+# вопросе называет целью «этот мир» или «все отметки», и поиск по этим словам ничего не
+# находил — отвечать нужно обзором, а не поиском.
+OVERVIEW_CUES = re.compile(
+    r"(что\s+(ты\s+)?(помнишь|запомнил|записал|знаешь\s+об?\s+(этом\s+)?мире)|"
+    r"(все|всю|весь|список)\s+\S*\s*(отметк|заметк|памят|запис)|"
+    r"(покажи|открой|выведи)\s+память|что\s+(есть\s+)?в\s+памяти|what\s+do\s+you\s+remember)",
+    re.IGNORECASE)
+
 # Начало реплики «запомни, …» — сама заметка идёт после него.
 REMEMBER_PREFIX = re.compile(r"^\s*(пожалуйста\s+)?(запомни|запиши|отметь|remember|note)\s*(что|это)?[\s,:—-]*",
                              re.IGNORECASE)
@@ -1028,17 +1037,30 @@ class Pipeline:
         label_of = self._label_of(game)
         target = str(proposal.target or "").strip() or None
         death = bool(DEATH_CUES.search(utterance or ""))
-        subjects = [] if death or game.lower() != DEFAULT_GAME.lower() else self._subjects(target)
+        overview = not death and bool(OVERVIEW_CUES.search(utterance or ""))
+        subjects = ([] if death or overview or game.lower() != DEFAULT_GAME.lower()
+                    else self._subjects(target))
         if death:
             last = memory.last_death()
             facts = [last] if last is not None else []
+        elif overview:
+            # Все факты мира, недавние и близкие — первыми; названо будет несколько, остальное —
+            # во вкладке «Память».
+            facts = [match.fact for match in recall(memory, None, position=position,
+                                                    label_of=label_of, limit=50)]
         else:
             matches = recall(memory, target or utterance, subjects=subjects, position=position,
                              label_of=label_of)
             facts = [match.fact for match in matches]
         stages["memory"] = {"action": RECALL, "query": target, "subjects": subjects,
-                            "death": death, "found": [fact.id for fact in facts]}
+                            "death": death, "overview": overview,
+                            "found": [fact.id for fact in facts]}
 
+        if not facts and overview:
+            return Turn(outcome=REJECT, action=RECALL, game=game, stages=stages,
+                        reason="В памяти этого мира пока ничего нет. Скажи «запомни, …» — "
+                               "запишу; увиденное в игре добавляется само.",
+                        explanation=["память: обзор запрошен, фактов нет"])
         if not facts:
             # В другой игре память — первый источник, поиск — второй, как и раньше.
             if game.lower() != DEFAULT_GAME.lower() and SEARCH_WEB in actions and not death:
@@ -1067,7 +1089,10 @@ class Pipeline:
         numbers: List[int] = []
         for fact in spoken:
             numbers.extend(fact_numbers(fact))
-        explanation = [f"память: найдено фактов {len(facts)}, названо {len(spoken)}"]
+        if overview:
+            summary = f"В памяти записей: {len(facts)}. " + summary
+        explanation = [f"память: {'обзор, ' if overview else ''}найдено фактов {len(facts)}, "
+                       f"названо {len(spoken)}"]
         explanation.extend(f"факт {fact.kind} «{fact.label or fact.subject}», источник {fact.source}"
                            for fact in spoken)
         return Turn(outcome=ACT, action=RECALL, query=target, game=game, stages=stages,
