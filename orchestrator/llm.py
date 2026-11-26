@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
@@ -106,6 +108,23 @@ _client: Optional[GroqClient] = None
 _client_model: Optional[str] = None
 
 
+# Модель на один вызов: страница сравнения прогоняет ту же реплику через тот же конвейер на
+# другой модели, не меняя настроек сервера. Переменная контекста, а не глобальная: соседний
+# поток с основной моделью подмены не видит.
+_override: ContextVar[Optional[str]] = ContextVar("llm_model_override", default=None)
+_override_clients: Dict[str, GroqClient] = {}
+
+
+@contextmanager
+def using_model(key: str):
+    """Все обращения к модели внутри блока идут к модели `key` из llm_config.json."""
+    token = _override.set(key)
+    try:
+        yield
+    finally:
+        _override.reset(token)
+
+
 def client() -> GroqClient:
     """Клиент для текущей модели из конфигурации.
 
@@ -116,6 +135,14 @@ def client() -> GroqClient:
     from api.llm_config_manager import get_llm_config
 
     config = get_llm_config()
+    key = _override.get()
+    if key and key != config.model_type:
+        if key not in config.models:
+            raise ModelUnavailable(f"модели {key!r} нет в llm_config.json")
+        with _usage_lock:
+            if key not in _override_clients:
+                _override_clients[key] = GroqClient(config.model_copy(update={"model_type": key}))
+            return _override_clients[key]
     if _client is None or _client_model != config.model_type:
         _client = GroqClient(config)
         _client_model = config.model_type
@@ -127,6 +154,7 @@ def reset() -> None:
     global _client, _client_model
     _client = None
     _client_model = None
+    _override_clients.clear()
 
 
 def available() -> bool:

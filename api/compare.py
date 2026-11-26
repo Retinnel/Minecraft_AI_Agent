@@ -1,9 +1,12 @@
 """Сравнение конфигураций на живой реплике — для демонстрации на защите.
 
-Одна и та же реплика уходит в две конфигурации сразу:
+Одна и та же реплика уходит в три колонки сразу:
 
     A — та же языковая модель с теми же инструментами, но без базы знаний;
-    C — гибрид: модель определяет намерение, онтология — предмет, решатель — допустимость.
+    C — гибрид: модель определяет намерение, онтология — предмет, решатель — допустимость;
+    C на малой локальной модели — тот же конвейер, модель заменена на четырёхмиллиардную,
+    запущенную на этом компьютере: знания и проверки лежат вне модели, и от её силы
+    зависит только понимание реплики.
 
 Используются буквально те же конфигурации, что и в оценочном контуре (eval/configs),
 а не их повторная реализация: иначе показанное на защите расходилось бы с измеренным.
@@ -22,6 +25,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/compare", tags=["compare"])
+
+
+# Ключ малой локальной модели в llm_config.json (LM Studio).
+LOCAL_MODEL = "qwen3.5-4b-local"
+
+_local_pipeline = None
 
 
 class CompareRequest(BaseModel):
@@ -48,7 +57,9 @@ def _judge(prediction, mode: str) -> Dict[str, Any]:
     from kb.graph import KnowledgeBase
     from solver.validator import Validator
 
-    if prediction.outcome != "act":
+    # Недопустимым бывает только действие в игре — команда. Ответ на вопрос (план, сведения
+    # базы знаний, найденное в сети) в мире ничего не меняет и под правила не подпадает.
+    if prediction.outcome != "act" or not prediction.command:
         return {"allowed": True, "reason": None}
 
     validator = Validator(KnowledgeBase.shared())
@@ -81,10 +92,38 @@ def _run_llm_only(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _run_hybrid(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
+def _local_available() -> bool:
+    """Запущена ли локальная модель: без неё третья колонка не опрашивается вовсе —
+    иначе каждая реплика ждала бы повторов обращения к выключенной программе."""
+    import httpx
+    from api.groq_client import LMSTUDIO_BASE_URL
+
+    try:
+        return httpx.get(LMSTUDIO_BASE_URL.rstrip("/") + "/models", timeout=0.6).status_code == 200
+    except Exception:
+        return False
+
+
+def _run_hybrid_local(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """Гибрид на малой локальной модели. Конвейер свой: у общего есть состояние на время
+    вызова, а колонки считаются одновременно."""
+    global _local_pipeline
+    from orchestrator import Pipeline, llm
+    from orchestrator.extractor import LanguageModelIntent
+
+    if not _local_available():
+        return {"offline": True}
+    if _local_pipeline is None:
+        _local_pipeline = Pipeline(LanguageModelIntent())
+    with llm.using_model(LOCAL_MODEL):
+        return _run_hybrid(utterance, context, pipeline=_local_pipeline)
+
+
+def _run_hybrid(utterance: str, context: Dict[str, Any], pipeline=None) -> Dict[str, Any]:
     from eval.configs import hybrid
 
-    prediction = hybrid.predict(utterance, mode=context["mode"], inventory=context["inventory"])
+    prediction = hybrid.predict(utterance, mode=context["mode"], inventory=context["inventory"],
+                                pipeline=pipeline)
     details = prediction.details or {}
     stages = details.get("stages") or {}
 
@@ -108,9 +147,11 @@ def _run_hybrid(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
         "plan_tree": details.get("plan_tree"),
         "plan_summary": details.get("plan_summary"),
         "plan_alternatives": details.get("plan_alternatives"),
+        "summary": details.get("summary"),
         "explanation": details.get("explanation") or [],
         "stages": stages,
         "error": details.get("error") if prediction.outcome == "error" else None,
+        "latency_ms": round(prediction.latency_ms or 0),
         # Проверяется той же меркой, что и конфигурация A. Нулевая доля недопустимых
         # действий у гибрида — следствие устройства системы, но на защите она должна
         # быть видна как результат проверки, а не как утверждение докладчика.
@@ -120,23 +161,26 @@ def _run_hybrid(utterance: str, context: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.post("")
 async def compare(request: CompareRequest) -> Dict[str, Any]:
-    """Обе конфигурации на одной реплике. Вызовы идут параллельно: на защите важно время."""
+    """Все колонки на одной реплике. Вызовы идут параллельно: на защите важно время."""
     utterance = (request.utterance or "").strip()
     if not utterance:
         return {"utterance": "", "error": "пустая реплика"}
 
     context = _session_context()
-    left, right = await asyncio.gather(
+    left, right, local = await asyncio.gather(
         asyncio.to_thread(_run_llm_only, utterance, context),
         asyncio.to_thread(_run_hybrid, utterance, context),
+        asyncio.to_thread(_run_hybrid_local, utterance, context),
     )
     return {
         "utterance": utterance,
         "mode": context["mode"],
         "llm_only": left,
         "hybrid": right,
+        "hybrid_local": local,
         "illegal": {"llm_only": not left["verdict"]["allowed"],
-                    "hybrid": not right["verdict"]["allowed"]},
+                    "hybrid": not right["verdict"]["allowed"],
+                    "hybrid_local": bool(local.get("verdict")) and not local["verdict"]["allowed"]},
     }
 
 
@@ -147,6 +191,8 @@ async def model() -> Dict[str, Optional[str]]:
 
     config = get_llm_config()
     active = config.models.get(config.model_type)
+    local = config.models.get(LOCAL_MODEL)
     return {"key": config.model_type,
             "name": getattr(active, "name", None),
-            "provider": getattr(active, "provider", None)}
+            "provider": getattr(active, "provider", None),
+            "local": getattr(local, "name", None)}

@@ -50,14 +50,15 @@ def _get_pipeline() -> Pipeline:
 def predict(utterance: str, *, mode: Optional[str] = None,
             inventory: Optional[Dict[str, int]] = None,
             memory: Optional[Any] = None, position: Optional[Any] = None,
-            autopilot: Optional[Dict[str, Any]] = None) -> Prediction:
+            autopilot: Optional[Dict[str, Any]] = None,
+            pipeline: Optional[Pipeline] = None) -> Prediction:
     """Золотой набор прогоняется в творческом режиме с пустым инвентарём (значения по
     умолчанию); страница сравнения передаёт режим и инвентарь текущей сессии.
     Набор памяти мира передаёт ещё память и позицию игрока (eval/memory_fixture.py),
     набор «Сделай сам» — сведения автопилота (eval/autopilot_fixture.py)."""
     started = time.perf_counter()
     try:
-        turn = _get_pipeline().handle(utterance, mode=mode, inventory=inventory,
+        turn = (pipeline or _get_pipeline()).handle(utterance, mode=mode, inventory=inventory,
                                       memory=memory, position=position, autopilot=autopilot)
     except ModelUnavailable as error:
         # Сбой канала связи — не решение системы, поэтому и не отказ.
@@ -77,6 +78,7 @@ def predict(utterance: str, *, mode: Optional[str] = None,
         details={"stages": turn.stages, "reason": turn.reason, "explanation": turn.explanation,
                  "plan_tree": turn.plan_tree, "plan_summary": turn.plan_summary,
                  "plan_alternatives": turn.plan_alternatives,
+                 "summary": turn.world_summary or turn.progress_summary or turn.memory_summary,
                  "memory_labels": [fact.label for fact in turn.memory]},
     )
 

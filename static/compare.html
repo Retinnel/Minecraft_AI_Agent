@@ -32,7 +32,7 @@
   }
   header h1 { font-size: 21px; margin: 0; font-weight: 600; }
   header .model { color: var(--muted); font-size: 15px; }
-  main { padding: 20px 28px 40px; max-width: 1500px; margin: 0 auto; }
+  main { padding: 20px 28px 40px; max-width: 1800px; margin: 0 auto; }
 
   .ask { display: flex; gap: 12px; margin-bottom: 14px; }
   .ask input {
@@ -55,7 +55,9 @@
   }
   .presets button:hover { color: var(--text); border-color: var(--accent); }
 
-  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1100px) { .panels, .counters { grid-template-columns: 1fr !important; } }
+  .took { float: right; color: var(--muted); font-size: 13px; text-transform: none; letter-spacing: 0; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .panel > h2 {
     margin: 0; padding: 14px 20px; font-size: 16px; font-weight: 600;
@@ -65,7 +67,7 @@
   .body { padding: 18px 20px; min-height: 230px; }
 
   .outcome { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-  .result { font-size: 26px; font-weight: 600; margin: 8px 0 14px; }
+  .result { font-size: 22px; font-weight: 600; margin: 8px 0 14px; word-break: break-word; }
   .command {
     font-family: Consolas, "Courier New", monospace; font-size: 18px;
     background: #0d1117; border: 1px solid var(--line); border-radius: 6px;
@@ -92,7 +94,7 @@
   .trace li { margin: 3px 0; }
   .muted { color: var(--muted); }
 
-  .counters { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .counters { margin-top: 26px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .counter {
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     padding: 16px 20px; display: flex; align-items: baseline; justify-content: space-between;
@@ -107,7 +109,7 @@
 </head>
 <body>
 <header>
-  <h1>Одна реплика — две конфигурации</h1>
+  <h1>Одна реплика — три колонки</h1>
   <div id="topbar"></div>
 </header>
 
@@ -132,6 +134,12 @@
       </h2>
       <div class="body" id="right"><span class="muted">Ожидание реплики</span></div>
     </section>
+    <section class="panel">
+      <h2>C — гибрид на малой локальной модели
+        <small>Тот же конвейер, модель заменена: <span id="local-name">qwen3.5-4b</span>, работает на этом компьютере.</small>
+      </h2>
+      <div class="body" id="local"><span class="muted">Ожидание реплики</span></div>
+    </section>
   </div>
 
   <div class="counters">
@@ -142,6 +150,10 @@
     <div class="counter good">
       <span class="label">Недопустимых действий за сеанс</span>
       <span class="n" id="count-right">0</span>
+    </div>
+    <div class="counter good">
+      <span class="label">Недопустимых действий за сеанс</span>
+      <span class="n" id="count-local">0</span>
     </div>
   </div>
 </main>
@@ -168,7 +180,16 @@ const OUTCOMES = {
   error: "модель недоступна"
 };
 
-const counts = { left: 0, right: 0 };
+// Действия-ответы: в игре ничего не меняют, объекта команды у них нет.
+const ANSWERS = {
+  search_web: "ответ по поиску в сети",
+  ask_uses: "ответ из базы знаний", ask_sources: "ответ из базы знаний",
+  ask_drops: "ответ из базы знаний", ask_available: "ответ из базы знаний",
+  ask_about: "ответ из базы знаний", show_progress: "ступень развития",
+  recall: "ответ из памяти мира", remember: "запись в память мира"
+};
+
+const counts = { left: 0, right: 0, local: 0 };
 const node = (id) => document.getElementById(id);
 
 function escapeHtml(value) {
@@ -188,6 +209,9 @@ function renderPanel(target, data, trace, options) {
   }
 
   let subject = "—";
+  let outcome = OUTCOMES[data.outcome] || data.outcome;
+  if (data.outcome === "act" && !data.command) outcome = data.plan_tree ? "план решателя" : "ответ на вопрос";
+  if (!data.target && !data.recognised && ANSWERS[data.intent]) subject = ANSWERS[data.intent];
   if (data.target) {
     subject = escapeHtml(data.target) + (data.count ? " ×" + data.count : "");
   } else if (data.recognised) {
@@ -196,7 +220,8 @@ function renderPanel(target, data, trace, options) {
       ' <span class="muted" style="font-size:17px">— цель опознана, действие не выполнено</span>';
   }
 
-  let html = '<div class="outcome">' + escapeHtml(OUTCOMES[data.outcome] || data.outcome) + "</div>" +
+  const took = data.latency_ms ? '<span class="took">' + (data.latency_ms / 1000).toFixed(1).replace(".", ",") + " с</span>" : "";
+  let html = '<div class="outcome">' + escapeHtml(outcome) + took + "</div>" +
              '<div class="result">' + subject + "</div>";
 
   if (data.plan_tree) {
@@ -215,11 +240,13 @@ function renderPanel(target, data, trace, options) {
     html += '<div class="command">' + escapeHtml(data.command) + "</div>";
   } else if (data.reason) {
     html += '<div class="command">' + escapeHtml(data.reason) + "</div>";
+  } else if (data.summary) {
+    html += '<div class="command plan">' + escapeHtml(data.summary) + "</div>";
   }
 
   if (!data.verdict.allowed) {
     html += '<div class="flag">Недопустимое действие: ' + escapeHtml(data.verdict.reason) + "</div>";
-  } else if (data.outcome === "act") {
+  } else if (data.outcome === "act" && data.command) {
     // Слева проверка задним числом, справа — до выполнения. Разницу стоит называть прямо.
     html += checked
       ? '<div class="ok-flag">Проверено решателем до выполнения</div>'
@@ -243,6 +270,7 @@ async function ask(utterance) {
   node("send").disabled = true;
   node("left").innerHTML = '<span class="muted">Запрос к модели…</span>';
   node("right").innerHTML = '<span class="muted">Запрос к модели…</span>';
+  node("local").innerHTML = '<span class="muted">Запрос к модели…</span>';
 
   try {
     const response = await fetch("/api/compare", {
@@ -256,12 +284,19 @@ async function ask(utterance) {
     const silent = data.hybrid.outcome === "clarify" && data.llm_only.outcome === "act";
     renderPanel(node("left"), data.llm_only, null, { checked: false, silent: silent });
     renderPanel(node("right"), data.hybrid, data.hybrid.explanation, { checked: true });
+    if (data.hybrid_local.offline) {
+      node("local").innerHTML = '<span class="muted">Локальная модель не запущена (LM Studio, порт 1234).</span>';
+    } else {
+      renderPanel(node("local"), data.hybrid_local, data.hybrid_local.explanation, { checked: true });
+    }
 
     if (data.illegal.llm_only) node("count-left").textContent = ++counts.left;
     if (data.illegal.hybrid) node("count-right").textContent = ++counts.right;
+    if (data.illegal.hybrid_local) node("count-local").textContent = ++counts.local;
   } catch (error) {
     node("left").innerHTML = '<div class="flag">' + escapeHtml(error) + "</div>";
     node("right").innerHTML = "";
+    node("local").innerHTML = "";
   } finally {
     node("send").disabled = false;
   }
@@ -280,8 +315,11 @@ node("utterance").addEventListener("keydown", function (event) {
   if (event.key === "Enter") ask(node("utterance").value);
 });
 
-// Модель и режим показывает общая шапка (frontend/js/topbar.js): одна и та же модель в
-// обеих панелях.
+// Модель и режим показывает общая шапка (frontend/js/topbar.js): в первых двух панелях
+// модель одна и та же, в третьей — малая локальная.
+fetch("/api/compare/model").then((r) => r.json()).then((m) => {
+  if (m.local) node("local-name").textContent = m.local;
+}).catch(() => {});
 </script>
 <script src="/frontend/js/topbar.js"></script>
 </body>
