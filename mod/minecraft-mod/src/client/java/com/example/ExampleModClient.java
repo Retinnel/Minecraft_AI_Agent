@@ -12,12 +12,15 @@ import com.example.assistant.AssistantConfig;
 import com.example.assistant.AssistantOverlayScreen;
 import com.example.assistant.AssistantRuntime;
 import com.example.assistant.ConfigManager;
+import com.example.assistant.VoiceInput;
 import org.lwjgl.glfw.GLFW;
 
 public class ExampleModClient implements ClientModInitializer {
 	private static AssistantRuntime runtime;
 	private static KeyMapping overlayKey;
 	private static KeyMapping autopilotStopKey;
+	private static KeyMapping voiceKey;
+	private static VoiceInput voice;
 
 	@Override
 	public void onInitializeClient() {
@@ -38,9 +41,19 @@ public class ExampleModClient implements ClientModInitializer {
 			"category.aiassistant.general"
 		));
 
+		// Голос: пока клавиша V зажата, пишется микрофон; сказанное уходит как реплика
+		voiceKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.aiassistant.voice",
+			GLFW.GLFW_KEY_V,
+			"category.aiassistant.general"
+		));
+		voice = new VoiceInput(runtime);
+
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			// Основной тик ассистента
 			runtime.onClientTick(client);
+
+			voice.onTick(client, voiceKey.isDown());
 			
 			while (autopilotStopKey.consumeClick()) {
 				runtime.getAutopilot().stopByPlayer(client);

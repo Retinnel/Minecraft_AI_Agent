@@ -185,6 +185,30 @@ public final class HttpAssistantClient {
         return sendChat(text, Map.of());
     }
 
+    /** Запись микрофона (WAV) в текст; пустая строка — не расслышано или сервер не ответил. */
+    public CompletableFuture<String> transcribe(byte[] wav) {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl() + "/api/voice/transcribe"))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "audio/wav")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(wav))
+                .build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .thenApply(resp -> {
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        System.out.println("[AI Assistant] transcribe failed: HTTP " + resp.statusCode());
+                        return "";
+                    }
+                    try {
+                        com.google.gson.JsonObject body = GSON.fromJson(resp.body(), com.google.gson.JsonObject.class);
+                        return body != null && body.has("text") ? body.get("text").getAsString() : "";
+                    } catch (Exception error) {
+                        return "";
+                    }
+                })
+                .exceptionally(error -> "");
+    }
+
     /**
      * Реплика игрока и то, что игра знает о его взгляде: блок или существо под прицелом,
      * предмет в руке. Сервер по этим сведениям отвечает на «что это передо мной».
