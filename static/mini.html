@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Игровой ассистент</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #0a0f17; --panel: #161f2e; --line: rgba(120, 150, 190, .22); --text: #e9f0fa;
+          --muted: #8fa1b8; --accent: #5cc8ff; --gradient: linear-gradient(135deg, #5cc8ff, #4be3a8); }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column;
+         font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  header b { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; }
+  header input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line);
+                 background: rgba(255, 255, 255, .04); color: var(--text); font: inherit; }
+  header .kb { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  header .kb.on { color: #4be3a8; }
+  #log { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 92%; padding: 7px 10px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+  .msg.me { align-self: flex-end; background: rgba(92, 200, 255, .18); border: 1px solid rgba(92, 200, 255, .3); }
+  .msg.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
+  .msg details { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .msg summary { cursor: pointer; color: var(--accent); }
+  .msg pre { margin: 6px 0 0; font: 12px/1.35 Consolas, monospace; white-space: pre; overflow-x: auto; color: var(--text); }
+  .msg .src { margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .msg .src a { color: var(--accent); text-decoration: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .chips button { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent;
+                  color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+  .chips button:hover { border-color: var(--accent); }
+  form { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+  form input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line);
+               background: rgba(255, 255, 255, .05); color: var(--text); font: inherit; }
+  form input:focus, header input:focus { outline: none; border-color: var(--accent); }
+  form button { padding: 0 14px; border: none; border-radius: 10px; background: var(--gradient); color: #06131c;
+                font: inherit; font-weight: 700; cursor: pointer; }
+  form button:disabled { opacity: .5; }
+  .hint { color: var(--muted); font-size: 12.5px; align-self: center; text-align: center; padding: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Ассистент</b>
+  <input id="game" list="games" placeholder="игра" autocomplete="off">
+  <datalist id="games"></datalist>
+  <span id="kb" class="kb"></span>
+</header>
+<div id="log"><div class="hint">Назови игру вверху и спроси: «как сделать кошмарную кирку», «что выпадает из
+  слизня», «как победить босса». У каждой игры свой разговор; на чат в Minecraft окно не влияет.</div></div>
+<form id="form">
+  <input id="text" placeholder="вопрос об игре" autocomplete="off" autofocus>
+  <button id="send">→</button>
+</form>
+<script>
+const node = (id) => document.getElementById(id);
+const known = {};
+
+function add(kind, text) {
+  const box = document.createElement("div");
+  box.className = "msg " + kind;
+  box.textContent = text;
+  node("log").append(box);
+  node("log").scrollTop = node("log").scrollHeight;
+  return box;
+}
+
+function fold(box, title, text) {
+  if (!text) return;
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = title;
+  const pre = document.createElement("pre");
+  pre.textContent = text;
+  details.append(summary, pre);
+  box.append(details);
+}
+
+function markGame() {
+  const name = node("game").value.trim().toLowerCase();
+  const has = known[name];
+  node("kb").textContent = !name ? "" : has ? "есть база знаний" : "по поиску в сети";
+  node("kb").className = "kb" + (has ? " on" : "");
+}
+
+async function ask(text) {
+  if (!text.trim()) return;
+  add("me", text);
+  node("send").disabled = true;
+  const wait = add("bot", "…");
+  try {
+    const d = await (await fetch("/api/window/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, game: node("game").value })
+    })).json();
+    wait.textContent = d.response || "…";
+    if (d.game && !node("game").value.trim()) node("game").value = d.game;
+    if (d.game) known[d.game.toLowerCase()] = known[d.game.toLowerCase()] || d.knowledge_base;
+    markGame();
+    fold(wait, "план", d.plan_tree);
+    fold(wait, "почему так", d.plan_alternatives || (d.explanation || []).join("\n"));
+    if (d.options && d.options.length) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      for (const label of d.options) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.onclick = () => ask(label);
+        chips.append(button);
+      }
+      wait.append(chips);
+    }
+    if (d.sources && d.sources.length) {
+      const src = document.createElement("div");
+      src.className = "src";
+      src.append("источники: ");
+      d.sources.slice(0, 4).forEach((s, i) => {
+        const link = document.createElement("a");
+        link.href = s.url; link.target = "_blank"; link.rel = "noopener"; link.textContent = s.site;
+        if (i) src.append(", ");
+        src.append(link);
+      });
+      wait.append(src);
+    }
+  } catch (e) { wait.textContent = "Сервер не ответил: " + e; }
+  node("send").disabled = false;
+  node("log").scrollTop = node("log").scrollHeight;
+  node("text").focus();
+}
+
+node("form").onsubmit = (event) => {
+  event.preventDefault();
+  const text = node("text").value;
+  node("text").value = "";
+  ask(text);
+};
+node("game").oninput = markGame;
+
+fetch("/api/window/games").then((r) => r.json()).then((d) => {
+  for (const g of d.games) {
+    known[g.game.toLowerCase()] = g.knowledge_base;
+    const option = document.createElement("option");
+    option.value = g.game;
+    node("games").append(option);
+  }
+  const start = new URLSearchParams(location.search).get("game");
+  node("game").value = start || (d.games[1] || d.games[0]).game;
+  markGame();
+}).catch(() => {});
+</script>
+</body>
+</html>

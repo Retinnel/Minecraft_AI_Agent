@@ -1,0 +1,78 @@
+"""Окно ассистента: свой разговор на каждую игру, команд не отдаёт."""
+
+import unittest
+
+from api import window
+from orchestrator.pipeline import Pipeline, Proposal
+from orchestrator.responder import Responder
+from desktop.window import page
+
+
+class Extractor:
+    def __init__(self, action, target=None):
+        self.action, self.target, self.calls = action, target, []
+
+    def extract(self, utterance, **kwargs):
+        self.calls.append(kwargs)
+        return Proposal(action=self.action, target=self.target)
+
+
+def responder():
+    return Responder(ask_text=lambda messages: "")
+
+
+class WindowTests(unittest.TestCase):
+    def setUp(self):
+        window._sessions.clear()
+        self.addCleanup(window._sessions.clear)
+
+    def test_game_name_is_canonical(self):
+        self.assertEqual(window.canonical("террария"), "Terraria")
+        self.assertEqual(window.canonical("майнкрафт"), "Minecraft")
+        self.assertEqual(window.canonical(""), "Minecraft")
+        self.assertEqual(window.canonical("Elden  Ring"), "Elden Ring")
+
+    def test_games_with_knowledge_base_are_listed(self):
+        names = [entry["game"] for entry in window.games_list()]
+        self.assertEqual(names[0], "Minecraft")
+        self.assertIn("Terraria", names)
+
+    def test_plan_for_the_second_world_without_touching_the_chat_session(self):
+        from api import advice
+        before = advice._assistant_session().game
+        extractor = Extractor("plan_goal", "золотая кирка")
+        result = window.answer("как сделать золотую кирку", "террария", Pipeline(extractor),
+                               responder())
+        self.assertEqual((result["game"], result["outcome"]), ("Terraria", "act"))
+        self.assertTrue(result["knowledge_base"])
+        self.assertIn("Золотая кирка", result["plan_tree"])
+        self.assertEqual(advice._assistant_session().game, before)
+
+    def test_each_game_has_its_own_conversation(self):
+        pipeline = Pipeline(Extractor("plan_goal", "кирка"))
+        asked = window.answer("хочу кирку", "Terraria", pipeline, responder())
+        self.assertEqual(asked["outcome"], "clarify")
+        self.assertIn("Кошмарная кирка", asked["options"])
+        self.assertIsNotNone(window._session("Terraria").pending)
+        self.assertIsNone(window._session("Minecraft").pending)
+
+    def test_window_never_gives_commands(self):
+        result = window.answer("дай алмаз", "Minecraft", Pipeline(Extractor("give_item", "алмаз")),
+                               responder())
+        self.assertEqual(result["outcome"], "reject")
+        self.assertNotIn("command", result)
+
+    def test_why_uses_the_window_session(self):
+        pipeline = Pipeline(Extractor("give_item", "алмаз"))
+        window.answer("дай алмаз", "Minecraft", pipeline, responder())
+        result = window.answer("почему?", "Minecraft", pipeline, responder())
+        self.assertEqual(result["source"], "rule")
+        self.assertIn("режим survival", result["response"])
+
+    def test_page_address_carries_the_game(self):
+        self.assertEqual(page("http://127.0.0.1:8000/"), "http://127.0.0.1:8000/mini")
+        self.assertTrue(page("http://127.0.0.1:8000", "Elden Ring").endswith("/mini?game=Elden%20Ring"))
+
+
+if __name__ == "__main__":
+    unittest.main()

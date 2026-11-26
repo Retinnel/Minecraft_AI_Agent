@@ -18,6 +18,7 @@ from api import worlds
 from api import quality
 from api import speech
 from api import profile
+from api import window
 from api import vision
 from api import memory
 from api import autopilot
@@ -58,6 +59,7 @@ app.include_router(worlds.router)
 app.include_router(quality.router)
 app.include_router(speech.router)
 app.include_router(profile.router)
+app.include_router(window.router)
 app.include_router(memory.router)
 app.include_router(autopilot.router)
 app.include_router(companion.router)
@@ -115,6 +117,12 @@ async def admin_wiki_page():
 async def compare_page():
     """Страница сравнения конфигураций — демонстрационный материал к защите."""
     return FileResponse(BASE_DIR / "static" / "compare.html")
+
+
+@app.get("/mini")
+async def mini_page():
+    """Страница окна ассистента поверх игры (desktop/window.py)."""
+    return FileResponse(BASE_DIR / "static" / "mini.html")
 
 
 @app.get("/quality")
