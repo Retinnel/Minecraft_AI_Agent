@@ -383,6 +383,25 @@ public final class HttpAssistantClient {
     }
 
     /** История разговора в текущем мире — для вкладки оверлея. */
+    /** Профиль игрока: черты поверх миров и игр и их основания. */
+    public CompletableFuture<ProfileResponse> getProfile() {
+        return getJson("/api/profile/", ProfileResponse.class);
+    }
+
+    public static final class ProfileResponse {
+        public int turns;
+        public int deaths;
+        public int min_evidence;
+        public java.util.Map<String, Integer> games;
+        public java.util.List<Trait> traits;
+
+        public static final class Trait {
+            public String key;
+            public String text;
+            public String basis;
+        }
+    }
+
     public CompletableFuture<WorldResponse> getWorldHistory(int limit) {
         return getJson("/api/worlds/history?limit=" + limit, WorldResponse.class);
     }

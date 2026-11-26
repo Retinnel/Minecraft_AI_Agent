@@ -30,6 +30,8 @@ class World:
     names: List[str]
     source: Path
     starting_inventory: Dict[str, int] = field(default_factory=dict)
+    # Витрина древа развития: какие предметы показывать (узлы и ступени выводит решатель).
+    showcase: List[str] = field(default_factory=list)
     _kb: Optional[KnowledgeBase] = None
 
     @property
@@ -70,7 +72,8 @@ def worlds() -> Dict[str, World]:
             key = manifest.parent.name
             names = [game.lower()] + [str(name).lower() for name in data.get("names") or []]
             found[key] = World(key=key, game=game, names=names, source=manifest.parent,
-                               starting_inventory=dict(data.get("starting_inventory") or {}))
+                               starting_inventory=dict(data.get("starting_inventory") or {}),
+                               showcase=list(data.get("showcase") or []))
         _worlds = found
     return _worlds
 

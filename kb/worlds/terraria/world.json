@@ -88,5 +88,19 @@
     "наковальня"
    ]
   }
+ ],
+ "showcase": [
+  "terraria:work_bench",
+  "terraria:furnace",
+  "terraria:iron_anvil",
+  "terraria:iron_pickaxe",
+  "terraria:gold_pickaxe",
+  "terraria:nightmare_pickaxe",
+  "terraria:wooden_sword",
+  "terraria:iron_broadsword",
+  "terraria:gold_broadsword",
+  "terraria:wooden_bow",
+  "terraria:chest",
+  "terraria:torch"
  ]
 }

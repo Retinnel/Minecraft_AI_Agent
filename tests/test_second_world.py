@@ -90,6 +90,39 @@ class TerrariaOntologyTests(unittest.TestCase):
                                             "survival").outcome, REJECT)
 
 
+class WorldTreeTests(unittest.TestCase):
+    """Древо развития второй среды: тот же вывод ступеней, витрина и стартовый инвентарь —
+    из описания мира."""
+
+    @classmethod
+    def setUpClass(cls):
+        from solver.techtree import TechTree
+        games.reset()
+        cls.world = games.find("Terraria")
+        kb = cls.world.kb()
+        cls.tree = TechTree(kb, Planner(kb), showcase=cls.world.showcase,
+                            base=cls.world.starting_inventory)
+        cls.structure = cls.tree.structure()
+
+    def test_every_showcase_item_gets_into_the_tree(self):
+        self.assertEqual(self.structure.skipped, [])
+        self.assertIn("terraria:nightmare_pickaxe", self.structure.nodes)
+
+    def test_tiers_follow_the_pickaxe_scale_of_this_world(self):
+        nodes = self.structure.nodes
+        self.assertEqual(nodes["terraria:wood"].tier, 0)
+        # Демонит открывает золотая кирка: ступень выше руд, которые берёт медная.
+        self.assertGreater(nodes["terraria:demonite_ore"].tier, nodes["terraria:iron_ore"].tier)
+        self.assertGreaterEqual(nodes["terraria:nightmare_pickaxe"].tier,
+                                nodes["terraria:demonite_ore"].tier)
+
+    def test_state_comes_from_the_starting_inventory(self):
+        state = self.tree.state(self.world.starting_inventory)
+        self.assertEqual(state["terraria:copper_pickaxe"].status, "have")
+        self.assertEqual(state["terraria:demonite_ore"].status, "locked")
+        self.assertEqual(state["terraria:iron_ore"].status, "ready")
+
+
 class WorldPipelineTests(unittest.TestCase):
     def setUp(self):
         games.reset()

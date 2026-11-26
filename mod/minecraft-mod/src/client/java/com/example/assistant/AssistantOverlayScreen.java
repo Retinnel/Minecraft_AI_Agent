@@ -68,7 +68,8 @@ public class AssistantOverlayScreen extends Screen {
         CAMPAIGN,
         TREE,
         HISTORY,
-        MEMORY
+        MEMORY,
+        PROFILE
     }
 
     // Вкладка памяти: что сервер запомнил об этом мире — руды, хранилища, отметки, гибели.
@@ -83,6 +84,8 @@ public class AssistantOverlayScreen extends Screen {
 
     // Вкладка истории: разговор в этом мире, сохранённый сервером между запусками.
     private HttpAssistantClient.WorldResponse lastHistory;
+    private HttpAssistantClient.ProfileResponse lastProfile;
+    private Button profileTabButton;
     private int historyScroll = -1;   // -1 — показать конец разговора
 
     private Tab activeTab = Tab.STATUS;
@@ -247,7 +250,7 @@ public class AssistantOverlayScreen extends Screen {
 
         // Вкладки
         int tabY = top - 24;
-        int tabW = (panelW - 24) / 7;
+        int tabW = (panelW - 28) / 8;
         statusTabButton = Button.builder(Component.literal("§fСтатус"), btn -> {
             setActiveTab(Tab.STATUS);
         }).bounds(left, tabY, tabW, 20).build();
@@ -289,6 +292,13 @@ public class AssistantOverlayScreen extends Screen {
             fetchMemory();
         }).bounds(left + (tabW + 4) * 6, tabY, tabW, 20).build();
         addRenderableWidget(memoryTabButton);
+
+        // Профиль игрока: один на все миры и игры.
+        profileTabButton = Button.builder(Component.literal("§fИгрок"), btn -> {
+            setActiveTab(Tab.PROFILE);
+            fetchProfile();
+        }).bounds(left + (tabW + 4) * 7, tabY, tabW, 20).build();
+        addRenderableWidget(profileTabButton);
 
         memoryFilterButton = Button.builder(Component.literal(memoryFilterLabel()), btn -> {
             memoryFilter = (memoryFilter + 1) % MEMORY_FILTERS.length;
@@ -400,6 +410,10 @@ public class AssistantOverlayScreen extends Screen {
             memoryTabButton.setMessage(Component.literal(
                     activeTab == Tab.MEMORY ? "§b§lПамять" : "§fПамять"));
         }
+        if (profileTabButton != null) {
+            profileTabButton.setMessage(Component.literal(
+                    activeTab == Tab.PROFILE ? "§b§lИгрок" : "§fИгрок"));
+        }
         if (memoryFilterButton != null) {
             memoryFilterButton.visible = activeTab == Tab.MEMORY;
             memoryFilterButton.active = activeTab == Tab.MEMORY;
@@ -495,6 +509,8 @@ public class AssistantOverlayScreen extends Screen {
             renderHistoryTab(graphics, left, top, panelW, panelH);
         } else if (activeTab == Tab.MEMORY) {
             renderMemoryTab(graphics, left, top, panelW, panelH);
+        } else if (activeTab == Tab.PROFILE) {
+            renderProfileTab(graphics, left, top, panelW, panelH);
         } else {
             renderRecipesTab(graphics, left, top, panelW, panelH);
         }
@@ -1031,6 +1047,63 @@ public class AssistantOverlayScreen extends Screen {
                 }
             });
         });
+    }
+
+    private void fetchProfile() {
+        runtime.getHttpClient().getProfile().thenAccept(data -> {
+            Minecraft.getInstance().execute(() -> {
+                if (data != null) {
+                    lastProfile = data;
+                }
+            });
+        });
+    }
+
+    /** Вкладка «Игрок»: черты, выведенные сервером из исходов реплик, и их основания. */
+    private void renderProfileTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {
+        int textLeft = left + 15;
+        int maxWidth = panelW - 30;
+        graphics.drawString(font, "§lИгрок", textLeft, top + 34, COLOR_HEADER);
+        String scope = "по всем мирам и играм";
+        graphics.drawString(font, scope, left + panelW - 15 - font.width(scope), top + 34, COLOR_MUTED);
+
+        int y = top + 50;
+        int bottom = top + panelH - 14;
+        if (lastProfile == null) {
+            graphics.drawString(font, "Загрузка…", textLeft, y, COLOR_MUTED);
+            return;
+        }
+        if (lastProfile.traits == null || lastProfile.traits.isEmpty()) {
+            for (String row : fitLine("Наблюдений пока мало: реплик — " + lastProfile.turns
+                    + ". Черта называется, когда под ней не меньше " + lastProfile.min_evidence
+                    + " свидетельств.", maxWidth)) {
+                graphics.drawString(font, row, textLeft, y, COLOR_MUTED);
+                y += font.lineHeight + 1;
+            }
+            return;
+        }
+        for (HttpAssistantClient.ProfileResponse.Trait trait : lastProfile.traits) {
+            if (trait == null || trait.text == null) {
+                continue;
+            }
+            for (String row : fitLine("• " + trait.text, maxWidth)) {
+                if (y > bottom) {
+                    return;
+                }
+                graphics.drawString(font, row, textLeft, y, COLOR_TEXT);
+                y += font.lineHeight + 1;
+            }
+            if (trait.basis != null) {
+                for (String row : fitLine("  " + trait.basis, maxWidth)) {
+                    if (y > bottom) {
+                        return;
+                    }
+                    graphics.drawString(font, row, textLeft, y, COLOR_MUTED);
+                    y += font.lineHeight + 1;
+                }
+            }
+            y += 3;
+        }
     }
 
     private void renderHistoryTab(GuiGraphics graphics, int left, int top, int panelW, int panelH) {

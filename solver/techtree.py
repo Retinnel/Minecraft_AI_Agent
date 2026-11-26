@@ -77,8 +77,12 @@ class Structure:
 
 class TechTree:
     def __init__(self, kb: KnowledgeBase, planner: Optional[Planner] = None,
-                 showcase: Optional[Sequence[str]] = None) -> None:
+                 showcase: Optional[Sequence[str]] = None,
+                 base: Optional[Dict[str, int]] = None) -> None:
         self.kb = kb
+        # С чем игрок появляется в мире. В Minecraft — ни с чем; в мире, где первая кирка
+        # выдаётся при входе, без этого строение древа упёрлось бы в неё.
+        self.base: Dict[str, int] = dict(base or {})
         self.planner = planner or Planner(kb)
         if showcase is None:
             showcase = json.loads(SHOWCASE_PATH.read_text(encoding="utf-8")).get("items") or []
@@ -103,7 +107,7 @@ class TechTree:
             if goal in seen_goals:
                 continue
             seen_goals.add(goal)
-            plan = self.planner.plan(goal, 1, {})
+            plan = self.planner.plan(goal, 1, {k: v for k, v in self.base.items() if k != goal})
             if not plan.feasible:
                 if goal in self.showcase:
                     result.skipped.append(goal)
@@ -133,7 +137,8 @@ class TechTree:
                 for child in step.children:
                     if child.kind != MISSING and child.item != step.item:
                         edges.setdefault((child.item, step.item), kind)
-                station = STATION_ITEMS.get(step.station or "")
+                station = (self.kb.station_item(step.station)
+                           or STATION_ITEMS.get(step.station or ""))
                 if station and station != step.item:
                     edges.setdefault((station, step.item), STATION)
                     # Оборудование в план шагом не входит, но в древе это узел со своим путём.
@@ -225,7 +230,7 @@ class TechTree:
         if any(step.kind in (MINE, HUNT) for step in actions):
             return False
         for station in {step.station for step in actions if step.station}:
-            station_item = STATION_ITEMS.get(station)
+            station_item = self.kb.station_item(station) or STATION_ITEMS.get(station)
             if not station_item or stock.get(station_item, 0) > 0:
                 continue
             extra = self.planner.plan(station_item, 1, stock)

@@ -37,10 +37,35 @@ STATUS_RU = {HAVE_IT: "есть в инвентаре", READY: "получает
              UNKNOWN: "план не строится"}
 
 _tree_instance: Optional[TechTree] = None
+_world_trees: Dict[str, TechTree] = {}
+
+
+def _world():
+    """Мир со своей базой знаний, если разговор сейчас о такой игре (kb/worlds)."""
+    from api import advice
+    from kb import games
+    session = advice._assistant_session()
+    return None if session.is_default_game else games.find(session.game)
 
 
 def _tree() -> TechTree:
+    """Древо для игры разговора: Minecraft либо мир из kb/worlds — тот же вывод, другая
+    онтология и своя витрина."""
     global _tree_instance
+    world = _world()
+    if world is not None:
+        if world.key not in _world_trees:
+            from solver.planner import Planner
+            kb = world.kb()
+            tree = TechTree(kb, Planner(kb), showcase=world.showcase,
+                            base=world.starting_inventory)
+            # Названия ступеней — по киркам этого мира: ступень N открывает кирка уровня N-1.
+            picks = {}
+            for tool in kb.tools_of_kind("pickaxe"):
+                picks.setdefault(tool.tier_rank, kb.label(tool.id) or tool.id)
+            tree.tier_labels = [TIER_LABELS[0]] + [picks[rank] for rank in sorted(picks)]
+            _world_trees[world.key] = tree
+        return _world_trees[world.key]
     if _tree_instance is None:
         from api import advice
         pipeline = advice._assistant_pipeline()
@@ -49,6 +74,10 @@ def _tree() -> TechTree:
 
 
 def _inventory() -> Dict[str, int]:
+    world = _world()
+    if world is not None:
+        # Мода для этой игры нет: состояние узлов считается от стартового инвентаря мира.
+        return dict(world.starting_inventory)
     from api import advice
     return advice._inventory_counts()
 
@@ -80,12 +109,12 @@ def tree_payload(tree: TechTree, inventory: Dict[str, int]) -> Dict[str, Any]:
     nodes.sort(key=lambda entry: (entry["tier"], entry["depth"], entry["label"]))
 
     used = sorted({node["tier"] for node in nodes})
+    labels = getattr(tree, "tier_labels", None) or TIER_LABELS
     return {
         "rank": rank,
         # Ступени, открытые игроку: всё до уровня его лучшей кирки включительно.
         "open_tier": rank + 1,
-        "tiers": [{"index": tier,
-                   "label": TIER_LABELS[tier] if tier < len(TIER_LABELS) else str(tier)}
+        "tiers": [{"index": tier, "label": labels[tier] if tier < len(labels) else str(tier)}
                   for tier in used],
         "nodes": nodes,
         "edges": [{"source": edge.source, "target": edge.target, "kind": edge.kind}
@@ -185,6 +214,9 @@ def icon_bytes(name: str) -> Optional[bytes]:
 
 @router.get("/icon/{name}.png")
 async def get_icon(name: str):
+    # Иконки берутся из jar Minecraft: для другой игры одноимённая картинка была бы чужой.
+    if _world() is not None:
+        raise HTTPException(status_code=404, detail="иконок для этой игры нет")
     data = icon_bytes(name)
     if data is None:
         raise HTTPException(status_code=404, detail="иконки нет")
