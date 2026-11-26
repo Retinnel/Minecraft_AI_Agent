@@ -37,6 +37,12 @@
   form button { padding: 0 14px; border: none; border-radius: 10px; background: var(--gradient); color: #06131c;
                 font: inherit; font-weight: 700; cursor: pointer; }
   form button:disabled { opacity: .5; }
+  #dialogs { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  #dialogs select { flex: 1; min-width: 0; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line);
+                    background: #111a27; color: var(--text); font: inherit; font-size: 12.5px; }
+  #dialogs button { padding: 3px 9px; border-radius: 8px; border: 1px solid var(--line);
+                    background: rgba(255, 255, 255, .05); color: var(--text); font: inherit; cursor: pointer; }
+  #dialogs button:hover { border-color: var(--accent); }
   #screen { display: none; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
   #screen.open { display: block; }
   #screen .row { display: flex; gap: 6px; align-items: center; }
@@ -61,6 +67,11 @@
   <span id="kb" class="kb"></span>
   <button id="screen-toggle" type="button" title="Экран игры">экран</button>
 </header>
+<div id="dialogs">
+  <select id="dialog" title="Диалоги: у каждого своя история"></select>
+  <button id="dialog-new" type="button" title="Новый диалог">＋</button>
+  <button id="dialog-delete" type="button" title="Удалить диалог">✕</button>
+</div>
 <div id="screen">
   <div class="row">
     <select id="screen-window"></select>
@@ -109,6 +120,93 @@ function markGame() {
   node("kb").className = "kb" + (has ? " on" : "");
 }
 
+// Раскрывающиеся блоки, варианты ответа и ссылки под репликой ассистента.
+function decorate(box, d, live) {
+  fold(box, "план", d.plan_tree);
+  fold(box, "почему так", d.plan_alternatives || (d.explanation || []).join("\n"));
+  if (live && d.options && d.options.length) {
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    for (const label of d.options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.onclick = () => ask(label);
+      chips.append(button);
+    }
+    box.append(chips);
+  }
+  if (d.sources && d.sources.length) {
+    const src = document.createElement("div");
+    src.className = "src";
+    d.sources.slice(0, 4).forEach((s, i) => {
+      const link = document.createElement("a");
+      link.href = s.url; link.target = "_blank"; link.rel = "noopener"; link.textContent = s.site;
+      if (i) src.append(" · ");
+      src.append(link);
+    });
+    box.append(src);
+  }
+}
+
+// --- диалоги: у каждого своя история, хранится на сервере (api/window.py) ---
+let dialogId = null;
+
+async function loadDialogs() {
+  let d;
+  try { d = await (await fetch("/api/window/dialogs")).json(); } catch (e) { return []; }
+  const select = node("dialog");
+  select.textContent = "";
+  for (const entry of d.dialogs) {
+    const option = document.createElement("option");
+    option.value = entry.id;
+    option.textContent = (entry.game ? entry.game + " · " : "") + entry.title;
+    select.append(option);
+  }
+  if (dialogId) select.value = dialogId;
+  return d.dialogs;
+}
+
+async function openDialog(id) {
+  let d;
+  try { d = await (await fetch("/api/window/dialogs/" + id)).json(); } catch (e) { return; }
+  dialogId = d.id;
+  try { localStorage.setItem("dialog", d.id); } catch (e) {}
+  node("log").textContent = "";
+  if (d.game) { node("game").value = d.game; markGame(); }
+  for (const message of d.messages || []) {
+    const box = add(message.role === "user" ? "me" : "bot", message.text);
+    if (message.role !== "user") decorate(box, message, false);
+  }
+  if (!(d.messages || []).length) {
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Новый диалог. Назови игру вверху и спроси.";
+    node("log").append(hint);
+  }
+  node("dialog").value = d.id;
+  node("log").scrollTop = node("log").scrollHeight;
+}
+
+async function newDialog() {
+  const d = await (await fetch("/api/window/dialogs", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ game: node("game").value })
+  })).json();
+  await loadDialogs();
+  await openDialog(d.id);
+}
+
+node("dialog").onchange = () => openDialog(node("dialog").value);
+node("dialog-new").onclick = newDialog;
+node("dialog-delete").onclick = async () => {
+  if (!dialogId || !confirm("Удалить этот диалог?")) return;
+  await fetch("/api/window/dialogs/" + dialogId, { method: "DELETE" });
+  dialogId = null;
+  const rest = await loadDialogs();
+  if (rest.length) openDialog(rest[0].id); else newDialog();
+};
+
 async function ask(text) {
   if (!text.trim()) return;
   add("me", text);
@@ -117,38 +215,14 @@ async function ask(text) {
   try {
     const d = await (await fetch("/api/window/chat", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, game: node("game").value, screen: screenOn })
+      body: JSON.stringify({ text, game: node("game").value, screen: screenOn, dialog: dialogId })
     })).json();
     wait.textContent = d.response || "…";
+    if (d.dialog) { dialogId = d.dialog; loadDialogs(); }
     if (d.game && !node("game").value.trim()) node("game").value = d.game;
     if (d.game) known[d.game.toLowerCase()] = known[d.game.toLowerCase()] || d.knowledge_base;
     markGame();
-    fold(wait, "план", d.plan_tree);
-    fold(wait, "почему так", d.plan_alternatives || (d.explanation || []).join("\n"));
-    if (d.options && d.options.length) {
-      const chips = document.createElement("div");
-      chips.className = "chips";
-      for (const label of d.options) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = label;
-        button.onclick = () => ask(label);
-        chips.append(button);
-      }
-      wait.append(chips);
-    }
-    if (d.sources && d.sources.length) {
-      const src = document.createElement("div");
-      src.className = "src";
-      src.append("источники: ");
-      d.sources.slice(0, 4).forEach((s, i) => {
-        const link = document.createElement("a");
-        link.href = s.url; link.target = "_blank"; link.rel = "noopener"; link.textContent = s.site;
-        if (i) src.append(", ");
-        src.append(link);
-      });
-      wait.append(src);
-    }
+    decorate(wait, d, true);
   } catch (e) { wait.textContent = "Сервер не ответил: " + e; }
   node("send").disabled = false;
   node("log").scrollTop = node("log").scrollHeight;
@@ -311,7 +385,15 @@ fetch("/api/window/games").then((r) => r.json()).then((d) => {
   const start = new URLSearchParams(location.search).get("game");
   node("game").value = start || (d.games[1] || d.games[0]).game;
   markGame();
-}).catch(() => {});
+}).catch(() => {}).then(async () => {
+  // Открывается последний диалог; если их нет — заводится первый.
+  const all = await loadDialogs();
+  let saved = null;
+  try { saved = localStorage.getItem("dialog"); } catch (e) {}
+  const start = new URLSearchParams(location.search).get("game");
+  const pick = all.find((entry) => entry.id === saved) || (start ? null : all[0]);
+  if (pick) openDialog(pick.id); else newDialog();
+});
 </script>
 </body>
 </html>

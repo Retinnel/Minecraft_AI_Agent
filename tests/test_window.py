@@ -149,7 +149,7 @@ class LookAtTheFrameTests(unittest.TestCase):
         def __init__(self, text="Ставь бур на рудное пятно слева от персонажа."):
             self.text, self.calls = text, []
 
-        def look(self, question, game="", context=""):
+        def look(self, question, game="", context="", style=""):
             self.calls.append((question, game, context))
             return self.text
 
@@ -163,7 +163,9 @@ class LookAtTheFrameTests(unittest.TestCase):
         result = window.look(self._searched(), "куда ставить бур?", watcher)
         self.assertEqual(result["source"], "vision")
         self.assertTrue(result["response"].startswith("Ставь бур на рудное пятно"))
-        self.assertTrue(result["response"].endswith("Источники: wiki.factorio.com."))
+        # Источники показывает окно ссылками; в тексте ответа их нет.
+        self.assertNotIn("Источники", result["response"])
+        self.assertEqual(result["sources"][0]["site"], "wiki.factorio.com")
         question, game, context = watcher.calls[0]
         self.assertEqual(game, "Factorio")
         self.assertIn("Железная руда", context)
@@ -194,7 +196,7 @@ class LookAtTheFrameTests(unittest.TestCase):
             available = True
             model = "stub"
 
-            def answer(self, image, question, game="", context=""):
+            def answer(self, image, question, game="", context="", style=""):
                 return "вижу"
 
         now = [100.0]
@@ -204,3 +206,98 @@ class LookAtTheFrameTests(unittest.TestCase):
         self.assertEqual(watcher.look("где?"), "вижу")
         now[0] = 200.0
         self.assertIsNone(watcher.look("где?"))
+
+
+class WindowStyleTests(unittest.TestCase):
+    """Окно говорит разговорно и не пишет источники в текст; чат мода — как прежде."""
+
+    def _web_turn(self):
+        from orchestrator.pipeline import Turn
+        from search.engines import Hit
+        from search.service import SearchAnswer
+        web = SearchAnswer(query="q", engine="stub", hits=[Hit(
+            title="Iron ore", url="https://wiki.factorio.com/Iron_ore", content="Mined by drills.",
+            score=0.9, engine="stub")])
+        return Turn(outcome="act", action="search_web", web=web, game="Factorio")
+
+    def test_window_style_and_no_sources_in_text(self):
+        seen = []
+
+        def ask(messages):
+            seen.append(messages)
+            return "Ставь бур прямо на руду."
+
+        reply = Responder(ask_text=ask).reply(
+            self._web_turn(), "куда бур?", style=window.STYLE, cite=False,
+            window=[{"role": "user", "content": "привет"}, {"role": "assistant", "content": "йо"}])
+        self.assertEqual(reply.text, "Ставь бур прямо на руду.")
+        self.assertTrue(seen[0][0]["content"].endswith(window.STYLE))
+        # Прошлые реплики идут в запрос: ответ продолжает разговор.
+        self.assertEqual([m["content"] for m in seen[0][1:]], ["привет", "йо", "куда бур?"])
+
+    def test_default_reply_is_unchanged_for_the_mod_chat(self):
+        seen = []
+
+        def ask(messages):
+            seen.append(messages)
+            return "Руду добывают бурами."
+
+        reply = Responder(ask_text=ask).reply(self._web_turn(), "как добыть руду?")
+        self.assertTrue(reply.text.endswith("Источник: wiki.factorio.com."))
+        self.assertNotIn("напарник", seen[0][0]["content"])
+        self.assertEqual(len(seen[0]), 2)
+
+
+class DialogStoreTests(unittest.TestCase):
+    """Диалоги окна: у каждого своя история и сессия, они переживают перезапуск."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        patcher = patch.object(window, "DIALOGS_DIR", Path(self.dir.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        window._dialog_sessions.clear()
+        self.addCleanup(window._dialog_sessions.clear)
+
+    def _say(self, dialog, text, action, target):
+        session = window.dialog_session(dialog)
+        result = window.answer(text, dialog["game"], Pipeline(Extractor(action, target)),
+                               responder(), session=session)
+        window.remember(dialog, text, result, session)
+        return result
+
+    def test_two_dialogs_keep_separate_histories(self):
+        first = window.create_dialog("террария")
+        second = window.create_dialog("Minecraft")
+        self._say(first, "как сделать золотую кирку", "plan_goal", "золотая кирка")
+        self._say(second, "как сделать печь", "plan_goal", "печь")
+        self.assertEqual(window.load_dialog(first["id"])["messages"][0]["text"],
+                         "как сделать золотую кирку")
+        self.assertEqual(len(window.load_dialog(second["id"])["messages"]), 2)
+        titles = {entry["id"]: (entry["game"], entry["title"]) for entry in window.list_dialogs()}
+        self.assertEqual(titles[first["id"]], ("Terraria", "как сделать золотую кирку"))
+        self.assertEqual(titles[second["id"]][0], "Minecraft")
+
+    def test_history_and_context_survive_a_restart(self):
+        dialog = window.create_dialog("Terraria")
+        self._say(dialog, "как сделать золотую кирку", "plan_goal", "золотая кирка")
+        window._dialog_sessions.clear()                      # «перезапуск сервера»
+        restored = window.load_dialog(dialog["id"])
+        self.assertIn("Золотая кирка", restored["messages"][1]["plan_tree"])
+        session = window.dialog_session(restored)
+        # «Сделай это» после перезапуска относится к тому же предмету.
+        self.assertEqual(session.last_target[0], "terraria:gold_pickaxe")
+        self.assertIn("золотую кирку", session.last_exchange)
+        self.assertEqual(session.game, "Terraria")
+
+    def test_delete_removes_the_file_and_bad_ids_are_rejected(self):
+        dialog = window.create_dialog("Terraria")
+        self.assertTrue(window.delete_dialog(dialog["id"]))
+        self.assertIsNone(window.load_dialog(dialog["id"]))
+        for bad in ("../secrets", "", "A" * 12, "abc"):
+            self.assertIsNone(window.load_dialog(bad))
+            self.assertFalse(window.delete_dialog(bad))

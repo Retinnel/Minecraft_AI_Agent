@@ -180,6 +180,7 @@ class Session:
             "quests": list(self.quests), "campaign": self.campaign,
             "last_exchange": self.last_exchange,
             "last_why": self.last_why,
+            "last_target": list(self.last_target) if self.last_target else None,
         }
 
     @classmethod
@@ -209,6 +210,9 @@ class Session:
                 getattr(session, name).extend(str(fact) for fact in facts[-SUMMARY_LIMIT:])
         session.campaign = data.get("campaign") if isinstance(data.get("campaign"), str) else None
         session.last_why = data.get("last_why") if isinstance(data.get("last_why"), dict) else None
+        target = data.get("last_target")
+        if isinstance(target, (list, tuple)) and len(target) == 2 and isinstance(target[0], str):
+            session.last_target = (target[0], target[1])
         session.last_exchange = (data.get("last_exchange")
                                  if isinstance(data.get("last_exchange"), str) else None)
         return session

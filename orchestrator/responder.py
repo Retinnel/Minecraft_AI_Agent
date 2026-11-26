@@ -175,9 +175,16 @@ class Responder:
     # --- формулирование ---
 
     def reply(self, turn: Turn, utterance: str, *, state: str = "", summary: str = "",
-              window: Optional[List[Dict[str, str]]] = None, profile: str = "") -> Reply:
+              window: Optional[List[Dict[str, str]]] = None, profile: str = "",
+              style: str = "", cite: bool = True) -> Reply:
         """profile — черты игрока одной строкой (api/profile.py). Идут только в свободный
-        разговор и только в конец подсказки: на исход реплики они не влияют."""
+        разговор и только в конец подсказки: на исход реплики они не влияют.
+
+        style — манера речи (окно ассистента просит разговорную): дописывается в конец
+        подсказок формулирования и меняет только слова, не содержание. cite=False —
+        источники найденного называет интерфейс (ссылками под ответом), а не текст ответа.
+        По умолчанию оба выключены: чат мода и замеры идут как прежде."""
+        self._style = style
         if turn.outcome == NONE:
             if turn.game and turn.game.lower() != "minecraft":
                 return self._chat_other_game(utterance, turn.game, window or [], profile)
@@ -185,7 +192,8 @@ class Responder:
                 state = (state + "\n" if state else "") + profile
             return self._chat(utterance, state, summary, window or [])
         if turn.action == SEARCH_WEB and turn.outcome == ACT and turn.web is not None:
-            return self._answer_web(turn, utterance)
+            return self._answer_web(turn, utterance, cite=cite,
+                                    window=window if style else None)
         if turn.autopilot_summary:
             # Вопрос перед запуском «Сделай сам» — шаблоном: пересказ мог бы потерять
             # «Начать?» и стоп-клавишу, а от них зависит согласие игрока.
@@ -219,7 +227,12 @@ class Responder:
         excerpt = clean_passage(best.content, WEB_TEMPLATE_CHARS)
         return f"Нашёл на {best.site}: {excerpt} {Responder.source_line(turn)}"
 
-    def _answer_web(self, turn: Turn, question: str) -> Reply:
+    def _styled(self, prompt: str) -> str:
+        style = getattr(self, "_style", "")
+        return f"{prompt}\n\n{style}" if style else prompt
+
+    def _answer_web(self, turn: Turn, question: str, *, cite: bool = True,
+                    window: Optional[List[Dict[str, str]]] = None) -> Reply:
         passages = "\n\n".join(f"— {hit.title} ({hit.site})\n{hit.content}"
                                  for hit in turn.web.hits)
         # Что игра сама показывает на экране (подсказка под курсором): это тоже сведения
@@ -228,9 +241,12 @@ class Responder:
         if screen:
             passages += f"\n\n— На экране игрока сейчас (сведения самой игры)\n{screen}"
         try:
+            # Предыдущие реплики — только в разговорной манере: ответ продолжает беседу,
+            # а не начинается каждый раз с чистого листа.
             text = self._ask([
-                {"role": "system", "content": WEB_PROMPT.format(game=turn.game or "Minecraft",
-                                                                passages=passages)},
+                {"role": "system", "content": self._styled(
+                    WEB_PROMPT.format(game=turn.game or "Minecraft", passages=passages))},
+                *(window or []),
                 {"role": "user", "content": question},
             ])
         except Exception:
@@ -238,13 +254,14 @@ class Responder:
         text = FOOTNOTES.sub("", text or "").strip()
         if not text:
             return Reply(self.web_template(turn), TEMPLATE)
-        return Reply(f"{text} {self.source_line(turn)}", MODEL)
+        return Reply(f"{text} {self.source_line(turn)}" if cite else text, MODEL)
 
     def _phrase(self, turn: Turn) -> Reply:
         template = self.template(turn)
         try:
             text = self._ask([
-                {"role": "system", "content": PHRASING_PROMPT.format(facts=self.facts(turn))},
+                {"role": "system", "content": self._styled(
+                    PHRASING_PROMPT.format(facts=self.facts(turn)))},
                 {"role": "user", "content": "Сообщи это игроку."},
             ])
         except Exception:
@@ -313,7 +330,7 @@ class Responder:
 
     def _chat_other_game(self, utterance: str, game: str,
                          window: List[Dict[str, str]], profile: str = "") -> Reply:
-        system = OTHER_GAME_CHAT_PROMPT.format(game=game)
+        system = self._styled(OTHER_GAME_CHAT_PROMPT.format(game=game))
         if profile:
             system += "\n\n" + profile
         messages = [{"role": "system", "content": system}]

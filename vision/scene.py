@@ -208,7 +208,7 @@ class VisionModel:
         return bool(self.api_key)
 
     def answer(self, image: Image.Image, question: str, *, game: str = "",
-               context: str = "") -> str:
+               context: str = "", style: str = "") -> str:
         """Ответ на вопрос игрока по кадру; `context` — справка текстом."""
         if not self.api_key:
             raise VisionUnavailable("Нет ключа DEEPSEEK_API: модель зрения недоступна")
@@ -217,8 +217,9 @@ class VisionModel:
             "model": self.model, "temperature": 0, "max_tokens": LOOK_MAX_TOKENS,
             "thinking": {"type": "disabled"},
             "messages": [
-                {"role": "system", "content": LOOK_PROMPT.format(game=game or "неизвестной",
-                                                                 context=context or "нет")},
+                {"role": "system", "content": LOOK_PROMPT.format(
+                    game=game or "неизвестной", context=context or "нет")
+                    + (f"\n\n{style}" if style else "")},
                 {"role": "user", "content": [
                     {"type": "text", "text": question[:400]},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{data}"}}]},

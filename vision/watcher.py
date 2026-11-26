@@ -316,14 +316,16 @@ class ScreenWatcher:
                 return None
             return frame.image
 
-    def look(self, question: str, *, game: str = "", context: str = "") -> Optional[str]:
+    def look(self, question: str, *, game: str = "", context: str = "",
+             style: str = "") -> Optional[str]:
         """Ответ модели зрения на вопрос по свежему кадру; None — кадра нет или модель
         не ответила (тогда остаётся ответ без кадра)."""
         image = self.fresh_image()
         if image is None:
             return None
         try:
-            return self.model.answer(image, question, game=game, context=context) or None
+            return self.model.answer(image, question, game=game, context=context,
+                                     style=style) or None
         except VisionUnavailable:
             return None
 
