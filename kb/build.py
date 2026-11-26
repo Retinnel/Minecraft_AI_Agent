@@ -32,6 +32,7 @@ KB_DIR = ROOT / "data" / "kb"
 RESTRICTIONS_PATH = Path(__file__).resolve().parent / "restrictions.json"
 ALIASES_PATH = Path(__file__).resolve().parent / "aliases.json"
 ACCESSIBILITY_PATH = Path(__file__).resolve().parent / "accessibility.json"
+GATHERING_PATH = Path(__file__).resolve().parent / "gathering.json"
 LEGACY_ITEM_CATALOG = ROOT / "data" / "minecraft_catalog.json"
 LEGACY_ENTITY_CATALOG = ROOT / "data" / "entity_catalog.json"
 
@@ -164,6 +165,23 @@ def _add_drops(graph: Graph, drops: Dict[str, Any], craftable: set) -> int:
                 graph.add((source, ont.RARE_YIELD, target))
                 rare_count += 1
     return rare_count
+
+
+def _add_gathering(graph: Graph, layer: Dict[str, Any], known: set) -> int:
+    """Способы получения, заданные кодом игры: урожай и то, что берут с источника действием.
+
+    Неизвестные идентификаторы пропускаются, как и в остальных рукописных слоях."""
+    added = 0
+    for item_id in layer.get("harvested_as_itself", []):
+        if item_id in known:
+            graph.add((ont.thing_uri(item_id), ont.YIELDS, ont.thing_uri(item_id)))
+            added += 1
+    for source_id, produced in (layer.get("yields") or {}).items():
+        for item_id in produced:
+            if source_id in known and item_id in known:
+                graph.add((ont.thing_uri(source_id), ont.YIELDS, ont.thing_uri(item_id)))
+                added += 1
+    return added
 
 
 def _add_tool_requirements(graph: Graph, tools: Dict[str, Dict[str, Any]]) -> None:
@@ -366,6 +384,7 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
     _add_tags(graph, tags["items"])
     craftable = {recipe["result"]["item"] for recipe in recipes}
     rare_yields = _add_drops(graph, drops, craftable)
+    gathering = _add_gathering(graph, _load(GATHERING_PATH), set(items))
     _add_tool_requirements(graph, tools)
     tool_items = _add_tool_items(graph, tags["items"])
     restriction_count = _add_restrictions(graph, restrictions)
@@ -392,6 +411,7 @@ def build(game_dir: Path, output_dir: Path) -> Dict[str, Any]:
         "групп (тегов)": len(set(graph.subjects(RDF.type, ont.TAG))),
         "связей добычи": len(list(graph.triples((None, ont.YIELDS, None)))),
         "  из них редких": rare_yields,
+        "  из рукописного слоя добычи": gathering,
         "инструментов размечено": tool_items,
         "запретов": restriction_count,
         "пометок доступности": accessibility_count,
