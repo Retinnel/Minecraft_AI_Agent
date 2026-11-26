@@ -69,6 +69,18 @@ ACT = "act"
 CLARIFY = "clarify"
 REJECT = "reject"
 
+MODE_LABELS = {CREATIVE: "творческий", SURVIVAL: "выживания"}
+
+# Чем можно заменить отклонённое действие, в порядке предложения, и какими словами это
+# назвать игроку. Годится ли замена для данной цели, решает проверка, а не этот перечень.
+SUBSTITUTES = ("summon_entity", "give_item", "ask_drops", "ask_about")
+SUBSTITUTE_OFFERS = {
+    "summon_entity": "призвать — скажи «призови»",
+    "give_item": "выдать — скажи «дай»",
+    "ask_drops": "рассказать, что из него выпадает",
+    "ask_about": "рассказать, что это такое",
+}
+
 
 @dataclass
 class Verdict:
@@ -86,6 +98,12 @@ class Verdict:
     clamped: bool = False
     # Цепочка применённых правил — основа объяснения и материал для протокола тестирования.
     explanation: List[str] = field(default_factory=list)
+    # Какое правило дало отказ: mode | restriction | kind | count. По нему выводится условие.
+    cause: Optional[str] = None
+    # При каком ближайшем условии просьба станет выполнимой (или что можно взамен).
+    # Выводится из тех же таблиц правил, что и сам отказ, — отдельного текста на каждый
+    # случай нет, поэтому новое правило получает условие без правки этого места.
+    remedy: Optional[str] = None
 
     @property
     def allowed(self) -> bool:
@@ -100,7 +118,7 @@ class Validator:
         return MODE_ACTIONS.get(mode, MODE_ACTIONS[CREATIVE])
 
     def validate(self, action: str, target: Optional[str] = None, count: Any = 1,
-                 mode: str = CREATIVE) -> Verdict:
+                 mode: str = CREATIVE, *, with_remedy: bool = True) -> Verdict:
         trace: List[str] = []
 
         if action not in ALL_ACTIONS:
@@ -114,7 +132,11 @@ class Validator:
                       "могу построить план или предложить задание.")
             if action == EXECUTE_PLAN:
                 reason = "В творческом режиме проще выдать: скажи «дай …», и предмет будет в инвентаре."
-            return Verdict(REJECT, action, target=target, reason=reason, explanation=trace)
+            remedy = self._mode_remedy(action, mode) if with_remedy else None
+            if remedy:
+                trace.append("условие: " + remedy)
+            return Verdict(REJECT, action, target=target, reason=reason, explanation=trace,
+                           cause="mode", remedy=remedy)
         trace.append(f"режим {mode}: действие {action} разрешено")
 
         # 2. Цель указана
@@ -140,8 +162,12 @@ class Validator:
             restriction = self.kb.restriction_for(target, restricted_action)
             if restriction is not None:
                 trace.append(f"правило запрета ({restriction.category}) применено к «{label}»")
+                remedy = (self._restriction_remedy(action, target, label, mode)
+                          if with_remedy else None)
+                if remedy:
+                    trace.append("условие: " + remedy)
                 return Verdict(REJECT, action, target=target, reason=restriction.reason,
-                               explanation=trace)
+                               explanation=trace, cause="restriction", remedy=remedy)
             trace.append(f"запретов на «{label}» нет")
 
         # 5. Цель подходящего рода
@@ -149,19 +175,27 @@ class Validator:
         kinds = self.kb.kinds(target)
         if expected == "creature" and not self._is_creature(kinds):
             trace.append(f"«{label}» не существо, призыв неприменим")
+            remedy = self._kind_remedy(action, target, label, mode) if with_remedy else None
+            if remedy:
+                trace.append("условие: " + remedy)
             return Verdict(REJECT, action, target=target,
                            reason=f"«{label}» — это не существо, призвать не получится.",
-                           explanation=trace)
+                           explanation=trace, cause="kind", remedy=remedy)
         if expected == "item" and not self._is_carryable(kinds):
             trace.append(f"«{label}» не может попасть в инвентарь")
+            remedy = self._kind_remedy(action, target, label, mode) if with_remedy else None
+            if remedy:
+                trace.append("условие: " + remedy)
             return Verdict(REJECT, action, target=target,
-                           reason=f"«{label}» нельзя взять в инвентарь.", explanation=trace)
+                           reason=f"«{label}» нельзя взять в инвентарь.", explanation=trace,
+                           cause="kind", remedy=remedy)
 
         # 6. Количество
         verdict_count, clamped, error = self._normalize_count(count, ACTION_LIMITS.get(action, MAX_ITEM_COUNT))
         if error is not None:
             trace.append(f"количество отклонено: {error}")
-            return Verdict(REJECT, action, target=target, reason=error, explanation=trace)
+            return Verdict(REJECT, action, target=target, reason=error, explanation=trace,
+                           cause="count")
         if clamped:
             trace.append(f"количество уменьшено до предела: {verdict_count}")
         else:
@@ -169,6 +203,48 @@ class Validator:
 
         return Verdict(ACT, action, target=target, count=verdict_count,
                        game_id=self.kb.game_id(target), clamped=clamped, explanation=trace)
+
+    # --- при каком условии станет можно ---
+
+    def _mode_remedy(self, action: str, mode: str) -> Optional[str]:
+        """Режимы, в которых действие входит в состав разрешённых (таблица MODE_ACTIONS)."""
+        others = [other for other in MODE_ACTIONS if other != mode and action in MODE_ACTIONS[other]]
+        if not others:
+            return None
+        names = " или ".join(f"«{MODE_LABELS.get(other, other)} режим»" for other in others)
+        return f"Станет можно в другом режиме: скажи {names}."
+
+    def _allowed_instead(self, action: str, target: str, mode: str) -> List[str]:
+        """Какие из действий-замен прошли бы проверку для той же цели в том же режиме.
+
+        Замена не подбирается по смыслу: каждое действие из перечня прогоняется через ту же
+        проверку, что и исходное, и остаются только прошедшие.
+        """
+        found = []
+        for other in SUBSTITUTES:
+            if other == action or other not in self.available_actions(mode):
+                continue
+            if other == "ask_drops" and not self._is_creature(self.kb.kinds(target)):
+                continue
+            if self.validate(other, target, 1, mode, with_remedy=False).allowed:
+                found.append(other)
+        return found
+
+    def _restriction_remedy(self, action: str, target: str, label: str, mode: str) -> str:
+        """Запрет из базы знаний от режима и количества не зависит — это и есть ответ на
+        «когда станет можно». Остаётся назвать, что с той же целью разрешено."""
+        text = "Это правило не зависит от режима и количества."
+        offers = [SUBSTITUTE_OFFERS[other]
+                  for other in self._allowed_instead(action, target, mode)]
+        if offers:
+            text += " Взамен могу: " + "; ".join(offers) + "."
+        return text
+
+    def _kind_remedy(self, action: str, target: str, label: str, mode: str) -> Optional[str]:
+        """Цель не того рода: назвать действие, которое к ней применимо."""
+        offers = [SUBSTITUTE_OFFERS[other]
+                  for other in self._allowed_instead(action, target, mode)]
+        return ("Могу: " + "; ".join(offers) + ".") if offers else None
 
     def validate_execution(self, verdict: Verdict, problems: Sequence[str], *,
                            enabled: bool, singleplayer: Optional[bool],

@@ -28,7 +28,7 @@ from solver.planner import Plan, Planner
 from solver.progression import ProgressReport, Progression, render_progress
 from solver.quest import COLLECT, KILL, QuestChecker
 from solver.render import render_alternatives, render_summary, render_tree
-from solver.validator import (ACT, CLARIFY, CREATIVE, EXECUTE_PLAN, MEMORY_ACTIONS, REJECT,
+from solver.validator import (ACT, CLARIFY, CREATIVE, EXECUTE_PLAN, MEMORY_ACTIONS, REJECT, SURVIVAL,
                               Validator)
 from solver.worldfacts import (ABOUT, AVAILABLE, DROPS, SOURCES, USES, WORLD_ACTIONS,
                                WorldAnswer, WorldFacts, essentials as world_essentials,
@@ -177,6 +177,8 @@ class Turn:
     count: Any = 1
     command: Optional[str] = None
     reason: Optional[str] = None
+    # При каком условии отклонённая просьба станет выполнимой; выводит решатель.
+    remedy: Optional[str] = None
     query: Optional[str] = None               # название словами игрока — для продолжения диалога
     options: Sequence[Candidate] = ()         # варианты для уточняющего вопроса
     explanation: List[str] = field(default_factory=list)
@@ -575,9 +577,37 @@ class Pipeline:
             count=verdict.count,
             command=command,
             reason=verdict.reason,
+            remedy=self._remedy(verdict, inventory, stages),
             explanation=verdict.explanation,
             stages=stages,
         )
+
+    def _remedy(self, verdict, inventory: Optional[Dict[str, int]],
+                stages: Dict[str, Any]) -> Optional[str]:
+        """Условие, при котором отклонённая просьба станет выполнимой.
+
+        Условие по правилам называет валидатор. Здесь к нему добавляется вывод
+        планировщика: выдача в выживании отклонена режимом, но тот же предмет достижим
+        планом — и расстояние до него от инвентаря игрока известно, а не обещано.
+        """
+        if verdict.outcome != REJECT:
+            return None
+        remedy = verdict.remedy
+        if verdict.cause == "mode" and verdict.action == "give_item" and verdict.target:
+            checked = self.validator.validate(PLAN_GOAL, verdict.target, 1, SURVIVAL)
+            if checked.allowed:
+                plan = self.planner.plan(verdict.target, 1, inventory)
+                steps = len(plan.actions())
+                label = self.kb.label(verdict.target) or verdict.target
+                stages["remedy"] = {"feasible": plan.feasible, "steps": steps}
+                if plan.feasible and steps:
+                    path = (f"В выживании это достижимо: до цели «{label}» от твоего инвентаря "
+                            f"шагов — {steps}. Спроси, как это получить, — покажу план.")
+                    remedy = path + (" " + remedy if remedy else "")
+                    verdict.explanation.append(f"условие: план до «{label}» выполним, шагов {steps}")
+        if remedy:
+            stages.setdefault("remedy", {})["text"] = remedy
+        return remedy
 
     @property
     def executor(self):

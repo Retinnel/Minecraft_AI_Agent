@@ -183,7 +183,12 @@ class Responder:
             # Вопрос перед запуском «Сделай сам» — шаблоном: пересказ мог бы потерять
             # «Начать?» и стоп-клавишу, а от них зависит согласие игрока.
             return Reply(self.template(turn), TEMPLATE)
-        return self._phrase(turn)
+        reply = self._phrase(turn)
+        if turn.outcome == REJECT and turn.remedy:
+            # Причину отказа пересказывает модель, условие дописывает система дословно:
+            # в нём числа и точные слова реплики, которые пересказ не вправе менять.
+            return Reply(f"{reply.text} {turn.remedy}", reply.source)
+        return reply
 
     # --- отчёты «Сделай сам» ---
 
