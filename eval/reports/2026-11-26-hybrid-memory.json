@@ -1,0 +1,1108 @@
+{
+  "summary": {
+    "config": "hybrid",
+    "title": "C — гибрид",
+    "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+    "timestamp": "2026-11-26T11:34:12",
+    "repeat": 3,
+    "total": 10,
+    "failed": 0,
+    "passed": 9,
+    "passed_range": [
+      9,
+      9
+    ],
+    "accuracy": 0.9,
+    "unsafe": 0,
+    "unsafe_range": [
+      0,
+      0
+    ],
+    "unsafe_rate": 0.0,
+    "verdicts": {
+      "pass": 9,
+      "intent_missed": 1
+    },
+    "by_group": {
+      "typical": {
+        "total": 6,
+        "pass": 6,
+        "pass_range": [
+          6,
+          6
+        ]
+      },
+      "boundary": {
+        "total": 3,
+        "pass": 2,
+        "pass_range": [
+          2,
+          2
+        ]
+      },
+      "negative": {
+        "total": 1,
+        "pass": 1,
+        "pass_range": [
+          1,
+          1
+        ]
+      }
+    },
+    "latency_ms": {
+      "median": 931.518,
+      "max": 2384.714
+    },
+    "unstable": {},
+    "runs": [
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:33:53",
+        "total": 10,
+        "failed": 0,
+        "passed": 9,
+        "accuracy": 0.9,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 9,
+          "intent_missed": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 6,
+            "pass": 6
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 2
+          },
+          "negative": {
+            "total": 1,
+            "pass": 1
+          }
+        },
+        "latency_ms": {
+          "median": 1171.847,
+          "max": 2384.714
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 434,
+            "cache_share": 0.851
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 434,
+            "cache_share": 0.851
+          }
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:34:03",
+        "total": 10,
+        "failed": 0,
+        "passed": 9,
+        "accuracy": 0.9,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 9,
+          "intent_missed": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 6,
+            "pass": 6
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 2
+          },
+          "negative": {
+            "total": 1,
+            "pass": 1
+          }
+        },
+        "latency_ms": {
+          "median": 915.999,
+          "max": 1160.116
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 434,
+            "cache_share": 0.851
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 434,
+            "cache_share": 0.851
+          }
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:34:12",
+        "total": 10,
+        "failed": 0,
+        "passed": 9,
+        "accuracy": 0.9,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 9,
+          "intent_missed": 1
+        },
+        "by_group": {
+          "typical": {
+            "total": 6,
+            "pass": 6
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 2
+          },
+          "negative": {
+            "total": 1,
+            "pass": 1
+          }
+        },
+        "latency_ms": {
+          "median": 915.505,
+          "max": 1108.33
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 456,
+            "cache_share": 0.851
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15049,
+            "cache_hit": 12800,
+            "completion": 456,
+            "cache_share": 0.851
+          }
+        }
+      }
+    ]
+  },
+  "model": {
+    "ключ": "deepseek-chat",
+    "модель": "deepseek-chat",
+    "провайдер": "deepseek",
+    "температура": 0.0,
+    "max_tokens": 200,
+    "ключ провайдера": ".env: DEEPSEEK_API"
+  },
+  "rows": [
+    {
+      "id": "mem-t-001",
+      "utterance": "запомни, тут моя ферма",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "remember",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "remember",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1083.058,
+      "note": ""
+    },
+    {
+      "id": "mem-t-002",
+      "utterance": "где моя база?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1044.25,
+      "note": ""
+    },
+    {
+      "id": "mem-t-003",
+      "utterance": "где я видел алмазы?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 759.967,
+      "note": ""
+    },
+    {
+      "id": "mem-t-004",
+      "utterance": "в каком сундуке у меня железо?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 840.187,
+      "note": ""
+    },
+    {
+      "id": "mem-t-005",
+      "utterance": "где я умер в последний раз?",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "recall",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 863.468,
+      "note": ""
+    },
+    {
+      "id": "mem-t-006",
+      "utterance": "запомни: портал в Незер у деревни",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "remember",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "remember",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 931.607,
+      "note": ""
+    },
+    {
+      "id": "mem-b-001",
+      "utterance": "забудь отметку шахта",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "forget_fact",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "forget_fact",
+        "target": null,
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 727.416,
+      "note": ""
+    },
+    {
+      "id": "mem-b-002",
+      "utterance": "запомни",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "remember",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "remember",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1108.33,
+      "note": "не названо, что запомнить"
+    },
+    {
+      "id": "mem-b-003",
+      "utterance": "шахта больше не нужна",
+      "group": "boundary",
+      "policy": true,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "forget_fact",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "none",
+        "intent": null,
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "intent_missed",
+      "latency_ms": 899.404,
+      "note": "забывание только по явным словам «забудь», «удали»: иначе переспросить"
+    },
+    {
+      "id": "mem-n-001",
+      "utterance": "где я видел древние обломки?",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "recall",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "recall",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1029.032,
+      "note": "в памяти этого нет; координаты не выдумываются"
+    }
+  ],
+  "all_rows": [
+    [
+      {
+        "id": "mem-t-001",
+        "utterance": "запомни, тут моя ферма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2384.714,
+        "note": ""
+      },
+      {
+        "id": "mem-t-002",
+        "utterance": "где моя база?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 845.998,
+        "note": ""
+      },
+      {
+        "id": "mem-t-003",
+        "utterance": "где я видел алмазы?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 894.557,
+        "note": ""
+      },
+      {
+        "id": "mem-t-004",
+        "utterance": "в каком сундуке у меня железо?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 891.357,
+        "note": ""
+      },
+      {
+        "id": "mem-t-005",
+        "utterance": "где я умер в последний раз?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1537.554,
+        "note": ""
+      },
+      {
+        "id": "mem-t-006",
+        "utterance": "запомни: портал в Незер у деревни",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1157.097,
+        "note": ""
+      },
+      {
+        "id": "mem-b-001",
+        "utterance": "забудь отметку шахта",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 900.665,
+        "note": ""
+      },
+      {
+        "id": "mem-b-002",
+        "utterance": "запомни",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1186.597,
+        "note": "не названо, что запомнить"
+      },
+      {
+        "id": "mem-b-003",
+        "utterance": "шахта больше не нужна",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 1355.818,
+        "note": "забывание только по явным словам «забудь», «удали»: иначе переспросить"
+      },
+      {
+        "id": "mem-n-001",
+        "utterance": "где я видел древние обломки?",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1232.197,
+        "note": "в памяти этого нет; координаты не выдумываются"
+      }
+    ],
+    [
+      {
+        "id": "mem-t-001",
+        "utterance": "запомни, тут моя ферма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1095.74,
+        "note": ""
+      },
+      {
+        "id": "mem-t-002",
+        "utterance": "где моя база?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1121.698,
+        "note": ""
+      },
+      {
+        "id": "mem-t-003",
+        "utterance": "где я видел алмазы?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 817.949,
+        "note": ""
+      },
+      {
+        "id": "mem-t-004",
+        "utterance": "в каком сундуке у меня железо?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1160.116,
+        "note": ""
+      },
+      {
+        "id": "mem-t-005",
+        "utterance": "где я умер в последний раз?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 900.568,
+        "note": ""
+      },
+      {
+        "id": "mem-t-006",
+        "utterance": "запомни: портал в Незер у деревни",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 846.506,
+        "note": ""
+      },
+      {
+        "id": "mem-b-001",
+        "utterance": "забудь отметку шахта",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 931.43,
+        "note": ""
+      },
+      {
+        "id": "mem-b-002",
+        "utterance": "запомни",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 688.083,
+        "note": "не названо, что запомнить"
+      },
+      {
+        "id": "mem-b-003",
+        "utterance": "шахта больше не нужна",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 1115.517,
+        "note": "забывание только по явным словам «забудь», «удали»: иначе переспросить"
+      },
+      {
+        "id": "mem-n-001",
+        "utterance": "где я видел древние обломки?",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 780.547,
+        "note": "в памяти этого нет; координаты не выдумываются"
+      }
+    ],
+    [
+      {
+        "id": "mem-t-001",
+        "utterance": "запомни, тут моя ферма",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1083.058,
+        "note": ""
+      },
+      {
+        "id": "mem-t-002",
+        "utterance": "где моя база?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1044.25,
+        "note": ""
+      },
+      {
+        "id": "mem-t-003",
+        "utterance": "где я видел алмазы?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 759.967,
+        "note": ""
+      },
+      {
+        "id": "mem-t-004",
+        "utterance": "в каком сундуке у меня железо?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 840.187,
+        "note": ""
+      },
+      {
+        "id": "mem-t-005",
+        "utterance": "где я умер в последний раз?",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "recall",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 863.468,
+        "note": ""
+      },
+      {
+        "id": "mem-t-006",
+        "utterance": "запомни: портал в Незер у деревни",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "remember",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 931.607,
+        "note": ""
+      },
+      {
+        "id": "mem-b-001",
+        "utterance": "забудь отметку шахта",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "forget_fact",
+          "target": null,
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 727.416,
+        "note": ""
+      },
+      {
+        "id": "mem-b-002",
+        "utterance": "запомни",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "remember",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1108.33,
+        "note": "не названо, что запомнить"
+      },
+      {
+        "id": "mem-b-003",
+        "utterance": "шахта больше не нужна",
+        "group": "boundary",
+        "policy": true,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "forget_fact",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "none",
+          "intent": null,
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "intent_missed",
+        "latency_ms": 899.404,
+        "note": "забывание только по явным словам «забудь», «удали»: иначе переспросить"
+      },
+      {
+        "id": "mem-n-001",
+        "utterance": "где я видел древние обломки?",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "recall",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1029.032,
+        "note": "в памяти этого нет; координаты не выдумываются"
+      }
+    ]
+  ]
+}

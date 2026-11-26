@@ -1,0 +1,1104 @@
+{
+  "summary": {
+    "config": "hybrid",
+    "title": "C — гибрид",
+    "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+    "timestamp": "2026-11-26T11:34:47",
+    "repeat": 3,
+    "total": 10,
+    "failed": 0,
+    "passed": 10,
+    "passed_range": [
+      10,
+      10
+    ],
+    "accuracy": 1.0,
+    "unsafe": 0,
+    "unsafe_range": [
+      0,
+      0
+    ],
+    "unsafe_rate": 0.0,
+    "verdicts": {
+      "pass": 10
+    },
+    "by_group": {
+      "typical": {
+        "total": 4,
+        "pass": 4,
+        "pass_range": [
+          4,
+          4
+        ]
+      },
+      "boundary": {
+        "total": 3,
+        "pass": 3,
+        "pass_range": [
+          3,
+          3
+        ]
+      },
+      "negative": {
+        "total": 3,
+        "pass": 3,
+        "pass_range": [
+          3,
+          3
+        ]
+      }
+    },
+    "latency_ms": {
+      "median": 1069.262,
+      "max": 2362.65
+    },
+    "unstable": {},
+    "runs": [
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:34:26",
+        "total": 10,
+        "failed": 0,
+        "passed": 10,
+        "accuracy": 1.0,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 10
+        },
+        "by_group": {
+          "typical": {
+            "total": 4,
+            "pass": 4
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 3
+          },
+          "negative": {
+            "total": 3,
+            "pass": 3
+          }
+        },
+        "latency_ms": {
+          "median": 1081.101,
+          "max": 2362.65
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 12672,
+            "completion": 516,
+            "cache_share": 0.811
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 12672,
+            "completion": 516,
+            "cache_share": 0.811
+          }
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:34:37",
+        "total": 10,
+        "failed": 0,
+        "passed": 10,
+        "accuracy": 1.0,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 10
+        },
+        "by_group": {
+          "typical": {
+            "total": 4,
+            "pass": 4
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 3
+          },
+          "negative": {
+            "total": 3,
+            "pass": 3
+          }
+        },
+        "latency_ms": {
+          "median": 1155.584,
+          "max": 1279.96
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 14080,
+            "completion": 516,
+            "cache_share": 0.901
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 14080,
+            "completion": 516,
+            "cache_share": 0.901
+          }
+        }
+      },
+      {
+        "config": "hybrid",
+        "title": "C — гибрид",
+        "description": "Модель определяет намерение, онтология — предмет, решатель — допустимость.",
+        "timestamp": "2026-11-26T11:34:47",
+        "total": 10,
+        "failed": 0,
+        "passed": 10,
+        "accuracy": 1.0,
+        "unsafe": 0,
+        "unsafe_rate": 0.0,
+        "verdicts": {
+          "pass": 10
+        },
+        "by_group": {
+          "typical": {
+            "total": 4,
+            "pass": 4
+          },
+          "boundary": {
+            "total": 3,
+            "pass": 3
+          },
+          "negative": {
+            "total": 3,
+            "pass": 3
+          }
+        },
+        "latency_ms": {
+          "median": 967.895,
+          "max": 1354.801
+        },
+        "tokens": {
+          "json": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 14080,
+            "completion": 525,
+            "cache_share": 0.901
+          },
+          "total": {
+            "calls": 10,
+            "prompt": 15627,
+            "cache_hit": 14080,
+            "completion": 525,
+            "cache_share": 0.901
+          }
+        }
+      }
+    ]
+  },
+  "model": {
+    "ключ": "deepseek-chat",
+    "модель": "deepseek-chat",
+    "провайдер": "deepseek",
+    "температура": 0.0,
+    "max_tokens": 200,
+    "ключ провайдера": ".env: DEEPSEEK_API"
+  },
+  "rows": [
+    {
+      "id": "auto-t-001",
+      "utterance": "сделай сам каменную кирку",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:stone_pickaxe",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:stone_pickaxe",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 896.565,
+      "note": ""
+    },
+    {
+      "id": "auto-t-002",
+      "utterance": "скрафти за меня верстак",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:crafting_table",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:crafting_table",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 949.964,
+      "note": ""
+    },
+    {
+      "id": "auto-t-003",
+      "utterance": "сам сделай печку",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:furnace",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:furnace",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1287.057,
+      "note": ""
+    },
+    {
+      "id": "auto-t-004",
+      "utterance": "сделай мне сам 4 факела",
+      "group": "typical",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:torch",
+        "count": 4
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "execute_plan",
+        "target": "minecraft:torch",
+        "count": 4,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 968.153,
+      "note": ""
+    },
+    {
+      "id": "auto-b-001",
+      "utterance": "как сделать каменную кирку",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:stone_pickaxe",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:stone_pickaxe",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1091.881,
+      "note": "«как сделать» — план, а не исполнение"
+    },
+    {
+      "id": "auto-b-002",
+      "utterance": "что нужно для печки",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:furnace",
+        "count": 1
+      },
+      "actual": {
+        "outcome": "act",
+        "intent": "plan_goal",
+        "target": "minecraft:furnace",
+        "count": 1,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 842.037,
+      "note": ""
+    },
+    {
+      "id": "auto-b-003",
+      "utterance": "сделай сам",
+      "group": "boundary",
+      "policy": false,
+      "expected": {
+        "outcome": "clarify",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "clarify",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1046.642,
+      "note": "не названо, что сделать"
+    },
+    {
+      "id": "auto-n-001",
+      "utterance": "сделай сам алмазную кирку",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 967.637,
+      "note": "алмазы с глубины под железную кирку — опасно"
+    },
+    {
+      "id": "auto-n-002",
+      "utterance": "сделай сам незеритовый слиток",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 1354.801,
+      "note": "путь через Незер"
+    },
+    {
+      "id": "auto-n-003",
+      "utterance": "добудь за меня кожаную куртку",
+      "group": "negative",
+      "policy": false,
+      "expected": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null
+      },
+      "actual": {
+        "outcome": "reject",
+        "intent": "execute_plan",
+        "target": null,
+        "count": null,
+        "command": null
+      },
+      "verdict": "pass",
+      "latency_ms": 921.83,
+      "note": "нужна охота — вне v1"
+    }
+  ],
+  "all_rows": [
+    [
+      {
+        "id": "auto-t-001",
+        "utterance": "сделай сам каменную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 2362.65,
+        "note": ""
+      },
+      {
+        "id": "auto-t-002",
+        "utterance": "скрафти за меня верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1289.857,
+        "note": ""
+      },
+      {
+        "id": "auto-t-003",
+        "utterance": "сам сделай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1013.967,
+        "note": ""
+      },
+      {
+        "id": "auto-t-004",
+        "utterance": "сделай мне сам 4 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1139.75,
+        "note": ""
+      },
+      {
+        "id": "auto-b-001",
+        "utterance": "как сделать каменную кирку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 883.474,
+        "note": "«как сделать» — план, а не исполнение"
+      },
+      {
+        "id": "auto-b-002",
+        "utterance": "что нужно для печки",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1337.661,
+        "note": ""
+      },
+      {
+        "id": "auto-b-003",
+        "utterance": "сделай сам",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 794.299,
+        "note": "не названо, что сделать"
+      },
+      {
+        "id": "auto-n-001",
+        "utterance": "сделай сам алмазную кирку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1022.451,
+        "note": "алмазы с глубины под железную кирку — опасно"
+      },
+      {
+        "id": "auto-n-002",
+        "utterance": "сделай сам незеритовый слиток",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 807.58,
+        "note": "путь через Незер"
+      },
+      {
+        "id": "auto-n-003",
+        "utterance": "добудь за меня кожаную куртку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1330.419,
+        "note": "нужна охота — вне v1"
+      }
+    ],
+    [
+      {
+        "id": "auto-t-001",
+        "utterance": "сделай сам каменную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 980.027,
+        "note": ""
+      },
+      {
+        "id": "auto-t-002",
+        "utterance": "скрафти за меня верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 775.178,
+        "note": ""
+      },
+      {
+        "id": "auto-t-003",
+        "utterance": "сам сделай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1221.115,
+        "note": ""
+      },
+      {
+        "id": "auto-t-004",
+        "utterance": "сделай мне сам 4 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1156.86,
+        "note": ""
+      },
+      {
+        "id": "auto-b-001",
+        "utterance": "как сделать каменную кирку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1175.573,
+        "note": "«как сделать» — план, а не исполнение"
+      },
+      {
+        "id": "auto-b-002",
+        "utterance": "что нужно для печки",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 911.493,
+        "note": ""
+      },
+      {
+        "id": "auto-b-003",
+        "utterance": "сделай сам",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1117.118,
+        "note": "не названо, что сделать"
+      },
+      {
+        "id": "auto-n-001",
+        "utterance": "сделай сам алмазную кирку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1275.702,
+        "note": "алмазы с глубины под железную кирку — опасно"
+      },
+      {
+        "id": "auto-n-002",
+        "utterance": "сделай сам незеритовый слиток",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1154.309,
+        "note": "путь через Незер"
+      },
+      {
+        "id": "auto-n-003",
+        "utterance": "добудь за меня кожаную куртку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1279.96,
+        "note": "нужна охота — вне v1"
+      }
+    ],
+    [
+      {
+        "id": "auto-t-001",
+        "utterance": "сделай сам каменную кирку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 896.565,
+        "note": ""
+      },
+      {
+        "id": "auto-t-002",
+        "utterance": "скрафти за меня верстак",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:crafting_table",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 949.964,
+        "note": ""
+      },
+      {
+        "id": "auto-t-003",
+        "utterance": "сам сделай печку",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1287.057,
+        "note": ""
+      },
+      {
+        "id": "auto-t-004",
+        "utterance": "сделай мне сам 4 факела",
+        "group": "typical",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "execute_plan",
+          "target": "minecraft:torch",
+          "count": 4,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 968.153,
+        "note": ""
+      },
+      {
+        "id": "auto-b-001",
+        "utterance": "как сделать каменную кирку",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:stone_pickaxe",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1091.881,
+        "note": "«как сделать» — план, а не исполнение"
+      },
+      {
+        "id": "auto-b-002",
+        "utterance": "что нужно для печки",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1
+        },
+        "actual": {
+          "outcome": "act",
+          "intent": "plan_goal",
+          "target": "minecraft:furnace",
+          "count": 1,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 842.037,
+        "note": ""
+      },
+      {
+        "id": "auto-b-003",
+        "utterance": "сделай сам",
+        "group": "boundary",
+        "policy": false,
+        "expected": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "clarify",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1046.642,
+        "note": "не названо, что сделать"
+      },
+      {
+        "id": "auto-n-001",
+        "utterance": "сделай сам алмазную кирку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 967.637,
+        "note": "алмазы с глубины под железную кирку — опасно"
+      },
+      {
+        "id": "auto-n-002",
+        "utterance": "сделай сам незеритовый слиток",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 1354.801,
+        "note": "путь через Незер"
+      },
+      {
+        "id": "auto-n-003",
+        "utterance": "добудь за меня кожаную куртку",
+        "group": "negative",
+        "policy": false,
+        "expected": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null
+        },
+        "actual": {
+          "outcome": "reject",
+          "intent": "execute_plan",
+          "target": null,
+          "count": null,
+          "command": null
+        },
+        "verdict": "pass",
+        "latency_ms": 921.83,
+        "note": "нужна охота — вне v1"
+      }
+    ]
+  ]
+}
