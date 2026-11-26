@@ -193,6 +193,13 @@
         сам. В игре: Esc → «Открыть для сети» → «Выживание»; порт игра пишет в чат. Затем в чате:
         «пусть помощник сделает каменную кирку» → «да».</div>
     </div>
+    <div class="card extra">
+      <h2>Профиль игрока</h2>
+      <div id="profile-traits" class="muted" style="font-size:13.5px">—</div>
+      <div class="muted" style="font-size:12px;margin-top:6px">Один на все миры и игры. Черты выводятся
+        правилами из исходов реплик и событий игры и называют своё основание.
+        <a href="#" id="profile-forget">Забыть</a></div>
+    </div>
     <div class="card">
       <h2>Кампания</h2>
       <div id="campaign"><span class="muted">нет</span></div>
@@ -801,6 +808,39 @@ node("companion-launch").onclick = () => {
 node("companion-shutdown").onclick = () => companionPost("shutdown");
 refreshCompanion();
 setInterval(refreshCompanion, 4000);
+
+// --- профиль игрока: черты поверх миров и игр (api/profile.py) ---
+async function refreshProfile() {
+  let d;
+  try { d = await (await fetch("/api/profile/")).json(); } catch (e) { return; }
+  const box = node("profile-traits");
+  box.textContent = "";
+  if (!d.traits.length) {
+    box.textContent = "Наблюдений пока мало: реплик — " + d.turns + ". Черта называется, когда под ней не меньше " +
+      d.min_evidence + " свидетельств.";
+    return;
+  }
+  for (const trait of d.traits) {
+    const row = document.createElement("div");
+    row.style.margin = "4px 0";
+    const text = document.createElement("span");
+    text.style.color = "var(--text)";
+    text.textContent = trait.text;
+    const basis = document.createElement("div");
+    basis.style.fontSize = "12px";
+    basis.textContent = trait.basis;
+    row.append(text, basis);
+    box.append(row);
+  }
+}
+node("profile-forget").onclick = async (event) => {
+  event.preventDefault();
+  if (!confirm("Забыть всё, что накоплено об игроке?")) return;
+  await fetch("/api/profile/forget", { method: "POST" });
+  refreshProfile();
+};
+refreshProfile();
+setInterval(refreshProfile, 6000);
 node("memory-kind").onchange = refreshMemory;
 let memoryTimer = null;
 node("memory-query").addEventListener("input", () => {

@@ -987,6 +987,9 @@ def _death_reply() -> GroqAdvice:
     analyzer = _death_analyzer()
     result = analyzer.analyze(str(death.get("cause") or "unknown"), counts, armor=armor, held=held)
     facts = render_postmortem(result, analyzer.kb)
+    from api import profile
+    profile.observe_death("Minecraft", result.threat_label,
+                          key=str(death.get("timestamp") or death.get("time") or death.get("cause")))
     # Если об этой же угрозе ассистент предупреждал незадолго до смерти, разбор об этом
     # напоминает: совет был, им не воспользовались.
     warned = _last_forewarning
@@ -1678,13 +1681,18 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
         turn, narrated = await asyncio.to_thread(_persist_campaign, turn)
 
     if narrated is None:
+        from api import profile
         reply = await asyncio.to_thread(
             _assistant_responder().reply, turn, text,
             state=_state_snapshot(), summary=session.summary(), window=session.window(),
+            profile=profile.prompt_line(),
         )
     else:
         reply = narrated
     session.record(text, turn, reply.text)
+    # Исход реплики — в профиль игрока: он общий для всех миров и игр.
+    from api import profile
+    profile.observe_turn(session.game, turn, _assistant_pipeline().kb)
 
     result = _advice_from_turn(turn, (reply.text + " " + started) if started else reply.text,
                                last, source=reply.source)

@@ -172,10 +172,14 @@ class Responder:
     # --- формулирование ---
 
     def reply(self, turn: Turn, utterance: str, *, state: str = "", summary: str = "",
-              window: Optional[List[Dict[str, str]]] = None) -> Reply:
+              window: Optional[List[Dict[str, str]]] = None, profile: str = "") -> Reply:
+        """profile — черты игрока одной строкой (api/profile.py). Идут только в свободный
+        разговор и только в конец подсказки: на исход реплики они не влияют."""
         if turn.outcome == NONE:
             if turn.game and turn.game.lower() != "minecraft":
-                return self._chat_other_game(utterance, turn.game, window or [])
+                return self._chat_other_game(utterance, turn.game, window or [], profile)
+            if profile:
+                state = (state + "\n" if state else "") + profile
             return self._chat(utterance, state, summary, window or [])
         if turn.action == SEARCH_WEB and turn.outcome == ACT and turn.web is not None:
             return self._answer_web(turn, utterance)
@@ -300,8 +304,11 @@ class Responder:
         return True
 
     def _chat_other_game(self, utterance: str, game: str,
-                         window: List[Dict[str, str]]) -> Reply:
-        messages = [{"role": "system", "content": OTHER_GAME_CHAT_PROMPT.format(game=game)}]
+                         window: List[Dict[str, str]], profile: str = "") -> Reply:
+        system = OTHER_GAME_CHAT_PROMPT.format(game=game)
+        if profile:
+            system += "\n\n" + profile
+        messages = [{"role": "system", "content": system}]
         messages.extend(window)
         messages.append({"role": "user", "content": utterance})
         try:

@@ -17,6 +17,7 @@ from api import voice
 from api import worlds
 from api import quality
 from api import speech
+from api import profile
 from api import vision
 from api import memory
 from api import autopilot
@@ -56,6 +57,7 @@ app.include_router(vision.router)
 app.include_router(worlds.router)
 app.include_router(quality.router)
 app.include_router(speech.router)
+app.include_router(profile.router)
 app.include_router(memory.router)
 app.include_router(autopilot.router)
 app.include_router(companion.router)
