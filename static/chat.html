@@ -85,6 +85,8 @@
   #vision-frame { width: 100%; border-radius: 8px; border: 1px solid var(--line); margin: 6px 0; }
   #vision-status .warn { color: var(--bad); }
 </style>
+<!-- Общее оформление сайта: идёт после стилей страницы и перекрывает их. -->
+<link rel="stylesheet" href="/static/theme.css?v=3">
 </head>
 <body>
 <header>
@@ -134,7 +136,7 @@
       <label class="muted autopoll"><input type="checkbox" id="autopoll" checked>
         опрос сервера каждые 3 с, как у мода</label>
     </div>
-    <div class="card">
+    <div class="card extra">
       <h2>Экран</h2>
       <div class="vision-row">
         <select id="vision-window" title="окно игры"></select>
@@ -159,7 +161,7 @@
       <div class="muted" style="font-size:12px">Снимается только окно игры и только когда оно на переднем
         плане; в игру ничего не встраивается и ничего не нажимается.</div>
     </div>
-    <div class="card">
+    <div class="card extra">
       <h2>Память</h2>
       <div class="memory-row">
         <select id="memory-kind" title="вид фактов">
@@ -178,7 +180,7 @@
       <div class="muted" style="font-size:12px">Факты этого мира: что прислал мод, что ты велел запомнить,
         что распознано на экране. Память для игры, о которой сейчас разговор.</div>
     </div>
-    <div class="card">
+    <div class="card extra">
       <h2>Помощник</h2>
       <div class="memory-row">
         <span class="muted">порт мира:</span>
@@ -343,6 +345,9 @@ function showGame(game, knowledgeBase) {
 let knownWorld = null;
 // «?fresh» — страница без прошлого разговора: так её открывает съёмка для записки.
 const SKIP_PAST = new URLSearchParams(location.search).has("fresh");
+// На снимке для записки остаётся диалог, план и объяснение: карточки экрана, памяти и
+// помощника (в них бывает заголовок чужого окна) скрываются.
+if (SKIP_PAST) document.body.classList.add("fresh");
 
 function showHistory(state) {
   node("log").innerHTML = "";
