@@ -76,3 +76,37 @@ class WindowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WindowScreenTests(unittest.TestCase):
+    def setUp(self):
+        window._sessions.clear()
+        self.addCleanup(window._sessions.clear)
+
+    def test_screen_facts_reach_the_extractor_and_the_explanation(self):
+        extractor = Extractor("plan_goal", "золотая кирка")
+        seen = "игра: Terraria; под курсором или выделено: Золотая кирка"
+        result = window.answer("как это сделать", "Terraria", Pipeline(extractor), responder(),
+                               screen=seen)
+        self.assertEqual(extractor.calls[0]["screen"], seen)
+        self.assertEqual(result["explanation"][0], "по снимку экрана: " + seen)
+        self.assertEqual(result["screen"], seen)
+
+    def test_without_screen_the_call_is_as_before(self):
+        extractor = Extractor("plan_goal", "золотая кирка")
+        result = window.answer("как сделать золотую кирку", "Terraria", Pipeline(extractor),
+                               responder())
+        self.assertNotIn("screen", extractor.calls[0])
+        self.assertIsNone(result["screen"])
+
+
+class WindowVoiceTests(unittest.TestCase):
+    def test_vocabulary_of_the_named_game_is_used_for_repair(self):
+        from api import speech
+        from resolver.speech import repair
+        terraria = speech._vocabulary("Terraria")
+        minecraft = speech._vocabulary(None)
+        self.assertIsNot(terraria, minecraft)
+        self.assertEqual(repair("сделайкошмарнуюкирку", terraria), "сделай кошмарную кирку")
+        # У игры без базы знаний словаря нет своего: берётся общий, правка не падает.
+        self.assertIsNotNone(speech._vocabulary("Elden Ring"))

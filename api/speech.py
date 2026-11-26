@@ -107,20 +107,22 @@ def transcribe(audio: bytes, post: Optional[Callable[[bytes, str], Dict[str, Any
     return {"text": text, "heard": heard, "seconds": round(seconds, 2), "engine": "deepseek"}
 
 
-def _vocabulary() -> Optional[Any]:
-    """Словарь названий той базы знаний, по которой сейчас идёт разговор."""
+def _vocabulary(game: Optional[str] = None) -> Optional[Any]:
+    """Словарь названий базы знаний игры: названной (окно ассистента) либо Minecraft."""
     try:
         from api.advice import _assistant_pipeline
-        return _assistant_pipeline().resolver.index.vocabulary
+        pipeline = _assistant_pipeline()
+        world = pipeline._world_pipeline(game) if game else None
+        return (world or pipeline).resolver.index.vocabulary
     except Exception:   # правка — удобство: без словаря текст уходит как услышан
         return None
 
 
 @router.post("/transcribe")
-async def transcribe_audio(request: Request):
+async def transcribe_audio(request: Request, game: Optional[str] = None):
     """Тело запроса — WAV как есть (`audio/wav`): моду так проще, чем собирать форму."""
     audio = await request.body()
     try:
-        return await asyncio.to_thread(transcribe, audio, None, _vocabulary())
+        return await asyncio.to_thread(transcribe, audio, None, _vocabulary(game))
     except SpeechError as error:
         return JSONResponse(status_code=error.status, content={"detail": str(error)})

@@ -69,7 +69,8 @@ def main() -> int:
         return 0
     webview.create_window("Игровой ассистент", url, width=WIDTH, height=HEIGHT,
                           on_top=not args.no_top, min_size=(320, 360))
-    webview.start()
+    # Не приватный режим: разрешение на микрофон, выданное один раз, запоминается.
+    webview.start(private_mode=False)
     return 0
 
 

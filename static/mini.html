@@ -37,6 +37,19 @@
   form button { padding: 0 14px; border: none; border-radius: 10px; background: var(--gradient); color: #06131c;
                 font: inherit; font-weight: 700; cursor: pointer; }
   form button:disabled { opacity: .5; }
+  #screen { display: none; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  #screen.open { display: block; }
+  #screen .row { display: flex; gap: 6px; align-items: center; }
+  #screen select { flex: 1; min-width: 0; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line);
+                   background: #111a27; color: var(--text); font: inherit; }
+  #screen button, header button { padding: 4px 9px; border-radius: 8px; border: 1px solid var(--line);
+                   background: rgba(255, 255, 255, .05); color: var(--text); font: inherit; cursor: pointer; }
+  #screen button:hover, header button:hover { border-color: var(--accent); }
+  header button.on { border-color: #4be3a8; color: #4be3a8; }
+  #screen-state { color: var(--muted); margin-top: 5px; }
+  #screen-state.warn { color: #ffcf5c; }
+  form button.mic { background: rgba(255, 255, 255, .06); color: var(--text); border: 1px solid var(--line); }
+  form button.mic.rec { background: #ff6b6b; color: #fff; border-color: #ff6b6b; }
   .hint { color: var(--muted); font-size: 12.5px; align-self: center; text-align: center; padding: 12px; }
 </style>
 </head>
@@ -46,11 +59,23 @@
   <input id="game" list="games" placeholder="игра" autocomplete="off">
   <datalist id="games"></datalist>
   <span id="kb" class="kb"></span>
+  <button id="screen-toggle" type="button" title="Экран игры">экран</button>
 </header>
+<div id="screen">
+  <div class="row">
+    <select id="screen-window"></select>
+    <button id="screen-refresh" type="button" title="Обновить список окон">↻</button>
+    <button id="screen-start" type="button">Смотреть</button>
+    <button id="screen-stop" type="button">Стоп</button>
+  </div>
+  <div id="screen-state">Выбери окно игры. Кадр снимается, только пока игра на переднем плане; к вопросу
+    прикладывается последний свежий кадр.</div>
+</div>
 <div id="log"><div class="hint">Назови игру вверху и спроси: «как сделать кошмарную кирку», «что выпадает из
   слизня», «как победить босса». У каждой игры свой разговор; на чат в Minecraft окно не влияет.</div></div>
 <form id="form">
   <input id="text" placeholder="вопрос об игре" autocomplete="off" autofocus>
+  <button id="mic" class="mic" type="button" title="Голос: нажми, скажи, нажми ещё раз">🎤</button>
   <button id="send">→</button>
 </form>
 <script>
@@ -92,7 +117,7 @@ async function ask(text) {
   try {
     const d = await (await fetch("/api/window/chat", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, game: node("game").value })
+      body: JSON.stringify({ text, game: node("game").value, screen: screenOn })
     })).json();
     wait.textContent = d.response || "…";
     if (d.game && !node("game").value.trim()) node("game").value = d.game;
@@ -129,6 +154,144 @@ async function ask(text) {
   node("log").scrollTop = node("log").scrollHeight;
   node("text").focus();
 }
+
+// --- экран игры: наблюдатель сервера снимает выбранное окно (api/vision.py) ---
+let screenOn = false;
+
+async function loadWindows() {
+  try {
+    const d = await (await fetch("/api/vision/windows")).json();
+    const select = node("screen-window");
+    const current = select.value;
+    select.textContent = "";
+    for (const title of d.windows) {
+      if (title === document.title) continue;      // само окно ассистента не снимается
+      const option = document.createElement("option");
+      option.value = option.textContent = title;
+      select.append(option);
+    }
+    if (current) select.value = current;
+  } catch (e) {}
+}
+
+function showScreen(d) {
+  const box = node("screen-state");
+  screenOn = !!d.running;
+  node("screen-toggle").className = screenOn ? "on" : "";
+  let line;
+  if (d.blocked) line = "Съёмка остановлена: " + (d.warning || d.blocked);
+  else if (!d.running) line = d.error ? "Остановлено: " + d.error : "Не запущено.";
+  else if (d.frame_age === null) line = "Жду кадр: переключись в игру" + (d.last_skip ? " (" + d.last_skip + ")" : "") + ".";
+  else {
+    line = "Кадр " + Math.round(d.frame_age) + " с назад" + (d.frame_age > 30 ? " — устарел, зайди в игру" : "") + ".";
+    if (d.facts && (d.facts.focus || d.facts.game)) {
+      line += " Вижу: " + [d.facts.game, d.facts.focus].filter(Boolean).join(", ") + ".";
+    }
+  }
+  box.textContent = line;
+  box.className = d.blocked || d.warning ? "warn" : "";
+}
+
+async function refreshScreen() {
+  try { showScreen(await (await fetch("/api/vision/state")).json()); } catch (e) {}
+}
+
+node("screen-toggle").onclick = () => {
+  const open = node("screen").classList.toggle("open");
+  if (open) { loadWindows(); refreshScreen(); }
+};
+node("screen-refresh").onclick = loadWindows;
+node("screen-start").onclick = async () => {
+  const title = node("screen-window").value;
+  if (!title) return;
+  const resp = await fetch("/api/vision/start", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    // Разбор кадра — в момент вопроса; игру разговора задаёт окно, а не снимок.
+    body: JSON.stringify({ window: title, interval: 3, mode: "on_demand", follow_game: false })
+  });
+  const d = await resp.json();
+  if (!resp.ok) {
+    node("screen-state").textContent = "Не запущено: " + (d.detail || resp.status);
+    node("screen-state").className = "warn";
+    return;
+  }
+  showScreen(d);
+};
+node("screen-stop").onclick = async () => {
+  showScreen(await (await fetch("/api/vision/stop", { method: "POST" })).json());
+};
+setInterval(() => { if (node("screen").classList.contains("open") || screenOn) refreshScreen(); }, 3000);
+refreshScreen();
+
+// --- голос: запись микрофона в WAV 16 кГц и распознавание на сервере (api/speech.py) ---
+let recorder = null;
+
+function toWav(chunks, rate) {
+  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const input = new Float32Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { input.set(chunk, offset); offset += chunk.length; }
+  const step = rate / 16000;
+  const length = Math.floor(total / step);
+  const view = new DataView(new ArrayBuffer(44 + length * 2));
+  const text = (at, value) => { for (let i = 0; i < value.length; i++) view.setUint8(at + i, value.charCodeAt(i)); };
+  text(0, "RIFF"); view.setUint32(4, 36 + length * 2, true); text(8, "WAVEfmt ");
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, 16000, true); view.setUint32(28, 32000, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  text(36, "data"); view.setUint32(40, length * 2, true);
+  for (let i = 0; i < length; i++) {
+    // Среднее по окну вместо выборки каждого третьего отсчёта: меньше шума на шипящих.
+    const from = Math.floor(i * step), to = Math.min(total, Math.floor((i + 1) * step));
+    let sum = 0;
+    for (let j = from; j < to; j++) sum += input[j];
+    const sample = Math.max(-1, Math.min(1, to > from ? sum / (to - from) : 0));
+    view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+  return view.buffer;
+}
+
+async function startRecording() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { add("bot", "Микрофон недоступен: " + (e.name || e)); return; }
+  const context = new (window.AudioContext || window.webkitAudioContext)();
+  const source = context.createMediaStreamSource(stream);
+  const tap = context.createScriptProcessor(4096, 1, 1);
+  const chunks = [];
+  tap.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+  source.connect(tap);
+  tap.connect(context.destination);
+  recorder = { stream, context, source, tap, chunks };
+  node("mic").classList.add("rec");
+  // Предел записи сервера — 30 секунд.
+  recorder.timer = setTimeout(stopRecording, 29000);
+}
+
+async function stopRecording() {
+  if (!recorder) return;
+  const { stream, context, source, tap, chunks, timer } = recorder;
+  recorder = null;
+  clearTimeout(timer);
+  node("mic").classList.remove("rec");
+  source.disconnect(); tap.disconnect();
+  stream.getTracks().forEach((track) => track.stop());
+  const wav = toWav(chunks, context.sampleRate);
+  context.close();
+  node("text").placeholder = "распознаю…";
+  try {
+    const resp = await fetch("/api/voice/transcribe?game=" + encodeURIComponent(node("game").value), {
+      method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav
+    });
+    const d = await resp.json();
+    if (!resp.ok) add("bot", "Не распознал: " + (d.detail || resp.status));
+    else if (d.text) ask(d.text);
+    else add("bot", "Не расслышал — повтори.");
+  } catch (e) { add("bot", "Сервер не ответил: " + e); }
+  node("text").placeholder = "вопрос об игре";
+}
+
+node("mic").onclick = () => (recorder ? stopRecording() : startRecording());
 
 node("form").onsubmit = (event) => {
   event.preventDefault();

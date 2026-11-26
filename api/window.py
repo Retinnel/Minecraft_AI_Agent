@@ -25,6 +25,8 @@ _sessions: Dict[str, Any] = {}
 class WindowMessage(BaseModel):
     text: str
     game: Optional[str] = None
+    # Учитывать ли экран игры: последние факты наблюдателя (vision/), если кадр свежий.
+    screen: bool = False
 
 
 def _session(game: str):
@@ -56,8 +58,12 @@ def games_list() -> List[Dict[str, Any]]:
     return listed
 
 
-def answer(text: str, game: Optional[str], pipeline: Any, responder: Any) -> Dict[str, Any]:
-    """Одна реплика окна. Конвейер и формулировщик передаются: в тестах — заглушки."""
+def answer(text: str, game: Optional[str], pipeline: Any, responder: Any,
+           screen: Optional[str] = None) -> Dict[str, Any]:
+    """Одна реплика окна. Конвейер и формулировщик передаются: в тестах — заглушки.
+
+    screen — факты об экране игры одной строкой. Как и в чате, это данные для разбора
+    реплики («что это за предмет?»), а не указания: действие выбирается по реплике."""
     from kb import games
     from orchestrator import why
     name = canonical(game)
@@ -73,14 +79,16 @@ def answer(text: str, game: Optional[str], pipeline: Any, responder: Any) -> Dic
                 "source": "rule", "explanation": list(told.get("trace") or []),
                 "plan_alternatives": told.get("alternatives")}
     turn = pipeline.handle(text, mode="survival", inventory={}, pending=session.pending,
-                           context=session.last_exchange, game=name)
+                           context=session.last_exchange, game=name, screen=screen or None)
     reply = responder.reply(turn, text, summary=session.summary(), window=session.window())
     session.record(text, turn, reply.text)
     web = getattr(turn, "web", None)
     return {**base, "response": reply.text, "outcome": turn.outcome, "action": turn.action,
             "source": reply.source, "plan_tree": turn.plan_tree,
             "plan_summary": turn.plan_summary, "plan_alternatives": turn.plan_alternatives,
-            "explanation": list(turn.explanation or []),
+            "explanation": ([f"по снимку экрана: {screen}"] if screen else [])
+            + list(turn.explanation or []),
+            "screen": screen,
             "options": [option.label for option in turn.options],
             "sources": [{"site": hit.site, "url": hit.url} for hit in getattr(web, "hits", [])]}
 
@@ -94,9 +102,16 @@ async def get_games() -> Dict[str, Any]:
 async def window_chat(message: WindowMessage) -> Dict[str, Any]:
     from api import advice
     from orchestrator.llm import ModelUnavailable
+    seen = None
+    if message.screen:
+        # Кадр снимается, только пока окно игры на переднем плане; здесь берётся последний
+        # свежий — игрок переключился в окно ассистента, чтобы спросить.
+        facts = await asyncio.to_thread(advice._screen_facts)
+        seen = facts.as_prompt() if facts is not None else None
     try:
         return await asyncio.to_thread(answer, message.text, message.game,
-                                       advice._assistant_pipeline(), advice._assistant_responder())
+                                       advice._assistant_pipeline(), advice._assistant_responder(),
+                                       seen)
     except ModelUnavailable as error:
         return {"game": canonical(message.game), "response": f"Модель недоступна: {error}",
                 "outcome": "error"}
