@@ -398,8 +398,15 @@ class Pipeline:
         self._preferences = dict(preferences or {})
         self._executor_kind = "player"
         companion = self._autopilot.get("companion") or {}
-        actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")
-                                                    or companion.get("enabled")))
+        # «Сделай сам» модели на выбор не даётся: она путала его с просьбой о плане и
+        # тянула из прошлого обмена («каменная» → запуск автопилота). Действие
+        # предъявляется, только когда игрок сказал это сам — «сделай сам», «за меня» или
+        # обратился к помощнику, — либо включена настройка автовыбора (autopilot.auto_select).
+        asked_to_execute = bool(EXECUTE_CUES.search(utterance or "")) or bool(
+            companion.get("enabled") and COMPANION_CUES.search(utterance or ""))
+        executable = bool(self._autopilot.get("enabled") or companion.get("enabled")) and (
+            asked_to_execute or bool(self._autopilot.get("auto_select")))
+        actions = self.actions_for(mode, game, executable)
 
         if (self._minecraft and self._at_home(game) and mode == CREATIVE
                 and EXECUTE_CUES.search(utterance or "")):
@@ -485,6 +492,12 @@ class Pipeline:
 
         # «Сделай сам» против «как сделать» — главный риск разбора (B.11). Явные слова игрока
         # важнее догадки модели: «сделай сам» — исполнение, «как сделать» без «сам» — план.
+        # Исполнение не предъявлялось, а модель его всё же назвала: игрок об исполнении не
+        # просил, значит это просьба о плане.
+        if (proposal.action == EXECUTE_PLAN and EXECUTE_PLAN not in actions
+                and PLAN_GOAL in actions and not asked_to_execute):
+            proposal = replace(proposal, action=PLAN_GOAL)
+            stages["rule"] = "execute_not_asked"
         if EXECUTE_PLAN in actions and proposal.action in (PLAN_GOAL, EXECUTE_PLAN):
             to_companion = bool(companion.get("enabled") and COMPANION_CUES.search(utterance or ""))
             asked_how = bool(HOWTO_CUES.search(utterance or ""))

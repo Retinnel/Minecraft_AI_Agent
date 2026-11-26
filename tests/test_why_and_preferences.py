@@ -154,3 +154,38 @@ class GoalOrderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExecuteOnlyWhenAskedTests(unittest.TestCase):
+    """«Сделай сам» модели на выбор не даётся: только по явным словам игрока."""
+
+    ON = {"enabled": True, "singleplayer": True, "available": True, "baritone": True}
+
+    class Extractor:
+        def __init__(self, action):
+            self.action, self.calls = action, []
+
+        def extract(self, utterance, **kwargs):
+            self.calls.append(kwargs)
+            return Proposal(action=self.action, target="каменная кирка")
+
+    def test_execution_is_not_offered_without_explicit_words(self):
+        extractor = self.Extractor("execute_plan")
+        turn = Pipeline(extractor).handle("пусть кирку сделает", mode="survival", inventory={},
+                                          autopilot=self.ON)
+        self.assertNotIn("execute_plan", extractor.calls[0]["actions"])
+        self.assertEqual(turn.action, "plan_goal")
+        self.assertEqual(turn.stages["rule"], "execute_not_asked")
+
+    def test_explicit_words_offer_it(self):
+        extractor = self.Extractor("execute_plan")
+        turn = Pipeline(extractor).handle("сделай сам каменную кирку", mode="survival",
+                                          inventory={}, autopilot=self.ON)
+        self.assertIn("execute_plan", extractor.calls[0]["actions"])
+        self.assertEqual(turn.action, "execute_plan")
+
+    def test_setting_restores_free_choice(self):
+        extractor = self.Extractor("execute_plan")
+        Pipeline(extractor).handle("нужна каменная кирка", mode="survival", inventory={},
+                                   autopilot={**self.ON, "auto_select": True})
+        self.assertIn("execute_plan", extractor.calls[0]["actions"])

@@ -1403,7 +1403,8 @@ def _autopilot_context(message: Optional[ChatMessage] = None,
     return {"enabled": config["enabled"], "singleplayer": singleplayer,
             "available": bool(source.get("autopilot_available")),
             "baritone": bool(source.get("baritone")) and config["use_baritone"],
-            "max_effort": config["max_effort"], "companion": companion.context()}
+            "max_effort": config["max_effort"], "auto_select": config["auto_select"],
+            "companion": companion.context()}
 
 
 def _autopilot_command(text: str) -> Optional[str]:

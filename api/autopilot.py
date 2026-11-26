@@ -45,6 +45,9 @@ MAX_REPLANS = 80
 MAX_LOG = 40
 
 DEFAULTS: Dict[str, Any] = {
+    # Давать ли модели самой выбирать «Сделай сам». По умолчанию нет: запуск только по
+    # явным словам игрока («сделай сам», «за меня», «пусть помощник …»).
+    "auto_select": False,
     "enabled": False,
     "require_confirmation": True,
     "singleplayer_only": True,
@@ -66,7 +69,8 @@ def settings(path: Optional[Path] = None) -> Dict[str, Any]:
     result = json.loads(json.dumps(DEFAULTS))
     if not isinstance(raw, dict):
         return result
-    for key in ("enabled", "require_confirmation", "singleplayer_only", "use_baritone"):
+    for key in ("enabled", "require_confirmation", "singleplayer_only", "use_baritone",
+                "auto_select"):
         if isinstance(raw.get(key), bool):
             result[key] = raw[key]
     for key, (low, high) in (("max_effort", (1, 200)), ("max_run_minutes", (1, 60)),
