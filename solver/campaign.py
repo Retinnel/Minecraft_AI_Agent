@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from math import ceil
 from typing import Deque, Dict, List, Optional, Sequence, Set, Tuple
 
+from kb import ontology as ont
 from kb.graph import KnowledgeBase
 from solver.planner import (CRAFT, HAVE, HUNT, MINE, SMELT, SMITH, STATION_ITEMS, STONECUT,
                             Plan, Planner, Step)
@@ -31,6 +32,7 @@ from solver.validator import CREATIVE, MAX_ITEM_COUNT, Validator
 UNLOCKS_TOOL = "tool"            # инструмент: открывает добычу следующего уровня
 UNLOCKS_STATION = "station"      # станция: открывает способ изготовления
 UNLOCKS_MATERIAL = "material"    # материал: выделен из слишком тяжёлого этапа
+UNLOCKS_GEAR = "gear"            # снаряжение по интересу игрока: оружие, броня
 UNLOCKS_GOAL = "goal"            # сама цель кампании
 
 ACTION_KINDS = (CRAFT, SMELT, STONECUT, SMITH, MINE, HUNT)
@@ -159,12 +161,17 @@ class CampaignBuilder:
         return Campaign(goal, count, stages=tuple(stages), feasible=True, explanation=trace)
 
     def propose_goals(self, inventory: Optional[Dict[str, int]] = None,
-                      mode: str = CREATIVE) -> List[GoalCandidate]:
+                      mode: str = CREATIVE, interest: Optional[str] = None
+                      ) -> List[GoalCandidate]:
         """Цели, до которых из текущего состояния доказанно ведёт кампания.
 
         По каждому виду инструмента — ступень выше имеющейся; станции — если их нет.
         Среди инструментов одной ступени (деревянная и золотая кирки) остаётся та, что
         дешевле: предлагать новичку золотую кирку — значит вести его не туда.
+
+        interest — главный род целей игрока из его профиля (`tools`, `weapons`, `armor`).
+        Он не меняет, что достижимо, — только что предлагается первым: к оружию и броне
+        добавляются цели этого рода, и цели по интересу идут впереди остальных.
         """
         stock = Counter(inventory or {})
         candidates: List[GoalCandidate] = []
@@ -190,7 +197,36 @@ class CampaignBuilder:
                 if candidate:
                     candidates.append(candidate)
 
-        return sorted(candidates, key=lambda c: (c.stages, c.effort, c.item))
+        for item in self._interest_goals(interest, stock):
+            candidate = self._candidate(item, UNLOCKS_GEAR, stock, mode)
+            if candidate:
+                candidates.append(candidate)
+
+        def off_interest(candidate: GoalCandidate) -> bool:
+            if not interest:
+                return False
+            if interest == "tools":
+                return candidate.kind != UNLOCKS_TOOL
+            return candidate.kind != UNLOCKS_GEAR
+
+        return sorted(candidates, key=lambda c: (off_interest(c), c.stages, c.effort, c.item))
+
+    def _interest_goals(self, interest: Optional[str], stock: Counter) -> List[str]:
+        """Цели по интересу игрока: меч следующей ступени либо щит и нагрудник.
+
+        Ступень меча считается так же, как у инструментов: выше лучшего имеющегося.
+        """
+        if interest == "weapons":
+            ranked = sorted((ont.TOOL_TIERS[tier], f"minecraft:{prefix}_sword")
+                            for prefix, tier in ont.TOOL_MATERIAL_PREFIXES.items()
+                            if prefix != "golden")
+            owned = [rank for rank, item in ranked if stock.get(item, 0) > 0]
+            wanted = (max(owned) + 1) if owned else 0
+            return [item for rank, item in ranked if rank == wanted]
+        if interest == "armor":
+            return [item for item in ("minecraft:shield", "minecraft:iron_chestplate")
+                    if stock.get(item, 0) == 0]
+        return []
 
     # --- вехи ---
 

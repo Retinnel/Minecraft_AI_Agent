@@ -50,6 +50,8 @@ class Session:
     persona: Optional[str] = None
     # Уточняющий вопрос, на который игрок ещё не ответил.
     pending: Optional[object] = None
+    # След правил последней реплики — для ответа на «почему?» (orchestrator/why.py).
+    last_why: Optional[dict] = None
     # Предыдущий обмен одной строкой — для продолжений вроде «и ещё крипера».
     last_exchange: Optional[str] = None
     # Игра, о которой спрашивает игрок. Для Minecraft работает онтология, для остальных —
@@ -94,6 +96,8 @@ class Session:
         # другое, держать вопрос открытым значит угадывать дальше.
         self.pending = turn if turn.outcome == "clarify" and turn.options else None
         self.last_exchange = f"игрок: «{utterance}»; итог: {reply}"
+        from orchestrator.why import snapshot
+        self.last_why = snapshot(turn)
 
         label = turn.label or turn.target
         if turn.outcome == "act" and label:
@@ -169,6 +173,7 @@ class Session:
             "asked_about": list(self.asked_about), "refused": list(self.refused),
             "quests": list(self.quests), "campaign": self.campaign,
             "last_exchange": self.last_exchange,
+            "last_why": self.last_why,
         }
 
     @classmethod
@@ -197,6 +202,7 @@ class Session:
             if isinstance(facts, list):
                 getattr(session, name).extend(str(fact) for fact in facts[-SUMMARY_LIMIT:])
         session.campaign = data.get("campaign") if isinstance(data.get("campaign"), str) else None
+        session.last_why = data.get("last_why") if isinstance(data.get("last_why"), dict) else None
         session.last_exchange = (data.get("last_exchange")
                                  if isinstance(data.get("last_exchange"), str) else None)
         return session

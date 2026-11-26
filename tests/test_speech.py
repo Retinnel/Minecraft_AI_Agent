@@ -82,3 +82,38 @@ class ModVoiceContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepairTests(unittest.TestCase):
+    """Правка распознанного по словарю онтологии: только к словам, которые система знает."""
+
+    @classmethod
+    def setUpClass(cls):
+        from kb.graph import KnowledgeBase
+        from resolver.resolve import Resolver
+        cls.vocabulary = Resolver(KnowledgeBase.shared()).index.vocabulary
+
+    def repair(self, text):
+        from resolver.speech import repair
+        return repair(text, self.vocabulary)
+
+    def test_glued_words_are_split_into_known_ones(self):
+        self.assertEqual(self.repair("Пустьделаеткаменнуюкирку."), "пусть делает каменную кирку.")
+        self.assertEqual(self.repair("дайалмазныймеч"), "дай алмазный меч")
+
+    def test_foreign_punctuation_is_removed(self):
+        self.assertEqual(self.repair("начинай。"), "начинай")
+
+    def test_unknown_long_words_are_left_alone(self):
+        for text in ("Достопримечательность какая-то", "железнодорожный вокзал",
+                     "действительно", "какпобедитьдракона"):
+            self.assertEqual(self.repair(text), text)
+
+    def test_real_words_are_not_replaced_by_similar_ones(self):
+        self.assertEqual(self.repair("Как сделал печь?"), "Как сделал печь?")
+
+    def test_transcribe_keeps_what_was_heard(self):
+        with patch.object(speech.keys, "get", return_value="k"):
+            result = speech.transcribe(_wav(1.0), post=lambda audio, key: {"text": "сделайверстак"},
+                                       vocabulary=self.vocabulary)
+        self.assertEqual((result["text"], result["heard"]), ("сделай верстак", "сделайверстак"))

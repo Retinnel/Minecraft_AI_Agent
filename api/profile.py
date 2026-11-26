@@ -224,6 +224,34 @@ def traits(state: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     return found
 
 
+def preferences(state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Черты в виде, пригодном для решателя: что из профиля влияет на вывод.
+
+    interest — главный род целей игрока (инструменты, оружие, броня): по нему решатель
+    кампании упорядочивает достижимые цели. deadly — угроза, от которой игрок гибнет чаще
+    всего, и основание: предупреждение о ней повторяется чаще и называет это основание.
+    Пусто, пока свидетельств мало: без порога решатель подстраивался бы под случайность.
+    """
+    found: Dict[str, Any] = {}
+    for trait in traits(state):
+        if trait["key"].startswith("focus_"):
+            found["interest"] = trait["key"][len("focus_"):]
+            found["interest_basis"] = trait["basis"]
+        elif trait["key"] == "dies_of":
+            source = state if state is not None else load()
+            found["deadly"] = max(source["threats"].items(), key=lambda pair: pair[1])[0]
+            found["deadly_basis"] = trait["basis"]
+    return found
+
+
+def current_preferences() -> Dict[str, Any]:
+    """Предпочтения для решателя на сервере; в тестах и прогонах — пусто."""
+    if not _enabled():
+        return {}
+    with _lock:
+        return preferences(load())
+
+
 def as_prompt(state: Optional[Dict[str, Any]] = None) -> str:
     """Черты одной строкой для свободного разговора; пусто, пока свидетельств мало."""
     lines = [trait["text"] for trait in traits(state) if trait["key"] != "games"]

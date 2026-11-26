@@ -1045,6 +1045,11 @@ FOREWARN_MEMORY_SECONDS = 180.0
 _last_forewarning: Optional[Dict[str, Any]] = None
 
 
+def _player_preferences() -> Dict[str, Any]:
+    from api import profile
+    return profile.current_preferences()
+
+
 def _forewarn_reply(event: Any) -> Optional[GroqAdvice]:
     """Предупреждение по событию «рядом враждебное существо»; None — сказать нечего."""
     global _last_forewarning
@@ -1060,10 +1065,14 @@ def _forewarn_reply(event: Any) -> Optional[GroqAdvice]:
     if warning is None or not warning.actionable:
         return None
 
+    # Угроза, от которой этот игрок гибнет чаще всего (профиль): о ней напоминание
+    # повторяется вдвое чаще и называет основание.
+    preferences = _player_preferences()
+    deadly = preferences.get("deadly") == warning.threat_label
     now = time.time()
     previous = _last_forewarning
-    if previous and previous["key"] == warning.key and (
-            now - previous["time"] < FOREWARN_REPEAT_SECONDS):
+    repeat = FOREWARN_REPEAT_SECONDS / 2 if deadly else FOREWARN_REPEAT_SECONDS
+    if previous and previous["key"] == warning.key and (now - previous["time"] < repeat):
         return None
     _last_forewarning = {"key": warning.key, "threat": warning.threat, "time": now}
 
@@ -1071,14 +1080,18 @@ def _forewarn_reply(event: Any) -> Optional[GroqAdvice]:
     plan = focus_plan(warning.state)
     session = _assistant_session()
     return GroqAdvice(
-        response=_clip(render_forewarning(warning, kb)),
+        response=_clip(render_forewarning(warning, kb) + (
+            f" От этой угрозы ты гибнешь чаще всего: {preferences.get('deadly_basis')}."
+            if deadly else "")),
         confidence=0.9, level="WARNING",
         threats=[kb.label(mob) or mob for mob in warning.mobs],
         source="forewarn", mode="chat", execute=False, outcome="act",
         assistant_mode=session.mode,
         plan_tree=render_tree(plan, kb) if plan else None,
         plan_summary=render_summary(plan, kb) if plan else None,
-        explanation=list(warning.state.explanation),
+        explanation=list(warning.state.explanation) + (
+            [f"профиль игрока: угроза «{warning.threat_label}» — "
+             f"{preferences.get('deadly_basis')}; повтор предупреждения чаще"] if deadly else []),
     )
 
 
@@ -1612,6 +1625,17 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
     if game:
         return await _game_reply(game, text)
 
+    # «Почему?» — по следу правил предыдущей реплики, без модели.
+    from orchestrator import why
+    if why.is_why(text):
+        told = session.last_why or {}
+        result = GroqAdvice(response=_clip(why.render(session.last_why)), confidence=1.0,
+                            level="INFO", threats=[], source="rule", mode="chat", outcome="act",
+                            assistant_mode=session.mode, game=session.game,
+                            explanation=list(told.get("trace") or []),
+                            plan_alternatives=told.get("alternatives"))
+        return await _store_chat_result(result, text)
+
     persona = _persona_command(text)
     if persona:
         session.persona = persona
@@ -1659,7 +1683,8 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
             _assistant_pipeline().handle, text, mode=session.mode, inventory=_inventory_counts(),
             pending=session.pending, context=session.last_exchange, state=_state_snapshot(),
             game=session.game, screen=seen or None, memory=_world_memory(session.game),
-            position=_player_position(), autopilot=_autopilot_context(message))
+            position=_player_position(), autopilot=_autopilot_context(message),
+            preferences=_player_preferences())
     except ModelUnavailable as error:
         logger.warning(f"[Chat] Модель недоступна: {error}")
         result = GroqAdvice(

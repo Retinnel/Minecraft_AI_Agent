@@ -75,9 +75,12 @@ def _post(audio: bytes, key: str) -> Dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
-def transcribe(audio: bytes, post: Optional[Callable[[bytes, str], Dict[str, Any]]] = None
-               ) -> Dict[str, Any]:
-    """Текст записи. `post` подменяется в тестах: к живому движку они не обращаются."""
+def transcribe(audio: bytes, post: Optional[Callable[[bytes, str], Dict[str, Any]]] = None,
+               vocabulary: Optional[Any] = None) -> Dict[str, Any]:
+    """Текст записи. `post` подменяется в тестах: к живому движку они не обращаются.
+
+    vocabulary — словарь названий базы знаний: по нему распознанное возвращается к
+    известным словам (`resolver/speech.py`); услышанное до правки остаётся в `heard`."""
     if not audio:
         raise SpeechError(400, "пустая запись")
     if len(audio) > MAX_BYTES:
@@ -96,8 +99,21 @@ def transcribe(audio: bytes, post: Optional[Callable[[bytes, str], Dict[str, Any
         raise SpeechError(502, f"движок распознавания ответил {error.code}")
     except Exception as error:  # сеть, тайм-аут, разбор ответа
         raise SpeechError(502, f"движок распознавания недоступен: {type(error).__name__}")
-    text = str(payload.get("text") or "").strip()
-    return {"text": text, "seconds": round(seconds, 2), "engine": "deepseek"}
+    heard = str(payload.get("text") or "").strip()
+    text = heard
+    if vocabulary is not None and heard:
+        from resolver.speech import repair
+        text = repair(heard, vocabulary)
+    return {"text": text, "heard": heard, "seconds": round(seconds, 2), "engine": "deepseek"}
+
+
+def _vocabulary() -> Optional[Any]:
+    """Словарь названий той базы знаний, по которой сейчас идёт разговор."""
+    try:
+        from api.advice import _assistant_pipeline
+        return _assistant_pipeline().resolver.index.vocabulary
+    except Exception:   # правка — удобство: без словаря текст уходит как услышан
+        return None
 
 
 @router.post("/transcribe")
@@ -105,6 +121,6 @@ async def transcribe_audio(request: Request):
     """Тело запроса — WAV как есть (`audio/wav`): моду так проще, чем собирать форму."""
     audio = await request.body()
     try:
-        return await asyncio.to_thread(transcribe, audio)
+        return await asyncio.to_thread(transcribe, audio, None, _vocabulary())
     except SpeechError as error:
         return JSONResponse(status_code=error.status, content={"detail": str(error)})

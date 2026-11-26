@@ -235,6 +235,7 @@ class Pipeline:
         # и планировщик; о любой другой игре — только поиск.
         self.home = home
         self._worlds: Dict[str, "Pipeline"] = {}
+        self._preferences: Dict[str, Any] = {}
         self.starting_inventory: Dict[str, int] = {}
         self.kb = kb or KnowledgeBase.shared()
         self._search = search
@@ -358,7 +359,8 @@ class Pipeline:
                screen: Optional[str] = None,
                memory: Optional[Any] = None,
                position: Optional[Any] = None,
-               autopilot: Optional[Dict[str, Any]] = None) -> Turn:
+               autopilot: Optional[Dict[str, Any]] = None,
+               preferences: Optional[Dict[str, Any]] = None) -> Turn:
         """Обрабатывает реплику.
 
         pending — предыдущий исход, если им был уточняющий вопрос: тогда реплика может
@@ -385,6 +387,9 @@ class Pipeline:
         mode = mode or self.mode
         # Сведения для «Сделай сам»: включён ли режим, одиночная ли игра, на связи ли мод.
         self._autopilot = dict(autopilot or {})
+        # Предпочтения игрока из его профиля (api/profile.py): влияют на порядок
+        # предлагаемых целей, на допустимость — нет.
+        self._preferences = dict(preferences or {})
         self._executor_kind = "player"
         companion = self._autopilot.get("companion") or {}
         actions = self.actions_for(mode, game, bool(self._autopilot.get("enabled")
@@ -1283,8 +1288,12 @@ class Pipeline:
         модели — даёт самую короткую из доказанных целей. Так кампания к предложенной цели
         не может оказаться невыполнимой, кто бы её ни назвал.
         """
-        candidates = self.campaigns.propose_goals(inventory or {}, mode)
+        interest = self._preferences.get("interest")
+        candidates = self.campaigns.propose_goals(inventory or {}, mode, interest=interest)
         stages["candidates"] = [candidate.item for candidate in candidates]
+        if interest:
+            stages["interest"] = {"kind": interest,
+                                  "basis": self._preferences.get("interest_basis")}
         if not candidates:
             return Turn(outcome=REJECT, action=PROPOSE_GOAL,
                         reason="Из того, что у тебя есть, посильной цели не вывести.",
