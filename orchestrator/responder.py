@@ -163,7 +163,10 @@ class Responder:
     def facts(turn: Turn) -> str:
         """Выход решателя в виде, пригодном для формулирования."""
         lines = [f"Ответ, который нужно передать: {Responder.template(turn)}"]
-        if turn.outcome == ACT and turn.action == PLAN_GOAL and turn.plan is not None:
+        # Про отдельный экран — только когда в плане есть что делать: к «уже есть в
+        # инвентаре» фраза о подробном плане не подходит.
+        if (turn.outcome == ACT and turn.action == PLAN_GOAL and turn.plan is not None
+                and (turn.plan.actions() or turn.plan.taken() or not turn.plan.feasible)):
             lines.append("Подробный план показан игроку на отдельном экране.")
         if turn.outcome == CLARIFY and turn.options:
             lines.append("Варианты: " + ", ".join(option.label for option in turn.options) + ".")

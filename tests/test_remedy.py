@@ -88,3 +88,59 @@ class ResponderRemedyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OwnTargetTests(unittest.TestCase):
+    """Цель реплики называет игрок: из предыдущего обмена она берётся, только если своей нет."""
+
+    CONTEXT = "игрок: «пусть помощник печь сделает»; итог: Помощник начинает: Печь."
+
+    class Extractor:
+        def __init__(self, with_context, alone):
+            self.with_context, self.alone, self.calls = with_context, alone, []
+
+        def extract(self, utterance, **kwargs):
+            from orchestrator.pipeline import Proposal
+            self.calls.append(kwargs)
+            action, target = self.with_context if kwargs.get("context") else self.alone
+            return Proposal(action=action, target=target)
+
+    def _handle(self, extractor, utterance):
+        return Pipeline(extractor).handle(utterance, mode="survival", inventory={},
+                                          context=self.CONTEXT)
+
+    def test_target_borrowed_from_context_is_replaced_by_the_named_one(self):
+        extractor = self.Extractor(("plan_goal", "Печь"), ("plan_goal", None))
+        turn = self._handle(extractor, "Каменную кирку пусть сделает тоже")
+        self.assertEqual(turn.target, "minecraft:stone_pickaxe")
+        self.assertEqual(turn.stages["context_check"]["borrowed"], "Печь")
+        # Решает словарь онтологии: модель второй раз не спрашивается.
+        self.assertEqual(len(extractor.calls), 1)
+
+    def test_generic_word_gives_a_question_not_the_previous_target(self):
+        extractor = self.Extractor(("plan_goal", "Печь"), ("plan_goal", None))
+        turn = self._handle(extractor, "Пусть кирку сделает тоже ещё одну.")
+        self.assertEqual(turn.outcome, "clarify")
+        self.assertIn("Каменная кирка", [option.label for option in turn.options])
+
+    def test_true_continuation_keeps_the_target_from_context(self):
+        extractor = self.Extractor(("plan_goal", "Печь"), ("plan_goal", None))
+        turn = self._handle(extractor, "и ещё одну")
+        self.assertEqual(turn.target, "minecraft:furnace")
+        self.assertEqual(turn.stages["context_check"]["named"], [])
+
+    def test_target_named_in_the_utterance_is_left_alone(self):
+        extractor = self.Extractor(("plan_goal", "верстак"), ("plan_goal", "верстак"))
+        turn = self._handle(extractor, "а теперь верстак")
+        self.assertEqual(turn.target, "minecraft:crafting_table")
+        self.assertNotIn("context_check", turn.stages)
+
+
+class OwnedGoalWordingTests(unittest.TestCase):
+    def test_no_detailed_plan_phrase_when_the_goal_is_already_owned(self):
+        pipeline = Pipeline(object())
+        owned = pipeline._decide("plan_goal", "minecraft:stone_pickaxe", 1, "survival",
+                                 {"minecraft:stone_pickaxe": 1}, {})
+        self.assertNotIn("отдельном экране", Responder.facts(owned))
+        needed = pipeline._decide("plan_goal", "minecraft:stone_pickaxe", 1, "survival", {}, {})
+        self.assertIn("отдельном экране", Responder.facts(needed))

@@ -294,6 +294,39 @@ class Pipeline:
             allowed.discard(EXECUTE_PLAN)
         return tuple(action for action in PROPOSABLE if action in allowed)
 
+    @staticmethod
+    def _named_in(target: Optional[str], text: Optional[str]) -> bool:
+        """Звучит ли название в тексте (сверка по основам слов)."""
+        from resolver.text import name_stems
+        return bool(set(name_stems(target or "")) & set(name_stems(text or "")))
+
+    def _own_target(self, proposal: Proposal, utterance: str, context: Optional[str],
+                    actions: Sequence[str], game: str, extra: Dict[str, Any],
+                    stages: Dict[str, Any]) -> Proposal:
+        """Цель называет игрок, а не предыдущий обмен.
+
+        Контекст нужен, чтобы продолжение («и ещё крипера») сохранило действие. Но модель
+        иногда берёт из него и цель: после разговора о печи «пусть кирку сделает тоже ещё
+        одну» разбиралось как печь. Признак — названной цели в реплике нет, а в контексте
+        она есть. Тогда решает словарь онтологии: если в реплике есть слова из названий
+        (кирка), целью становятся они, действие остаётся; если своих названий нет («ещё
+        одну»), это настоящее продолжение, и цель из контекста остаётся. Модель повторно
+        не спрашивается.
+        """
+        if not context or not proposal.target or not proposal.action or proposal.action == NONE:
+            return proposal
+        if self._named_in(proposal.target, utterance) or not self._named_in(proposal.target, context):
+            return proposal
+        from dataclasses import replace
+        from resolver.text import NUMERALS, STOPWORDS, stem, tokenize
+        vocabulary = self.resolver.index.vocabulary
+        named = [word for word in tokenize(utterance)
+                 if word not in STOPWORDS and word not in NUMERALS and stem(word) in vocabulary]
+        stages["context_check"] = {"borrowed": proposal.target, "named": named}
+        if not named:
+            return proposal
+        return replace(proposal, target=" ".join(named))
+
     @property
     def _minecraft(self) -> bool:
         return self.home.lower() == DEFAULT_GAME.lower()
@@ -383,6 +416,7 @@ class Pipeline:
         stages: Dict[str, Any] = {
             "llm": {"action": proposal.action, "target": proposal.target, "count": proposal.count}
         }
+        proposal = self._own_target(proposal, utterance, context, actions, game, extra, stages)
         if screen:
             stages["screen"] = screen
         if not proposal.action or proposal.action == NONE:
