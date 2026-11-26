@@ -56,6 +56,7 @@
     файл отчёта.</p>
   <section class="card" id="now"><h2>Гибрид сейчас</h2><div class="empty">загрузка…</div></section>
   <section class="card" id="comparison"><h2>Три конфигурации на одном наборе и одной модели</h2><div class="empty">загрузка…</div></section>
+  <section class="card" id="more" hidden><h2>Дополнительный набор</h2></section>
   <section class="card" id="weak"><h2>Замена модели на малую локальную</h2><div class="empty">загрузка…</div></section>
   <section class="card" id="extra"><h2>Отдельные наборы и планировщик</h2><div class="empty">загрузка…</div></section>
 </main>
@@ -132,6 +133,17 @@ async function load() {
     fill("comparison", "Три конфигурации на одном наборе и одной модели",
       "Недопустимое действие — выполненное вопреки разметке: выдан не тот объект, действие по несуществующему названию, призвано запрещённое существо.",
       rows(d.comparison) + groups(d.comparison) + source(d.comparison));
+  }
+  if (d.extra_comparison && d.extra_comparison.length) {
+    node("more").hidden = false;
+    const all = d.comparison.length === d.extra_comparison.length
+      ? d.comparison.map((run, i) => run.title + " — " + (run.passed + d.extra_comparison[i].passed) + " из " +
+          (run.total + d.extra_comparison[i].total) + ", недопустимых " + (run.unsafe + d.extra_comparison[i].unsafe)).join("; ")
+      : "";
+    fill("more", "Дополнительный набор: ещё 39 реплик",
+      "Размечены до прогона по той же политике; с основным набором — 100 реплик." +
+      (all ? " Сумма по двум наборам: " + esc(all) + "." : ""),
+      rows(d.extra_comparison) + source(d.extra_comparison));
   }
   if (d.weak_model.length) {
     fill("weak", "Замена модели на малую локальную",

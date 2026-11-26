@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import sys
 import statistics
 from dataclasses import asdict
 from datetime import datetime
@@ -417,6 +418,10 @@ def format_repeated(summary: Dict[str, Any]) -> str:
 
 
 def main() -> int:
+    # Консоль Windows в cp1251 не печатает «×» из отчёта: прогон падал уже после замера,
+    # не сохранив отчёт.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description="Прогон золотого набора реплик игрока.")
     parser.add_argument("--config", default="symbolic", choices=AVAILABLE_CONFIGS,
                         help="какую конфигурацию системы проверять")
