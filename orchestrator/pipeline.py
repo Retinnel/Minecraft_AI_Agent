@@ -71,6 +71,10 @@ HOWTO_CUES = re.compile(r"\bкак\b|\bчто\s+нужно\b|\bчем\b|\bпла
 # факты с экрана, — а остальное ищется в сети.
 OTHER_GAME_ACTIONS = (SEARCH_WEB, *MEMORY_ACTIONS)
 
+# Слова просьбы о выдаче: по ним видно, что игрок ждал предмет, а не план.
+GIVE_WORDS = re.compile(r"(?<![а-яё])(дай|дайте|выдай|выдайте|выдать|кинь|закинь|подкинь)(?![а-яё])",
+                        re.IGNORECASE)
+
 # Игра со своей базой знаний (kb/worlds): планы и вопросы о мире — по ней. Команд в такую
 # игру ассистент не отдаёт: мода для неё нет, и выдача с призывом модели не предъявляются.
 WORLD_GAME_ACTIONS = (PLAN_GOAL, *WORLD_ACTIONS, SEARCH_WEB, *MEMORY_ACTIONS)
@@ -236,6 +240,7 @@ class Pipeline:
         self.home = home
         self._worlds: Dict[str, "Pipeline"] = {}
         self._preferences: Dict[str, Any] = {}
+        self._utterance: str = ""
         self.starting_inventory: Dict[str, int] = {}
         self.kb = kb or KnowledgeBase.shared()
         self._search = search
@@ -377,6 +382,7 @@ class Pipeline:
         берутся только отсюда.
         """
         game = game or DEFAULT_GAME
+        self._utterance = utterance
         world = self._world_pipeline(game)
         if world is not None:
             # Инвентарь Minecraft к другой игре не относится: мода для неё нет, и план
@@ -649,7 +655,8 @@ class Pipeline:
         stages["validator"] = {"outcome": verdict.outcome, "clamped": verdict.clamped}
 
         if verdict.outcome == ACT and verdict.action == PLAN_GOAL:
-            return self._build_plan(verdict, inventory, stages, memory=memory, position=position)
+            turn = self._build_plan(verdict, inventory, stages, memory=memory, position=position)
+            return self._plan_instead_of_give(turn, mode)
         if verdict.outcome == ACT and verdict.action == START_CAMPAIGN:
             return self._build_campaign(verdict, mode, inventory, stages)
         if verdict.outcome == ACT and verdict.action == EXECUTE_PLAN:
@@ -672,6 +679,24 @@ class Pipeline:
             explanation=verdict.explanation,
             stages=stages,
         )
+
+    def _plan_instead_of_give(self, turn: "Turn", mode: str) -> "Turn":
+        """Игрок просил выдать, а получил план — об этом нужно сказать.
+
+        В выживании выдача модели не предъявляется, и «дай кирку» она разбирает как
+        просьбу о плане. Подмена не должна быть молчаливой: к ответу дописывается, что
+        выдачи здесь нет и при каком условии она есть (условие — от валидатора).
+        """
+        if not GIVE_WORDS.search(self._utterance or ""):
+            return turn
+        refused = self.validator.validate("give_item", turn.target, 1, mode)
+        if refused.cause != "mode":
+            return turn
+        turn.remedy = ("Выдачи в этом режиме нет, поэтому вместо неё план. "
+                       + (refused.remedy or "")).strip()
+        turn.explanation.append("просьба выдать в режиме без выдачи: вместо выдачи построен план")
+        turn.stages["give_as_plan"] = True
+        return turn
 
     def _remedy(self, verdict, inventory: Optional[Dict[str, int]],
                 stages: Dict[str, Any]) -> Optional[str]:
@@ -759,8 +784,15 @@ class Pipeline:
         stages["autopilot"] = {"outcome": checked.outcome, "problems": problems,
                                "executor": self._executor_kind}
         if not checked.allowed:
+            # В мире, открытом для сети, сам мод не исполняет, но помощник на связи —
+            # отказ называет, как попросить его.
+            remedy = None
+            if (not by_companion and context_flags.get("singleplayer") is False
+                    and companion.get("connected")):
+                remedy = (f"В мире, открытом для сети, план исполняет помощник: скажи «пусть "
+                          f"помощник сделает {label.lower()}».")
             return Turn(outcome=REJECT, action=EXECUTE_PLAN, target=verdict.target, label=label,
-                        count=verdict.count, reason=checked.reason,
+                        count=verdict.count, reason=checked.reason, remedy=remedy,
                         explanation=checked.explanation, stages=stages, plan=plan,
                         plan_tree=render_tree(plan, self.kb),
                         plan_summary=render_summary(plan, self.kb))

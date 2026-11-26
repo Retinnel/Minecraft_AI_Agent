@@ -1627,6 +1627,13 @@ async def player_chat_message(message: ChatMessage) -> GroqAdvice:
 
     # «Почему?» — по следу правил предыдущей реплики, без модели.
     from orchestrator import why
+    if why.is_give_question(text):
+        verdict = _assistant_pipeline().validator.validate("give_item", None, 1, session.mode)
+        result = GroqAdvice(response=_clip(why.render_give(verdict)), confidence=1.0,
+                            level="INFO", threats=[], source="rule", mode="chat", outcome="act",
+                            assistant_mode=session.mode, game=session.game,
+                            explanation=list(verdict.explanation))
+        return await _store_chat_result(result, text)
     if why.is_why(text):
         told = session.last_why or {}
         result = GroqAdvice(response=_clip(why.render(session.last_why)), confidence=1.0,

@@ -191,7 +191,7 @@ class Responder:
             # «Начать?» и стоп-клавишу, а от них зависит согласие игрока.
             return Reply(self.template(turn), TEMPLATE)
         reply = self._phrase(turn)
-        if turn.outcome == REJECT and turn.remedy:
+        if turn.remedy and turn.outcome in (REJECT, ACT):
             # Причину отказа пересказывает модель, условие дописывает система дословно:
             # в нём числа и точные слова реплики, которые пересказ не вправе менять.
             return Reply(f"{reply.text} {turn.remedy}", reply.source)

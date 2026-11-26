@@ -49,8 +49,45 @@ class WhyTests(unittest.TestCase):
         restored = Session.from_dict(session.to_dict())
         self.assertEqual(restored.last_why["outcome"], "reject")
         self.assertTrue(restored.last_why["trace"])
+        # Болтовня след не стирает: «почему?» после неё относится к последнему отказу.
         session.record("привет", Turn(outcome="none"), "Привет!")
-        self.assertIsNone(session.last_why)
+        self.assertEqual(session.last_why["outcome"], "reject")
+
+    def test_question_about_giving_is_answered_by_the_validator(self):
+        for text in ("А выдать можешь?", "Почему не можешь выдать?", "почему не даёшь"):
+            self.assertTrue(why.is_give_question(text), text)
+        for text in ("можешь сделать кирку?", "дай кирку", "почему?"):
+            self.assertFalse(why.is_give_question(text), text)
+        validator = self.pipeline.validator
+        survival = why.render_give(validator.validate("give_item", None, 1, "survival"))
+        self.assertIn("творческий режим", survival)
+        creative = why.render_give(validator.validate("give_item", None, 1, "creative"))
+        self.assertIn("выдаю", creative)
+
+
+class PlanInsteadOfGiveTests(unittest.TestCase):
+    """«Дай» в выживании даёт план — и ответ обязан сказать, что это не выдача."""
+
+    class Extractor:
+        def extract(self, utterance, **kwargs):
+            return Proposal(action="plan_goal", target="алмазная кирка")
+
+    def test_substitution_is_named_with_the_condition(self):
+        from orchestrator.responder import Responder
+        turn = Pipeline(self.Extractor()).handle("дай алмазную кирку", mode="survival", inventory={})
+        self.assertTrue(turn.stages["give_as_plan"])
+        text = Responder(ask_text=lambda messages: "План готов.").reply(turn, "дай кирку").text
+        self.assertIn("вместо неё план", text)
+        self.assertIn("творческий режим", text)
+
+    def test_question_how_to_make_gets_no_such_note(self):
+        turn = Pipeline(self.Extractor()).handle("как сделать алмазную кирку", mode="survival",
+                                                 inventory={})
+        self.assertIsNone(turn.remedy)
+
+    def test_creative_plan_gets_no_note_either(self):
+        turn = Pipeline(self.Extractor()).handle("дай алмазную кирку", mode="creative", inventory={})
+        self.assertIsNone(turn.remedy)
 
 
 class PreferenceTests(unittest.TestCase):

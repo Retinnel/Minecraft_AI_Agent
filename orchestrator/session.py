@@ -96,8 +96,10 @@ class Session:
         # другое, держать вопрос открытым значит угадывать дальше.
         self.pending = turn if turn.outcome == "clarify" and turn.options else None
         self.last_exchange = f"игрок: «{utterance}»; итог: {reply}"
+        # След держится до следующей реплики по делу: «почему?» после пары слов болтовни
+        # всё ещё относится к последнему отказу или плану.
         from orchestrator.why import snapshot
-        self.last_why = snapshot(turn)
+        self.last_why = snapshot(turn) or self.last_why
 
         label = turn.label or turn.target
         if turn.outcome == "act" and label:

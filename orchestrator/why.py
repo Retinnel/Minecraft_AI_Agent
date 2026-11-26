@@ -26,8 +26,29 @@ HEADS = {
 }
 
 
+# Вопрос о самой выдаче: «а выдать можешь?», «почему не можешь выдать?». Ответ — вердикт
+# валидатора о выдаче в текущем режиме, а не рассуждение модели о своих возможностях.
+GIVE_QUESTION = re.compile(
+    r"^\s*(?:а\s+|но\s+)?(?:почему\s+)?(?:ты\s+)?(?:не\s+)?(?:можешь|можно|нельзя|умеешь)\s+"
+    r"(?:просто\s+)?(?:выдать|дать|выдавать)(?:\s+(?:мне|предмет|предметы|её|его|это))?\s*[?.!]*\s*$"
+    r"|^\s*(?:а\s+)?(?:выдать|дать)\s+(?:можешь|можно|нельзя)\s*[?.!]*\s*$"
+    r"|^\s*почему\s+(?:ты\s+)?не\s+(?:выда[её]шь|да[её]шь)\s*[?.!]*\s*$",
+    re.IGNORECASE)
+
+
 def is_why(text: Optional[str]) -> bool:
     return bool(WHY_COMMAND.match(text or ""))
+
+
+def is_give_question(text: Optional[str]) -> bool:
+    return bool(GIVE_QUESTION.match(text or ""))
+
+
+def render_give(verdict: Any) -> str:
+    """Ответ на вопрос о выдаче по вердикту валидатора для текущего режима."""
+    if getattr(verdict, "cause", None) == "mode":
+        return " ".join(part for part in (verdict.reason, verdict.remedy) if part)
+    return "В этом режиме выдаю: скажи «дай» и назови предмет. Запрещённое правилами не выдам."
 
 
 def snapshot(turn: Any) -> Optional[Dict[str, Any]]:
@@ -66,6 +87,8 @@ def render(why: Optional[Dict[str, Any]]) -> str:
         if shown:
             parts.append("Проверял по порядку: " + _numbered(shown) + ".")
     else:
+        if why.get("remedy"):
+            parts.append(why["remedy"])
         if shown:
             parts.append("Проверки пройдены: " + _numbered(shown) + ".")
         if why.get("alternatives"):
