@@ -179,6 +179,19 @@
         что распознано на экране. Память для игры, о которой сейчас разговор.</div>
     </div>
     <div class="card">
+      <h2>Помощник</h2>
+      <div class="memory-row">
+        <span class="muted">порт мира:</span>
+        <input id="companion-port" style="width:80px" inputmode="numeric" placeholder="25565">
+        <button id="companion-launch">Запустить</button>
+        <button id="companion-shutdown">Выключить</button>
+      </div>
+      <div id="companion-state" class="muted" style="font-size:13px;margin-top:6px">—</div>
+      <div class="muted" style="font-size:12px;margin-top:6px">Второй игрок, который исполняет план
+        сам. В игре: Esc → «Открыть для сети» → «Выживание»; порт игра пишет в чат. Затем в чате:
+        «пусть помощник сделает каменную кирку» → «да».</div>
+    </div>
+    <div class="card">
       <h2>Кампания</h2>
       <div id="campaign"><span class="muted">нет</span></div>
     </div>
@@ -742,6 +755,47 @@ node("vision-file").onchange = (e) => {
 node("game-set").onclick = setGame;
 refreshMemory();
 setInterval(refreshMemory, 5000);
+
+// --- помощник: отдельный игрок под управлением сервера (api/companion.py) ---
+async function refreshCompanion() {
+  let d;
+  try { d = await (await fetch("/api/companion/state")).json(); } catch (e) { return; }
+  const state = node("companion-state");
+  if (!node("companion-port").value) node("companion-port").value = d.port || "";
+  if (!d.enabled) { state.textContent = "выключен в settings.json (раздел companion)"; return; }
+  let line = d.connected ? "в игре: " + d.username : (d.process && d.process.running
+    ? "процесс запущен, ждём входа в мир…" : "не запущен");
+  if (d.connected && d.bot && d.bot.position) {
+    const p = d.bot.position;
+    line += " · x " + p.x + ", y " + p.y + ", z " + p.z;
+  }
+  if (d.run) line += " · " + (d.run.label || "") + ": " + (d.run.message || d.run.status);
+  state.textContent = line;
+}
+
+async function companionPost(path, body) {
+  node("companion-state").textContent = "…";
+  try {
+    const resp = await fetch("/api/companion/" + path, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      node("companion-state").textContent = "не вышло: " + (d.detail || resp.status);
+      return;
+    }
+  } catch (e) { node("companion-state").textContent = String(e); return; }
+  setTimeout(refreshCompanion, 1500);
+}
+
+node("companion-launch").onclick = () => {
+  const port = parseInt(node("companion-port").value, 10);
+  companionPost("launch", port ? { port } : {});
+};
+node("companion-shutdown").onclick = () => companionPost("shutdown");
+refreshCompanion();
+setInterval(refreshCompanion, 4000);
 node("memory-kind").onchange = refreshMemory;
 let memoryTimer = null;
 node("memory-query").addEventListener("input", () => {
