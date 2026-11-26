@@ -50,6 +50,20 @@ def open_fallback(url: str) -> None:
     webbrowser.open(url)
 
 
+def hide_from_capture(window) -> None:
+    """Убирает окно ассистента из снимков экрана (Windows 10 2004 и новее).
+
+    Окно висит поверх игры и попадало в кадр, который разбирает модель зрения: закрывало
+    часть сцены и читалось как надпись «Ассистент». Игрок его видит по-прежнему.
+    """
+    try:
+        import ctypes
+        handle = int(window.native.Handle.ToInt64())
+        ctypes.windll.user32.SetWindowDisplayAffinity(handle, 0x11)   # WDA_EXCLUDEFROMCAPTURE
+    except Exception:
+        pass   # не Windows или старая сборка: окно просто остаётся в кадре
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Окно ассистента поверх игры.")
     parser.add_argument("--url", default=DEFAULT_URL, help="адрес сервера ассистента")
@@ -67,8 +81,9 @@ def main() -> int:
     except ImportError:
         open_fallback(url)
         return 0
-    webview.create_window("Игровой ассистент", url, width=WIDTH, height=HEIGHT,
-                          on_top=not args.no_top, min_size=(320, 360))
+    window = webview.create_window("Игровой ассистент", url, width=WIDTH, height=HEIGHT,
+                                   on_top=not args.no_top, min_size=(320, 360))
+    window.events.shown += lambda: hide_from_capture(window)
     # Не приватный режим: разрешение на микрофон, выданное один раз, запоминается.
     webview.start(private_mode=False)
     return 0

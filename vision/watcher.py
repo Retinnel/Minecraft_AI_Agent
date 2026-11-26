@@ -308,6 +308,25 @@ class ScreenWatcher:
                 "model": self.model.model,
             }
 
+    def fresh_image(self) -> Optional[Image.Image]:
+        """Последний кадр, если он ещё свежий; иначе None — по старому кадру не отвечают."""
+        with self._lock:
+            frame = self.frame
+            if frame is None or self._clock() - frame.taken_at > frame.ttl:
+                return None
+            return frame.image
+
+    def look(self, question: str, *, game: str = "", context: str = "") -> Optional[str]:
+        """Ответ модели зрения на вопрос по свежему кадру; None — кадра нет или модель
+        не ответила (тогда остаётся ответ без кадра)."""
+        image = self.fresh_image()
+        if image is None:
+            return None
+        try:
+            return self.model.answer(image, question, game=game, context=context) or None
+        except VisionUnavailable:
+            return None
+
     def frame_jpeg(self, width: int = 640) -> Optional[bytes]:
         with self._lock:
             frame = self.frame

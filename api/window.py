@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -20,6 +21,10 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/window", tags=["window"])
 
 DEFAULT_GAME = "Minecraft"
+# Вопрос о том, что видно на экране: «куда ставить», «где тут», «что это». На такие отвечает
+# модель зрения по самому кадру — в тексте фактов сцены расположения нет.
+LOOK_WORDS = re.compile(r"(?<![а-яё])(куда|где|сюда|туда|тут|здесь|на экране|передо мной|видишь|"
+                        r"покажи|это|этот|эта|эту|эти|этим|вот)(?![а-яё])", re.IGNORECASE)
 MAX_TEXT = 400
 # Журнал разговоров окна: по нему разбираются неудачные ответы. В репозиторий не идёт.
 LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "window" / "dialogue.jsonl"
@@ -105,6 +110,28 @@ async def get_games() -> Dict[str, Any]:
     return {"games": games_list()}
 
 
+def look(result: Dict[str, Any], text: str, watcher: Any) -> Dict[str, Any]:
+    """Дополняет ответ взглядом на кадр, когда вопрос — о видимом на экране.
+
+    План и сведения базы знаний кадром не заменяются: по кадру отвечает только то, что
+    иначе пошло бы в поиск или осталось без ответа. Найденное в сети и сведения игры идут
+    модели зрения справкой; источники к ответу, как и раньше, дописывает система.
+    """
+    if not LOOK_WORDS.search(text or "") or result.get("action") not in (None, "search_web"):
+        return result
+    context = "\n".join(part for part in (result.get("screen"), result.get("response")) if part)
+    seen = watcher.look(text, game=result.get("game") or "", context=context)
+    if not seen:
+        return result
+    sites = list(dict.fromkeys(source["site"] for source in result.get("sources") or []))
+    result["response"] = seen + ((" Источники: " + ", ".join(sites) + ".") if sites else "")
+    result["source"] = "vision"
+    result["outcome"] = "act"
+    result["explanation"] = ["ответ по кадру: вопрос о видимом на экране"] + list(
+        result.get("explanation") or [])
+    return result
+
+
 def log(entry: Dict[str, Any]) -> None:
     """Реплика, ответ и след конвейера — строкой в журнал; сбой записи разговору не мешает."""
     try:
@@ -130,6 +157,9 @@ async def window_chat(message: WindowMessage) -> Dict[str, Any]:
         result = await asyncio.to_thread(answer, message.text, message.game,
                                          advice._assistant_pipeline(),
                                          advice._assistant_responder(), seen)
+        if message.screen:
+            from vision import shared
+            await asyncio.to_thread(look, result, message.text, shared())
         log({"text": message.text, "typed_game": message.game, "screen_asked": message.screen,
              **{key: result.get(key) for key in ("game", "outcome", "action", "response",
                                                  "screen", "explanation", "stages")}})

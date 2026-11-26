@@ -140,3 +140,67 @@ class OtherGameQuestionTests(unittest.TestCase):
     def test_giving_in_another_game_is_still_refused(self):
         turn = Pipeline(Extractor("give_item", "iron ore")).handle("дай руду", game="Factorio")
         self.assertEqual(turn.outcome, "reject")
+
+
+class LookAtTheFrameTests(unittest.TestCase):
+    """Вопрос о видимом на экране: отвечает модель зрения по кадру, справкой — найденное."""
+
+    class Watcher:
+        def __init__(self, text="Ставь бур на рудное пятно слева от персонажа."):
+            self.text, self.calls = text, []
+
+        def look(self, question, game="", context=""):
+            self.calls.append((question, game, context))
+            return self.text
+
+    def _searched(self):
+        return {"game": "Factorio", "action": "search_web", "outcome": "act",
+                "response": "Бур ставится на месторождение.", "screen": "под курсором: Железная руда",
+                "sources": [{"site": "wiki.factorio.com", "url": "u"}], "explanation": ["поиск"]}
+
+    def test_where_question_is_answered_from_the_frame_with_sources_kept(self):
+        watcher = self.Watcher()
+        result = window.look(self._searched(), "куда ставить бур?", watcher)
+        self.assertEqual(result["source"], "vision")
+        self.assertTrue(result["response"].startswith("Ставь бур на рудное пятно"))
+        self.assertTrue(result["response"].endswith("Источники: wiki.factorio.com."))
+        question, game, context = watcher.calls[0]
+        self.assertEqual(game, "Factorio")
+        self.assertIn("Железная руда", context)
+        self.assertIn("Бур ставится на месторождение.", context)
+
+    def test_question_not_about_the_screen_is_left_alone(self):
+        watcher = self.Watcher()
+        result = window.look(self._searched(), "сколько стоит электрический бур", watcher)
+        self.assertEqual(result["response"], "Бур ставится на месторождение.")
+        self.assertEqual(watcher.calls, [])
+
+    def test_plan_from_the_knowledge_base_is_not_replaced_by_the_frame(self):
+        watcher = self.Watcher()
+        planned = {"game": "Terraria", "action": "plan_goal", "outcome": "act", "response": "План."}
+        self.assertEqual(window.look(planned, "как это сделать?", watcher)["response"], "План.")
+        self.assertEqual(watcher.calls, [])
+
+    def test_without_a_fresh_frame_the_text_answer_stays(self):
+        result = window.look(self._searched(), "куда ставить бур?", self.Watcher(text=None))
+        self.assertEqual(result["response"], "Бур ставится на месторождение.")
+        self.assertNotEqual(result.get("source"), "vision")
+
+    def test_watcher_gives_no_answer_from_a_stale_frame(self):
+        from PIL import Image
+        from vision.watcher import Frame, ScreenWatcher
+
+        class Model:
+            available = True
+            model = "stub"
+
+            def answer(self, image, question, game="", context=""):
+                return "вижу"
+
+        now = [100.0]
+        watcher = ScreenWatcher(Model(), clock=lambda: now[0])
+        image = Image.new("RGB", (8, 8))
+        watcher.frame = Frame(image, image, 100.0, 30.0)
+        self.assertEqual(watcher.look("где?"), "вижу")
+        now[0] = 200.0
+        self.assertIsNone(watcher.look("где?"))

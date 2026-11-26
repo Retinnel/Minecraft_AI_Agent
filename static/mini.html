@@ -207,7 +207,7 @@ node("screen-start").onclick = async () => {
   const resp = await fetch("/api/vision/start", {
     method: "POST", headers: { "Content-Type": "application/json" },
     // Разбор кадра — в момент вопроса; игру разговора задаёт окно, а не снимок.
-    body: JSON.stringify({ window: title, interval: 3, mode: "on_demand", follow_game: false })
+    body: JSON.stringify({ window: title, interval: 3, mode: "on_demand", follow_game: false, save: true })
   });
   const d = await resp.json();
   if (!resp.ok) {
